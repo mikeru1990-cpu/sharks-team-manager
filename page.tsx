@@ -1,39 +1,51 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Fixture } from "@/lib/types";
+import type { Player } from "@/lib/types";
 
-export default function FixtureDetailPage({ params }: { params: { id: string } }) {
-  const [fixture, setFixture] = useState<Fixture | null>(null);
+export default function PlayersPage() {
+  const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadFixture() {
-      const { data, error } = await supabase.from("fixtures").select("*").eq("id", params.id).single();
-      if (error) setError(error.message);
-      else setFixture(data as Fixture);
+    async function loadPlayers() {
+      const { data, error } = await supabase.from("players").select("*").order("name");
+      if (error) {
+        setError(error.message);
+      } else {
+        setPlayers((data || []) as Player[]);
+      }
       setLoading(false);
     }
-    loadFixture();
-  }, [params.id]);
+    loadPlayers();
+  }, []);
 
   return (
     <div className="grid">
+      <section className="card stack">
+        <p className="eyebrow">Squad</p>
+        <h2 className="page-title">Players</h2>
+        <p className="subtle">This page reads the squad from Supabase. Darcy-Rae should be marked as goalkeeper.</p>
+      </section>
+
       <section className="card">
-        {loading ? <p>Loading fixture…</p> : error ? <p>{error}</p> : fixture && (
-          <>
-            <p className="eyebrow">Fixture</p>
-            <h2 className="page-title">vs {fixture.opponent}</h2>
-            <p className="subtle">{fixture.match_date} {fixture.venue ? `• ${fixture.venue}` : ""}</p>
-            {fixture.notes && <p className="helper">{fixture.notes}</p>}
-            <div className="row" style={{ marginTop: 12 }}>
-              <Link href={`/fixtures/${fixture.id}/availability`} className="button">Availability</Link>
-              <Link href={`/fixtures/${fixture.id}/plan`} className="button-secondary">Generate plan</Link>
-            </div>
-          </>
+        {loading ? <p>Loading players…</p> : error ? <p>{error}</p> : (
+          <div className="list">
+            {players.map((player) => (
+              <div key={player.id} className="list-item space-between">
+                <div>
+                  <strong>{player.name}</strong>
+                  <div className="row" style={{ marginTop: 8 }}>
+                    {player.is_goalkeeper && <span className="badge blue">GK</span>}
+                    {player.can_cover_goal && <span className="badge orange">GK cover</span>}
+                    {player.active ? <span className="badge green">Active</span> : <span className="badge red">Inactive</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </section>
     </div>
