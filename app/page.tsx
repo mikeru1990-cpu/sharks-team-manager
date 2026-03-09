@@ -111,17 +111,20 @@ export default function Page() {
         }}
       >
         <input
-          placeholder="Player name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{
-            flex: 1,
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            fontSize: 16,
-          }}
-        />
+  placeholder="Player name"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+/>
+
+<select
+  value={position}
+  onChange={(e) => setPosition(e.target.value)}
+>
+  <option value="GK">GK</option>
+  <option value="DEF">DEF</option>
+  <option value="MID">MID</option>
+  <option value="FWD">FWD</option>
+</select>
         <button
           onClick={addPlayer}
           style={{
