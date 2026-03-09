@@ -95,7 +95,51 @@ export default function Page() {
   }
 
   function generateSquad(fixtureId: string) {
-    const available = players.filter((p) => isAvailable(fixtureId, p.id));
+  const available = players.filter((p) => isAvailable(fixtureId, p.id));
+
+  const gk = available.filter((p) => p.position === "GK");
+  const def = available.filter((p) => p.position === "DEF");
+  const mid = available.filter((p) => p.position === "MID");
+  const fwd = available.filter((p) => p.position === "FWD");
+
+  const starters: Player[] = [
+    ...gk.slice(0, 1),
+    ...def.slice(0, 2),
+    ...mid.slice(0, 2),
+    ...fwd.slice(0, 2),
+  ];
+
+  const starterIds = new Set(starters.map((p) => p.id));
+
+  const remaining = available.filter((p) => !starterIds.has(p.id));
+
+  while (starters.length < 7 && remaining.length > 0) {
+    const next = remaining.shift();
+    if (next) starters.push(next);
+  }
+
+  const finalStarterIds = new Set(starters.map((p) => p.id));
+  const bench = available.filter((p) => !finalStarterIds.has(p.id));
+
+  const q1 = starters;
+
+  const q2 = [...starters];
+  if (bench[0]) q2[5] = bench[0];
+  if (bench[1]) q2[6] = bench[1];
+
+  const q3 = [...starters];
+  if (bench[2]) q3[4] = bench[2];
+  if (bench[3]) q3[5] = bench[3];
+
+  const q4 = starters;
+
+  const quarters = [q1, q2, q3, q4];
+
+  setGeneratedSquads({
+    ...generatedSquads,
+    [fixtureId]: { starters, bench, quarters },
+  });
+}
 
     const starters = available.slice(0, 7);
     const bench = available.slice(7);
