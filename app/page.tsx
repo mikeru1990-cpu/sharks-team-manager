@@ -59,22 +59,36 @@ export default function Page() {
     {}
   );
 
+  const [currentQuarterByFixture, setCurrentQuarterByFixture] = useState<
+    Record<string, number>
+  >({});
+
   function addPlayer() {
     if (!name.trim()) return;
 
     const newPlayer: Player = {
       id: Date.now().toString(),
-      name,
+      name: name.trim(),
       position,
     };
 
-    setPlayers([...players, newPlayer]);
+    setPlayers((prev) => [...prev, newPlayer]);
     setName("");
     setPosition("GK");
   }
 
   function deletePlayer(id: string) {
-    setPlayers(players.filter((p) => p.id !== id));
+    setPlayers((prev) => prev.filter((p) => p.id !== id));
+
+    setAvailability((prev) => {
+      const next: Record<string, Set<string>> = {};
+      for (const fixtureId of Object.keys(prev)) {
+        const updated = new Set(prev[fixtureId]);
+        updated.delete(id);
+        next[fixtureId] = updated;
+      }
+      return next;
+    });
   }
 
   function toggleAvailability(fixtureId: string, playerId: string) {
@@ -87,10 +101,10 @@ export default function Page() {
       updated.add(playerId);
     }
 
-    setAvailability({
-      ...availability,
+    setAvailability((prev) => ({
+      ...prev,
       [fixtureId]: updated,
-    });
+    }));
   }
 
   function isAvailable(fixtureId: string, playerId: string) {
@@ -116,7 +130,6 @@ export default function Page() {
     ];
 
     const starterIds = new Set(starters.map((p) => p.id));
-
     const remaining = available.filter((p) => !starterIds.has(p.id));
 
     while (starters.length < 7 && remaining.length > 0) {
@@ -162,10 +175,29 @@ export default function Page() {
       quarters.push(uniqueQuarter);
     }
 
-    setGeneratedSquads({
-      ...generatedSquads,
+    setGeneratedSquads((prev) => ({
+      ...prev,
       [fixtureId]: { starters, bench, quarters },
-    });
+    }));
+
+    setCurrentQuarterByFixture((prev) => ({
+      ...prev,
+      [fixtureId]: 0,
+    }));
+  }
+
+  function nextQuarter(fixtureId: string) {
+    setCurrentQuarterByFixture((prev) => ({
+      ...prev,
+      [fixtureId]: ((prev[fixtureId] ?? 0) + 1) % 4,
+    }));
+  }
+
+  function previousQuarter(fixtureId: string) {
+    setCurrentQuarterByFixture((prev) => ({
+      ...prev,
+      [fixtureId]: ((prev[fixtureId] ?? 0) + 3) % 4,
+    }));
   }
 
   return (
@@ -191,6 +223,7 @@ export default function Page() {
             borderRadius: 10,
             border: "1px solid #ccc",
             fontSize: 16,
+            boxSizing: "border-box",
           }}
         />
 
@@ -204,6 +237,7 @@ export default function Page() {
             borderRadius: 10,
             border: "1px solid #ccc",
             fontSize: 16,
+            boxSizing: "border-box",
           }}
         >
           <option value="GK">GK</option>
@@ -241,6 +275,7 @@ export default function Page() {
             marginBottom: 8,
             paddingBottom: 8,
             borderBottom: "1px solid #eee",
+            gap: 12,
           }}
         >
           <span style={{ fontSize: 18 }}>
@@ -260,83 +295,62 @@ export default function Page() {
         </div>
       ))}
 
-      <h2 style={{ fontSize: 28, marginTop: 40, marginBottom: 12 }}>Fixtures</h2>
+      <h2 style={{ fontSize: 28, marginTop: 40, marginBottom: 12 }}>
+        Fixtures
+      </h2>
 
-      {fixtures.map((f) => (
-        <div
-          key={f.id}
-          style={{
-            border: "1px solid #ddd",
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 24,
-            background: "#fff",
-          }}
-        >
-          <h3 style={{ fontSize: 24, marginBottom: 6 }}>{f.opponent}</h3>
-          <div style={{ color: "#555", marginBottom: 12 }}>
-            {f.match_date} • {f.venue}
-          </div>
+      {fixtures.map((f) => {
+        const squad = generatedSquads[f.id];
+        const currentQuarter = currentQuarterByFixture[f.id] ?? 0;
+        const currentQuarterPlayers = squad?.quarters[currentQuarter] || [];
 
-          <button
-            onClick={() => generateSquad(f.id)}
+        return (
+          <div
+            key={f.id}
             style={{
-              marginBottom: 16,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "none",
-              background: "#111",
-              color: "white",
-              fontWeight: 600,
-              fontSize: 16,
+              border: "1px solid #ddd",
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 24,
+              background: "#fff",
             }}
           >
-            Generate Squad
-          </button>
+            <h3 style={{ fontSize: 24, marginBottom: 6 }}>{f.opponent}</h3>
+            <div style={{ color: "#555", marginBottom: 12 }}>
+              {f.match_date} • {f.venue}
+            </div>
 
-          {generatedSquads[f.id] && (
-            <div
+            <button
+              onClick={() => generateSquad(f.id)}
               style={{
                 marginBottom: 16,
-                background: "#f3f3f3",
-                padding: 14,
-                borderRadius: 14,
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "none",
+                background: "#111",
+                color: "white",
+                fontWeight: 600,
+                fontSize: 16,
               }}
             >
-              <div style={{ marginBottom: 14 }}>
-                <strong style={{ fontSize: 18 }}>Starting 7</strong>
-                {generatedSquads[f.id].starters.length > 0 ? (
-                  generatedSquads[f.id].starters.map((p) => (
-                    <div key={p.id}>
-                      {p.name} • {p.position}
-                    </div>
-                  ))
-                ) : (
-                  <div>None</div>
-                )}
-              </div>
+              Generate Squad
+            </button>
 
-              <div style={{ marginBottom: 14 }}>
-                <strong style={{ fontSize: 18 }}>Bench</strong>
-                {generatedSquads[f.id].bench.length > 0 ? (
-                  generatedSquads[f.id].bench.map((p) => (
-                    <div key={p.id}>
-                      {p.name} • {p.position}
-                    </div>
-                  ))
-                ) : (
-                  <div>None</div>
-                )}
-              </div>
-
-              <div>
-                <strong style={{ fontSize: 18 }}>Quarter Plan</strong>
-                {generatedSquads[f.id].quarters.map((quarter, i) => (
-                  <div key={i} style={{ marginTop: 12 }}>
-                    <strong>Quarter {i + 1}</strong>
-                    {quarter.length > 0 ? (
-                      quarter.map((p) => (
-                        <div key={`${i}-${p.id}`}>
+            {squad && (
+              <>
+                <div
+                  style={{
+                    marginBottom: 16,
+                    background: "#f3f3f3",
+                    padding: 14,
+                    borderRadius: 14,
+                  }}
+                >
+                  <div style={{ marginBottom: 14 }}>
+                    <strong style={{ fontSize: 18 }}>Starting 7</strong>
+                    {squad.starters.length > 0 ? (
+                      squad.starters.map((p) => (
+                        <div key={p.id}>
                           {p.name} • {p.position}
                         </div>
                       ))
@@ -344,35 +358,144 @@ export default function Page() {
                       <div>None</div>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
 
-          <div>
-            {players.map((player) => (
-              <label
-                key={player.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 0",
-                  fontSize: 18,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isAvailable(f.id, player.id)}
-                  onChange={() => toggleAvailability(f.id, player.id)}
-                  style={{ width: 22, height: 22 }}
-                />
-                {player.name} • {player.position}
-              </label>
-            ))}
+                  <div style={{ marginBottom: 14 }}>
+                    <strong style={{ fontSize: 18 }}>Bench</strong>
+                    {squad.bench.length > 0 ? (
+                      squad.bench.map((p) => (
+                        <div key={p.id}>
+                          {p.name} • {p.position}
+                        </div>
+                      ))
+                    ) : (
+                      <div>None</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <strong style={{ fontSize: 18 }}>Quarter Plan</strong>
+                    {squad.quarters.map((quarter, i) => (
+                      <div key={i} style={{ marginTop: 12 }}>
+                        <strong>Quarter {i + 1}</strong>
+                        {quarter.length > 0 ? (
+                          quarter.map((p) => (
+                            <div key={`${i}-${p.id}`}>
+                              {p.name} • {p.position}
+                            </div>
+                          ))
+                        ) : (
+                          <div>None</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginBottom: 16,
+                    background: "#eef3f8",
+                    padding: 14,
+                    borderRadius: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <strong style={{ fontSize: 18 }}>
+                      Match Mode — Quarter {currentQuarter + 1}
+                    </strong>
+                  </div>
+
+                  <div style={{ marginBottom: 12 }}>
+                    <strong>On Field</strong>
+                    {currentQuarterPlayers.length > 0 ? (
+                      currentQuarterPlayers.map((p) => (
+                        <div key={`field-${currentQuarter}-${p.id}`}>
+                          {p.name} • {p.position}
+                        </div>
+                      ))
+                    ) : (
+                      <div>Generate a squad first</div>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: 12 }}>
+                    <strong>Bench Pool</strong>
+                    {squad.bench.length > 0 ? (
+                      squad.bench.map((p) => (
+                        <div key={`bench-${p.id}`}>
+                          {p.name} • {p.position}
+                        </div>
+                      ))
+                    ) : (
+                      <div>None</div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      onClick={() => previousQuarter(f.id)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid #ccc",
+                        background: "white",
+                      }}
+                    >
+                      Previous Quarter
+                    </button>
+
+                    <button
+                      onClick={() => nextQuarter(f.id)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "#111",
+                        color: "white",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Next Quarter
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div>
+              {players.map((player) => (
+                <label
+                  key={player.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 0",
+                    fontSize: 18,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isAvailable(f.id, player.id)}
+                    onChange={() => toggleAvailability(f.id, player.id)}
+                    style={{ width: 22, height: 22 }}
+                  />
+                  {player.name} • {player.position}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </main>
   );
 }
