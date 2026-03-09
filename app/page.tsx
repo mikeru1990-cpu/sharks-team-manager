@@ -1,37 +1,40 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { supabase } from "../supabase"
+import { useEffect, useState } from "react";
+import { supabase } from "../supabase";
 
 export default function Page() {
-  const [players, setPlayers] = useState<any[]>([])
-  const [name, setName] = useState("")
+  const [players, setPlayers] = useState<any[]>([]);
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [name, setName] = useState("");
 
   async function loadPlayers() {
-    const { data } = await supabase
-      .from("players")
-      .select("*")
-      .order("name")
+    const { data } = await supabase.from("players").select("*").order("name");
+    setPlayers(data || []);
+  }
 
-    setPlayers(data || [])
+  async function loadFixtures() {
+    const { data } = await supabase.from("fixtures").select("*").order("match_date");
+    setFixtures(data || []);
   }
 
   useEffect(() => {
-    loadPlayers()
-  }, [])
+    loadPlayers();
+    loadFixtures();
+  }, []);
 
   async function addPlayer() {
-    if (!name) return
+    if (!name) return;
 
-    await supabase.from("players").insert([{ name }])
+    await supabase.from("players").insert({ name });
 
-    setName("")
-    loadPlayers()
+    setName("");
+    loadPlayers();
   }
 
   async function deletePlayer(id: string) {
-    await supabase.from("players").delete().eq("id", id)
-    loadPlayers()
+    await supabase.from("players").delete().eq("id", id);
+    loadPlayers();
   }
 
   return (
@@ -47,20 +50,22 @@ export default function Page() {
         <button onClick={addPlayer}>Add Player</button>
       </div>
 
-      {players.map((player) => (
-        <div
-          key={player.id}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            maxWidth: 420,
-            marginBottom: 8,
-          }}
-        >
-          <span>{player.name}</span>
-          <button onClick={() => deletePlayer(player.id)}>Delete</button>
+      <h2>Players</h2>
+
+      {players.map((p) => (
+        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", maxWidth: 400 }}>
+          {p.name}
+          <button onClick={() => deletePlayer(p.id)}>Delete</button>
+        </div>
+      ))}
+
+      <h2 style={{ marginTop: 40 }}>Fixtures</h2>
+
+      {fixtures.map((f) => (
+        <div key={f.id}>
+          {f.opponent} — {f.match_date} ({f.venue})
         </div>
       ))}
     </main>
-  )
+  );
 }
