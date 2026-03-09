@@ -115,7 +115,16 @@ export default function Page() {
           <strong>
             {f.opponent} — {f.match_date} ({f.venue})
           </strong>
+<strong>
+  {f.opponent} — {f.match_date}
+</strong>
 
+<button
+  style={{ marginLeft: 10 }}
+  onClick={() => alert("Squad generator coming next!")}
+>
+  Generate Squad
+</button>
           <div style={{ marginTop: 10 }}>
             {players.map((player) => (
               <label key={player.id} style={{ display: "block" }}>
