@@ -38,9 +38,23 @@ export default function Page() {
         <button onClick={addPlayer}>Add Player</button>
       </div>
 
-      {players.map((player) => (
-        <div key={player.id}>{player.name}</div>
-      ))}
-    </main>
-  )
+     async function deletePlayer(id: string) {
+  await supabase.from("players").delete().eq("id", id)
+  loadPlayers()
 }
+
+{players.map((player) => (
+  <div
+    key={player.id}
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 8,
+      maxWidth: 420,
+    }}
+  >
+    <span>{player.name}</span>
+    <button onClick={() => deletePlayer(player.id)}>Delete</button>
+  </div>
+))}
