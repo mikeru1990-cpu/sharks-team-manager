@@ -61,11 +61,18 @@ export default function Page() {
 
       <h2 style={{ marginTop: 40 }}>Fixtures</h2>
 
-      {fixtures.map((f) => (
-        <div key={f.id}>
-          {f.opponent} — {f.match_date} ({f.venue})
-        </div>
+      {fixtures.map((fixture) => (
+  <div key={fixture.id} style={{ marginBottom: 20 }}>
+    <strong>
+      {fixture.opponent} — {fixture.match_date} ({fixture.venue})
+    </strong>
+
+    <div style={{ marginTop: 10 }}>
+      {players.map((player) => (
+        <label key={player.id} style={{ display: "block" }}>
+          <input type="checkbox" /> {player.name}
+        </label>
       ))}
-    </main>
-  );
-}
+    </div>
+  </div>
+))}
