@@ -30,9 +30,9 @@ export default function Page() {
     { id: "2", name: "Bella Bainbridge", position: "MID" },
     { id: "3", name: "Betsy Rowland", position: "DEF" },
     { id: "4", name: "Connie Luff", position: "FWD" },
-    { id: "5", name: "Darcy-Rae Russell", position: "GK" },
+    { id: "5", name: "Darcy-Rae Russell", position: "DEF" },
     { id: "6", name: "Ella Wilson", position: "MID" },
-    { id: "7", name: "Elsy Harmer", position: "DEF" },
+    { id: "7", name: "Elsy Harmer", position: "GK" },
     { id: "8", name: "Evelyn Evans", position: "FWD" },
     { id: "9", name: "Isabella Ogden", position: "DEF" },
     { id: "10", name: "Lyra Twinning", position: "MID" },
@@ -51,13 +51,13 @@ export default function Page() {
     },
   ]);
 
-  const [availability, setAvailability] = useState<
-    Record<string, Set<string>>
-  >({});
+  const [availability, setAvailability] = useState<Record<string, Set<string>>>(
+    {}
+  );
 
-  const [generatedSquads, setGeneratedSquads] = useState<
-    Record<string, Squad>
-  >({});
+  const [generatedSquads, setGeneratedSquads] = useState<Record<string, Squad>>(
+    {}
+  );
 
   function addPlayer() {
     if (!name.trim()) return;
@@ -81,8 +81,11 @@ export default function Page() {
     const current = availability[fixtureId] || new Set<string>();
     const updated = new Set(current);
 
-    if (updated.has(playerId)) updated.delete(playerId);
-    else updated.add(playerId);
+    if (updated.has(playerId)) {
+      updated.delete(playerId);
+    } else {
+      updated.add(playerId);
+    }
 
     setAvailability({
       ...availability,
@@ -95,68 +98,69 @@ export default function Page() {
   }
 
   function generateSquad(fixtureId: string) {
-  const available = players.filter((p) => isAvailable(fixtureId, p.id));
+    const available = players.filter((p) => isAvailable(fixtureId, p.id));
 
-  const gk = available.filter((p) => p.position === "GK");
-  const def = available.filter((p) => p.position === "DEF");
-  const mid = available.filter((p) => p.position === "MID");
-  const fwd = available.filter((p) => p.position === "FWD");
+    const gk = available.filter((p) => p.position === "GK");
+    const def = available.filter((p) => p.position === "DEF");
+    const mid = available.filter((p) => p.position === "MID");
+    const fwd = available.filter((p) => p.position === "FWD");
+    const other = available.filter(
+      (p) => !["GK", "DEF", "MID", "FWD"].includes(p.position)
+    );
 
-  const starters: Player[] = [
-    ...gk.slice(0, 1),
-    ...def.slice(0, 2),
-    ...mid.slice(0, 2),
-    ...fwd.slice(0, 2),
-  ];
+    const starters: Player[] = [
+      ...gk.slice(0, 1),
+      ...def.slice(0, 2),
+      ...mid.slice(0, 2),
+      ...fwd.slice(0, 2),
+    ];
 
-  const starterIds = new Set(starters.map((p) => p.id));
+    const starterIds = new Set(starters.map((p) => p.id));
 
-  const remaining = available.filter((p) => !starterIds.has(p.id));
+    const remaining = available.filter((p) => !starterIds.has(p.id));
 
-  while (starters.length < 7 && remaining.length > 0) {
-    const next = remaining.shift();
-    if (next) starters.push(next);
-  }
+    while (starters.length < 7 && remaining.length > 0) {
+      const next = remaining.shift();
+      if (next) starters.push(next);
+    }
 
-  const finalStarterIds = new Set(starters.map((p) => p.id));
-  const bench = available.filter((p) => !finalStarterIds.has(p.id));
+    while (starters.length < 7 && other.length > 0) {
+      const next = other.shift();
+      if (next && !starters.find((p) => p.id === next.id)) {
+        starters.push(next);
+      }
+    }
 
-  const q1 = starters;
+    const finalStarterIds = new Set(starters.map((p) => p.id));
+    const bench = available.filter((p) => !finalStarterIds.has(p.id));
 
-  const q2 = [...starters];
-  if (bench[0]) q2[5] = bench[0];
-  if (bench[1]) q2[6] = bench[1];
+    const quarters: Player[][] = [];
 
-  const q3 = [...starters];
-  if (bench[2]) q3[4] = bench[2];
-  if (bench[3]) q3[5] = bench[3];
+    for (let q = 0; q < 4; q++) {
+      const quarter = [...starters];
 
-  const q4 = starters;
+      if (bench.length > 0) {
+        const swaps = Math.min(bench.length, 2);
 
-  const quarters = [q1, q2, q3, q4];
+        for (let s = 0; s < swaps; s++) {
+          const benchPlayer = bench[(q * 2 + s) % bench.length];
+          const swapIndex = 6 - s;
 
-  setGeneratedSquads({
-    ...generatedSquads,
-    [fixtureId]: { starters, bench, quarters },
-  });
-}
+          if (benchPlayer && quarter[swapIndex]) {
+            quarter[swapIndex] = benchPlayer;
+          }
+        }
+      }
 
-    const starters = available.slice(0, 7);
-    const bench = available.slice(7);
+      const seen = new Set<string>();
+      const uniqueQuarter = quarter.filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
 
-    const q1 = starters;
-
-    const q2 = [...starters];
-    if (bench[0]) q2[5] = bench[0];
-    if (bench[1]) q2[6] = bench[1];
-
-    const q3 = [...starters];
-    if (bench[2]) q3[4] = bench[2];
-    if (bench[3]) q3[5] = bench[3];
-
-    const q4 = starters;
-
-    const quarters = [q1, q2, q3, q4];
+      quarters.push(uniqueQuarter);
+    }
 
     setGeneratedSquads({
       ...generatedSquads,
@@ -165,35 +169,67 @@ export default function Page() {
   }
 
   return (
-    <main style={{ padding: 20, maxWidth: 500, margin: "0 auto" }}>
-      <h1>Sharks Team Manager</h1>
+    <main
+      style={{
+        padding: 20,
+        maxWidth: 520,
+        margin: "0 auto",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <h1 style={{ fontSize: 32, marginBottom: 20 }}>Sharks Team Manager</h1>
 
-      <input
-        placeholder="Player name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
-      />
+      <div style={{ marginBottom: 30 }}>
+        <input
+          placeholder="Player name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 10,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
+        />
 
-      <select
-        value={position}
-        onChange={(e) => setPosition(e.target.value)}
-        style={{ width: "100%", padding: 10, marginBottom: 10 }}
-      >
-        <option value="GK">GK</option>
-        <option value="DEF">DEF</option>
-        <option value="MID">MID</option>
-        <option value="FWD">FWD</option>
-      </select>
+        <select
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+          style={{
+            width: "100%",
+            padding: 12,
+            marginBottom: 10,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
+        >
+          <option value="GK">GK</option>
+          <option value="DEF">DEF</option>
+          <option value="MID">MID</option>
+          <option value="FWD">FWD</option>
+        </select>
 
-      <button
-        onClick={addPlayer}
-        style={{ width: "100%", padding: 10, marginBottom: 30 }}
-      >
-        Add Player
-      </button>
+        <button
+          onClick={addPlayer}
+          style={{
+            width: "100%",
+            padding: 12,
+            borderRadius: 10,
+            border: "none",
+            background: "#111",
+            color: "white",
+            fontWeight: 600,
+            fontSize: 16,
+          }}
+        >
+          Add Player
+        </button>
+      </div>
 
-      <h2>Players</h2>
+      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Players</h2>
 
       {players.map((p) => (
         <div
@@ -201,38 +237,58 @@ export default function Page() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: 6,
+            alignItems: "center",
+            marginBottom: 8,
+            paddingBottom: 8,
+            borderBottom: "1px solid #eee",
           }}
         >
-          {p.name} • {p.position}
-          <button onClick={() => deletePlayer(p.id)}>Delete</button>
+          <span style={{ fontSize: 18 }}>
+            {p.name} • {p.position}
+          </span>
+          <button
+            onClick={() => deletePlayer(p.id)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "none",
+              background: "#eee",
+            }}
+          >
+            Delete
+          </button>
         </div>
       ))}
 
-      <h2 style={{ marginTop: 40 }}>Fixtures</h2>
+      <h2 style={{ fontSize: 28, marginTop: 40, marginBottom: 12 }}>Fixtures</h2>
 
       {fixtures.map((f) => (
         <div
           key={f.id}
           style={{
             border: "1px solid #ddd",
-            borderRadius: 10,
+            borderRadius: 16,
             padding: 16,
-            marginBottom: 20,
+            marginBottom: 24,
+            background: "#fff",
           }}
         >
-          <h3>{f.opponent}</h3>
-          <div>
+          <h3 style={{ fontSize: 24, marginBottom: 6 }}>{f.opponent}</h3>
+          <div style={{ color: "#555", marginBottom: 12 }}>
             {f.match_date} • {f.venue}
           </div>
 
           <button
             onClick={() => generateSquad(f.id)}
             style={{
-              marginTop: 10,
-              padding: 10,
-              background: "black",
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: "#111",
               color: "white",
+              fontWeight: 600,
+              fontSize: 16,
             }}
           >
             Generate Squad
@@ -241,23 +297,27 @@ export default function Page() {
           {generatedSquads[f.id] && (
             <div
               style={{
-                marginTop: 16,
+                marginBottom: 16,
                 background: "#f3f3f3",
-                padding: 12,
-                borderRadius: 10,
+                padding: 14,
+                borderRadius: 14,
               }}
             >
-              <strong>Starting 7</strong>
+              <div style={{ marginBottom: 14 }}>
+                <strong style={{ fontSize: 18 }}>Starting 7</strong>
+                {generatedSquads[f.id].starters.length > 0 ? (
+                  generatedSquads[f.id].starters.map((p) => (
+                    <div key={p.id}>
+                      {p.name} • {p.position}
+                    </div>
+                  ))
+                ) : (
+                  <div>None</div>
+                )}
+              </div>
 
-              {generatedSquads[f.id].starters.map((p) => (
-                <div key={p.id}>
-                  {p.name} • {p.position}
-                </div>
-              ))}
-
-              <div style={{ marginTop: 10 }}>
-                <strong>Bench</strong>
-
+              <div style={{ marginBottom: 14 }}>
+                <strong style={{ fontSize: 18 }}>Bench</strong>
                 {generatedSquads[f.id].bench.length > 0 ? (
                   generatedSquads[f.id].bench.map((p) => (
                     <div key={p.id}>
@@ -269,33 +329,45 @@ export default function Page() {
                 )}
               </div>
 
-              <div style={{ marginTop: 20 }}>
-                <strong>Quarter Plan</strong>
-
+              <div>
+                <strong style={{ fontSize: 18 }}>Quarter Plan</strong>
                 {generatedSquads[f.id].quarters.map((quarter, i) => (
-                  <div key={i} style={{ marginTop: 10 }}>
+                  <div key={i} style={{ marginTop: 12 }}>
                     <strong>Quarter {i + 1}</strong>
-
-                    {quarter.map((p) => (
-                      <div key={p.id}>
-                        {p.name} • {p.position}
-                      </div>
-                    ))}
+                    {quarter.length > 0 ? (
+                      quarter.map((p) => (
+                        <div key={`${i}-${p.id}`}>
+                          {p.name} • {p.position}
+                        </div>
+                      ))
+                    ) : (
+                      <div>None</div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div style={{ marginTop: 16 }}>
+          <div>
             {players.map((player) => (
-              <label key={player.id} style={{ display: "block" }}>
+              <label
+                key={player.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 0",
+                  fontSize: 18,
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={isAvailable(f.id, player.id)}
                   onChange={() => toggleAvailability(f.id, player.id)}
-                />{" "}
-                {player.name}
+                  style={{ width: 22, height: 22 }}
+                />
+                {player.name} • {player.position}
               </label>
             ))}
           </div>
