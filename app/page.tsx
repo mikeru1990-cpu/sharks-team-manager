@@ -1,132 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../supabase";
+import { useState } from "react";
 
 type Player = {
   id: string;
   name: string;
-  position?: string;
+  position: string;
 };
 
 type Fixture = {
   id: string;
   opponent: string;
   match_date: string;
-  venue?: string;
-};
-
-type Availability = {
-  id: string;
-  fixture_id: string;
-  player_id: string;
-  available: boolean;
+  venue: string;
 };
 
 export default function Page() {
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [availability, setAvailability] = useState<Availability[]>([]);
+  const [name, setName] = useState("");
+  const [position, setPosition] = useState("GK");
+
+  const [players, setPlayers] = useState<Player[]>([
+    { id: "1", name: "Bailee Dowler-Rowles", position: "MID" },
+    { id: "2", name: "Bella Bainbridge", position: "MID" },
+    { id: "3", name: "Betsy Rowland", position: "DEF" },
+    { id: "4", name: "Connie Luff", position: "FWD" },
+    { id: "5", name: "Darcy-Rae Russell", position: "DEF" },
+    { id: "6", name: "Ella Wilson", position: "MID" },
+    { id: "7", name: "Elsy Harmer", position: "GK" },
+    { id: "8", name: "Evelyn Evans", position: "FWD" },
+    { id: "9", name: "Isabella Ogden", position: "DEF" },
+    { id: "10", name: "Lyra Twinning", position: "MID" },
+    { id: "11", name: "Martha Scrivens", position: "DEF" },
+    { id: "12", name: "Olivia Hassall", position: "FWD" },
+    { id: "13", name: "Poppy Bennett", position: "MID" },
+    { id: "14", name: "Ruby Salter", position: "FWD" },
+  ]);
+
+  const [fixtures] = useState<Fixture[]>([
+    {
+      id: "1",
+      opponent: "Tigers",
+      match_date: "2026-03-15",
+      venue: "Home",
+    },
+  ]);
+
+  const [availability, setAvailability] = useState<
+    Record<string, Set<string>>
+  >({});
+
   const [generatedSquads, setGeneratedSquads] = useState<
     Record<string, { starters: Player[]; bench: Player[] }>
   >({});
-  const [name, setName] = useState("");
-  const [position, setPosition] = useState("MID");
 
-  async function loadPlayers() {
-    const { data } = await supabase.from("players").select("*").order("name");
-    setPlayers((data as Player[]) || []);
-  }
-
-  async function loadFixtures() {
-    const { data } = await supabase
-      .from("fixtures")
-      .select("*")
-      .order("match_date");
-    setFixtures((data as Fixture[]) || []);
-  }
-
-  async function loadAvailability() {
-    const { data } = await supabase.from("availability").select("*");
-    setAvailability((data as Availability[]) || []);
-  }
-
-  useEffect(() => {
-    loadPlayers();
-    loadFixtures();
-    loadAvailability();
-  }, []);
-
-  async function addPlayer() {
+  function addPlayer() {
     if (!name.trim()) return;
 
-    await supabase.from("players").insert([
-      {
-        name: name.trim(),
-        position,
-      },
-    ]);
+    const newPlayer: Player = {
+      id: Date.now().toString(),
+      name,
+      position,
+    };
 
+    setPlayers([...players, newPlayer]);
     setName("");
-    setPosition("MID");
-    loadPlayers();
+    setPosition("GK");
   }
 
-  async function deletePlayer(id: string) {
-    await supabase.from("players").delete().eq("id", id);
-    loadPlayers();
-    loadAvailability();
+  function deletePlayer(id: string) {
+    setPlayers(players.filter((p) => p.id !== id));
+  }
+
+  function toggleAvailability(fixtureId: string, playerId: string) {
+    const current = availability[fixtureId] || new Set<string>();
+    const newSet = new Set(current);
+
+    if (newSet.has(playerId)) {
+      newSet.delete(playerId);
+    } else {
+      newSet.add(playerId);
+    }
+
+    setAvailability({
+      ...availability,
+      [fixtureId]: newSet,
+    });
   }
 
   function isAvailable(fixtureId: string, playerId: string) {
-    return availability.some(
-      (a) => a.fixture_id === fixtureId && a.player_id === playerId && a.available
-    );
-  }
-
-  async function toggleAvailability(
-    fixtureId: string,
-    playerId: string,
-    checked: boolean
-  ) {
-    const existing = availability.find(
-      (a) => a.fixture_id === fixtureId && a.player_id === playerId
-    );
-
-    if (existing) {
-      await supabase
-        .from("availability")
-        .update({ available: checked })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("availability").insert([
-        {
-          fixture_id: fixtureId,
-          player_id: playerId,
-          available: checked,
-        },
-      ]);
-    }
-
-    loadAvailability();
+    return availability[fixtureId]?.has(playerId) || false;
   }
 
   function generateSquad(fixtureId: string) {
     const available = players.filter((p) => isAvailable(fixtureId, p.id));
 
-    const goalkeepers = available.filter((p) => p.position === "GK");
-    const defenders = available.filter((p) => p.position === "DEF");
-    const midfielders = available.filter((p) => p.position === "MID");
-    const forwards = available.filter((p) => p.position === "FWD");
-    const others = available.filter(
-      (p) => !["GK", "DEF", "MID", "FWD"].includes(p.position || "")
-    );
+    const gk = available.filter((p) => p.position === "GK");
+    const def = available.filter((p) => p.position === "DEF");
+    const mid = available.filter((p) => p.position === "MID");
+    const fwd = available.filter((p) => p.position === "FWD");
 
     const starters: Player[] = [
-      ...goalkeepers.slice(0, 1),
-      ...defenders.slice(0, 2),
-      ...midfielders.slice(0, 2),
-      ...forwards.slice(0, 2),
+      ...gk.slice(0, 1),
+      ...def.slice(0, 2),
+      ...mid.slice(0, 2),
+      ...fwd.slice(0, 2),
     ];
 
     const starterIds = new Set(starters.map((p) => p.id));
@@ -138,42 +115,30 @@ export default function Page() {
       if (next) starters.push(next);
     }
 
-    const bench = available.filter((p) => !starterIds.has(p.id));
+    const finalStarterIds = new Set(starters.map((p) => p.id));
+    const bench = available.filter((p) => !finalStarterIds.has(p.id));
 
-    setGeneratedSquads((prev) => ({
-      ...prev,
+    setGeneratedSquads({
+      ...generatedSquads,
       [fixtureId]: { starters, bench },
-    }));
+    });
   }
 
   return (
-    <main
-      style={{
-        padding: 16,
-        maxWidth: 520,
-        margin: "0 auto",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1 style={{ fontSize: 32, marginBottom: 16 }}>Sharks Team Manager</h1>
+    <main style={{ padding: 20, maxWidth: 500, margin: "0 auto" }}>
+      <h1>Sharks Team Manager</h1>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          marginBottom: 24,
-        }}
-      >
+      <div style={{ marginBottom: 20 }}>
         <input
           placeholder="Player name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           style={{
+            width: "100%",
             padding: 12,
-            borderRadius: 10,
+            marginBottom: 10,
+            borderRadius: 8,
             border: "1px solid #ccc",
-            fontSize: 16,
           }}
         />
 
@@ -181,10 +146,10 @@ export default function Page() {
           value={position}
           onChange={(e) => setPosition(e.target.value)}
           style={{
+            width: "100%",
             padding: 12,
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            fontSize: 16,
+            marginBottom: 10,
+            borderRadius: 8,
           }}
         >
           <option value="GK">GK</option>
@@ -196,81 +161,61 @@ export default function Page() {
         <button
           onClick={addPlayer}
           style={{
-            padding: "12px 16px",
-            borderRadius: 10,
-            border: "none",
-            background: "#111",
+            width: "100%",
+            padding: 12,
+            borderRadius: 8,
+            background: "black",
             color: "white",
-            fontWeight: 600,
           }}
         >
           Add Player
         </button>
       </div>
 
-      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Players</h2>
+      <h2>Players</h2>
 
-      <div style={{ marginBottom: 32 }}>
-        {players.map((p) => (
-          <div
-            key={p.id}
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "10px 0",
-              borderBottom: "1px solid #eee",
-              gap: 12,
-            }}
-          >
-            <span style={{ fontSize: 18 }}>
-              {p.name} {p.position ? `• ${p.position}` : ""}
-            </span>
-            <button
-              onClick={() => deletePlayer(p.id)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: 999,
-                border: "none",
-                background: "#eee",
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        ))}
-      </div>
+      {players.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            marginBottom: 8,
+          }}
+        >
+          <span>
+            {p.name} • {p.position}
+          </span>
 
-      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Fixtures</h2>
+          <button onClick={() => deletePlayer(p.id)}>Delete</button>
+        </div>
+      ))}
+
+      <h2 style={{ marginTop: 40 }}>Fixtures</h2>
 
       {fixtures.map((f) => (
         <div
           key={f.id}
           style={{
-            border: "1px solid #e5e5e5",
-            borderRadius: 16,
+            border: "1px solid #ddd",
+            borderRadius: 10,
             padding: 16,
             marginBottom: 20,
-            background: "#fff",
           }}
         >
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{f.opponent}</div>
-            <div style={{ color: "#555", marginTop: 4 }}>
-              {f.match_date} • {f.venue || "No venue"}
-            </div>
+          <h3>{f.opponent}</h3>
+          <div>
+            {f.match_date} • {f.venue}
           </div>
 
           <button
             onClick={() => generateSquad(f.id)}
             style={{
-              marginBottom: 14,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "none",
-              background: "#111",
+              marginTop: 10,
+              padding: 10,
+              borderRadius: 8,
+              background: "black",
               color: "white",
-              fontWeight: 600,
             }}
           >
             Generate Squad
@@ -279,59 +224,51 @@ export default function Page() {
           {generatedSquads[f.id] && (
             <div
               style={{
-                marginBottom: 16,
+                marginTop: 16,
+                background: "#f2f2f2",
                 padding: 12,
-                borderRadius: 12,
-                background: "#f7f7f7",
+                borderRadius: 10,
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Starting 7</div>
-              {generatedSquads[f.id].starters.length > 0 ? (
-                generatedSquads[f.id].starters.map((p) => (
-                  <div key={p.id}>
-                    {p.name} {p.position ? `• ${p.position}` : ""}
-                  </div>
-                ))
-              ) : (
-                <div>None</div>
-              )}
+              <strong>Starting 7</strong>
 
-              <div style={{ fontWeight: 700, marginTop: 12, marginBottom: 8 }}>
-                Bench
+              {generatedSquads[f.id].starters.map((p) => (
+                <div key={p.id}>
+                  {p.name} • {p.position}
+                </div>
+              ))}
+
+              <div style={{ marginTop: 10 }}>
+                <strong>Bench</strong>
+
+                {generatedSquads[f.id].bench.length > 0 ? (
+                  generatedSquads[f.id].bench.map((p) => (
+                    <div key={p.id}>
+                      {p.name} • {p.position}
+                    </div>
+                  ))
+                ) : (
+                  <div>None</div>
+                )}
               </div>
-              {generatedSquads[f.id].bench.length > 0 ? (
-                generatedSquads[f.id].bench.map((p) => (
-                  <div key={p.id}>
-                    {p.name} {p.position ? `• ${p.position}` : ""}
-                  </div>
-                ))
-              ) : (
-                <div>None</div>
-              )}
             </div>
           )}
 
-          <div>
+          <div style={{ marginTop: 16 }}>
             {players.map((player) => (
               <label
                 key={player.id}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 0",
-                  fontSize: 18,
+                  display: "block",
+                  marginBottom: 6,
                 }}
               >
                 <input
                   type="checkbox"
                   checked={isAvailable(f.id, player.id)}
-                  onChange={(e) =>
-                    toggleAvailability(f.id, player.id, e.target.checked)
-                  }
-                  style={{ width: 22, height: 22 }}
-                />
-                {player.name} {player.position ? `• ${player.position}` : ""}
+                  onChange={() => toggleAvailability(f.id, player.id)}
+                />{" "}
+                {player.name}
               </label>
             ))}
           </div>
