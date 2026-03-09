@@ -14,7 +14,10 @@ export default function Page() {
   }
 
   async function loadFixtures() {
-    const { data } = await supabase.from("fixtures").select("*").order("match_date");
+    const { data } = await supabase
+      .from("fixtures")
+      .select("*")
+      .order("match_date");
     setFixtures(data || []);
   }
 
@@ -26,8 +29,7 @@ export default function Page() {
   async function addPlayer() {
     if (!name) return;
 
-    await supabase.from("players").insert({ name });
-
+    await supabase.from("players").insert([{ name }]);
     setName("");
     loadPlayers();
   }
@@ -53,26 +55,37 @@ export default function Page() {
       <h2>Players</h2>
 
       {players.map((p) => (
-        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", maxWidth: 400 }}>
-          {p.name}
+        <div
+          key={p.id}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            maxWidth: 420,
+            marginBottom: 8,
+          }}
+        >
+          <span>{p.name}</span>
           <button onClick={() => deletePlayer(p.id)}>Delete</button>
         </div>
       ))}
 
       <h2 style={{ marginTop: 40 }}>Fixtures</h2>
 
-      {fixtures.map((fixture) => (
-  <div key={fixture.id} style={{ marginBottom: 20 }}>
-    <strong>
-      {fixture.opponent} — {fixture.match_date} ({fixture.venue})
-    </strong>
+      {fixtures.map((f) => (
+        <div key={f.id} style={{ marginBottom: 20 }}>
+          <strong>
+            {f.opponent} — {f.match_date} ({f.venue})
+          </strong>
 
-    <div style={{ marginTop: 10 }}>
-      {players.map((player) => (
-        <label key={player.id} style={{ display: "block" }}>
-          <input type="checkbox" /> {player.name}
-        </label>
+          <div style={{ marginTop: 10 }}>
+            {players.map((player) => (
+              <label key={player.id} style={{ display: "block" }}>
+                <input type="checkbox" /> {player.name}
+              </label>
+            ))}
+          </div>
+        </div>
       ))}
-    </div>
-  </div>
-))}
+    </main>
+  );
+}
