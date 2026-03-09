@@ -8,7 +8,11 @@ export default function Page() {
   const [name, setName] = useState("")
 
   async function loadPlayers() {
-    const { data } = await supabase.from("players").select("*").order("name")
+    const { data } = await supabase
+      .from("players")
+      .select("*")
+      .order("name")
+
     setPlayers(data || [])
   }
 
@@ -25,6 +29,11 @@ export default function Page() {
     loadPlayers()
   }
 
+  async function deletePlayer(id: string) {
+    await supabase.from("players").delete().eq("id", id)
+    loadPlayers()
+  }
+
   return (
     <main style={{ padding: 20 }}>
       <h1>Sharks Team Manager</h1>
@@ -38,23 +47,20 @@ export default function Page() {
         <button onClick={addPlayer}>Add Player</button>
       </div>
 
-     async function deletePlayer(id: string) {
-  await supabase.from("players").delete().eq("id", id)
-  loadPlayers()
+      {players.map((player) => (
+        <div
+          key={player.id}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            maxWidth: 420,
+            marginBottom: 8,
+          }}
+        >
+          <span>{player.name}</span>
+          <button onClick={() => deletePlayer(player.id)}>Delete</button>
+        </div>
+      ))}
+    </main>
+  )
 }
-
-{players.map((player) => (
-  <div
-    key={player.id}
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 8,
-      maxWidth: 420,
-    }}
-  >
-    <span>{player.name}</span>
-    <button onClick={() => deletePlayer(player.id)}>Delete</button>
-  </div>
-))}
