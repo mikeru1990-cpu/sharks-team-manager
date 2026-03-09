@@ -78,77 +78,149 @@ export default function Page() {
     loadAvailability();
   }
 
-  return (
-    <main style={{ padding: 20 }}>
-      <h1>Sharks Team Manager</h1>
+  function generateSquad(fixtureId: string) {
+    const available = players.filter((p) => isAvailable(fixtureId, p.id));
+    const starters = available.slice(0, 7);
+    const bench = available.slice(7);
 
-      <div style={{ marginBottom: 20 }}>
+    alert(
+      "Starting 7:\n" +
+        (starters.map((p) => p.name).join("\n") || "None") +
+        "\n\nBench:\n" +
+        (bench.map((p) => p.name).join("\n") || "None")
+    );
+  }
+
+  return (
+    <main
+      style={{
+        padding: 16,
+        maxWidth: 480,
+        margin: "0 auto",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <h1 style={{ fontSize: 32, marginBottom: 16 }}>Sharks Team Manager</h1>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          marginBottom: 24,
+        }}
+      >
         <input
           placeholder="Player name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-        />
-        <button onClick={addPlayer}>Add Player</button>
-      </div>
-
-      <h2>Players</h2>
-
-      {players.map((p) => (
-        <div
-          key={p.id}
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            maxWidth: 420,
-            marginBottom: 8,
+            flex: 1,
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
+        />
+        <button
+          onClick={addPlayer}
+          style={{
+            padding: "12px 16px",
+            borderRadius: 10,
+            border: "none",
+            background: "#111",
+            color: "white",
+            fontWeight: 600,
           }}
         >
-          <span>{p.name}</span>
-          <button onClick={() => deletePlayer(p.id)}>Delete</button>
-        </div>
-      ))}
+          Add
+        </button>
+      </div>
 
-      <h2 style={{ marginTop: 40 }}>Fixtures</h2>
+      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Players</h2>
+
+      <div style={{ marginBottom: 32 }}>
+        {players.map((p) => (
+          <div
+            key={p.id}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "10px 0",
+              borderBottom: "1px solid #eee",
+            }}
+          >
+            <span style={{ fontSize: 18 }}>{p.name}</span>
+            <button
+              onClick={() => deletePlayer(p.id)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 999,
+                border: "none",
+                background: "#eee",
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Fixtures</h2>
 
       {fixtures.map((f) => (
-        <div key={f.id} style={{ marginBottom: 24 }}>
-          <strong>
-            {f.opponent} — {f.match_date} ({f.venue})
-          </strong>
-<strong>
-  {f.opponent} — {f.match_date}
-</strong>
+        <div
+          key={f.id}
+          style={{
+            border: "1px solid #e5e5e5",
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 20,
+            background: "#fff",
+          }}
+        >
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{f.opponent}</div>
+            <div style={{ color: "#555", marginTop: 4 }}>
+              {f.match_date} • {f.venue}
+            </div>
+          </div>
 
-<button
-  style={{ marginLeft: 10 }}
-  onClick={() => {
-    const available = players.filter((p) =>
-      isAvailable(f.id, p.id)
-    )
+          <button
+            onClick={() => generateSquad(f.id)}
+            style={{
+              marginBottom: 14,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: "#111",
+              color: "white",
+              fontWeight: 600,
+            }}
+          >
+            Generate Squad
+          </button>
 
-    const starters = available.slice(0, 7)
-    const bench = available.slice(7)
-
-    alert(
-      "Starters:\n" +
-        starters.map((p) => p.name).join("\n") +
-        "\n\nBench:\n" +
-        bench.map((p) => p.name).join("\n")
-    )
-  }}
->
-  Generate Squad
-</button>
-          <div style={{ marginTop: 10 }}>
+          <div>
             {players.map((player) => (
-              <label key={player.id} style={{ display: "block" }}>
+              <label
+                key={player.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 0",
+                  fontSize: 18,
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={isAvailable(f.id, player.id)}
                   onChange={(e) =>
                     toggleAvailability(f.id, player.id, e.target.checked)
                   }
-                />{" "}
+                  style={{ width: 22, height: 22 }}
+                />
                 {player.name}
               </label>
             ))}
