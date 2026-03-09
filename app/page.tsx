@@ -6,6 +6,7 @@ import { supabase } from "../supabase";
 export default function Page() {
   const [players, setPlayers] = useState<any[]>([]);
   const [fixtures, setFixtures] = useState<any[]>([]);
+  const [availability, setAvailability] = useState<any[]>([]);
   const [name, setName] = useState("");
 
   async function loadPlayers() {
@@ -21,14 +22,19 @@ export default function Page() {
     setFixtures(data || []);
   }
 
+  async function loadAvailability() {
+    const { data } = await supabase.from("availability").select("*");
+    setAvailability(data || []);
+  }
+
   useEffect(() => {
     loadPlayers();
     loadFixtures();
+    loadAvailability();
   }, []);
 
   async function addPlayer() {
     if (!name) return;
-
     await supabase.from("players").insert([{ name }]);
     setName("");
     loadPlayers();
@@ -37,6 +43,39 @@ export default function Page() {
   async function deletePlayer(id: string) {
     await supabase.from("players").delete().eq("id", id);
     loadPlayers();
+  }
+
+  function isAvailable(fixtureId: string, playerId: string) {
+    return availability.some(
+      (a) => a.fixture_id === fixtureId && a.player_id === playerId && a.available
+    );
+  }
+
+  async function toggleAvailability(
+    fixtureId: string,
+    playerId: string,
+    checked: boolean
+  ) {
+    const existing = availability.find(
+      (a) => a.fixture_id === fixtureId && a.player_id === playerId
+    );
+
+    if (existing) {
+      await supabase
+        .from("availability")
+        .update({ available: checked })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("availability").insert([
+        {
+          fixture_id: fixtureId,
+          player_id: playerId,
+          available: checked,
+        },
+      ]);
+    }
+
+    loadAvailability();
   }
 
   return (
@@ -72,7 +111,7 @@ export default function Page() {
       <h2 style={{ marginTop: 40 }}>Fixtures</h2>
 
       {fixtures.map((f) => (
-        <div key={f.id} style={{ marginBottom: 20 }}>
+        <div key={f.id} style={{ marginBottom: 24 }}>
           <strong>
             {f.opponent} — {f.match_date} ({f.venue})
           </strong>
@@ -80,7 +119,14 @@ export default function Page() {
           <div style={{ marginTop: 10 }}>
             {players.map((player) => (
               <label key={player.id} style={{ display: "block" }}>
-                <input type="checkbox" /> {player.name}
+                <input
+                  type="checkbox"
+                  checked={isAvailable(f.id, player.id)}
+                  onChange={(e) =>
+                    toggleAvailability(f.id, player.id, e.target.checked)
+                  }
+                />{" "}
+                {player.name}
               </label>
             ))}
           </div>
