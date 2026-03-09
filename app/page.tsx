@@ -121,7 +121,21 @@ export default function Page() {
 
 <button
   style={{ marginLeft: 10 }}
-  onClick={() => alert("Squad generator coming next!")}
+  onClick={() => {
+    const available = players.filter((p) =>
+      isAvailable(f.id, p.id)
+    )
+
+    const starters = available.slice(0, 7)
+    const bench = available.slice(7)
+
+    alert(
+      "Starters:\n" +
+        starters.map((p) => p.name).join("\n") +
+        "\n\nBench:\n" +
+        bench.map((p) => p.name).join("\n")
+    )
+  }}
 >
   Generate Squad
 </button>
