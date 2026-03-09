@@ -3,18 +3,39 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 
+type Player = {
+  id: string;
+  name: string;
+  position?: string;
+};
+
+type Fixture = {
+  id: string;
+  opponent: string;
+  match_date: string;
+  venue?: string;
+};
+
+type Availability = {
+  id: string;
+  fixture_id: string;
+  player_id: string;
+  available: boolean;
+};
+
 export default function Page() {
-  const [players, setPlayers] = useState<any[]>([]);
-  const [fixtures, setFixtures] = useState<any[]>([]);
-  const [availability, setAvailability] = useState<any[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [availability, setAvailability] = useState<Availability[]>([]);
   const [generatedSquads, setGeneratedSquads] = useState<
-    Record<string, { starters: any[]; bench: any[] }>
+    Record<string, { starters: Player[]; bench: Player[] }>
   >({});
   const [name, setName] = useState("");
+  const [position, setPosition] = useState("MID");
 
   async function loadPlayers() {
     const { data } = await supabase.from("players").select("*").order("name");
-    setPlayers(data || []);
+    setPlayers((data as Player[]) || []);
   }
 
   async function loadFixtures() {
@@ -22,12 +43,12 @@ export default function Page() {
       .from("fixtures")
       .select("*")
       .order("match_date");
-    setFixtures(data || []);
+    setFixtures((data as Fixture[]) || []);
   }
 
   async function loadAvailability() {
     const { data } = await supabase.from("availability").select("*");
-    setAvailability(data || []);
+    setAvailability((data as Availability[]) || []);
   }
 
   useEffect(() => {
@@ -37,15 +58,24 @@ export default function Page() {
   }, []);
 
   async function addPlayer() {
-    if (!name) return;
-    await supabase.from("players").insert([{ name }]);
+    if (!name.trim()) return;
+
+    await supabase.from("players").insert([
+      {
+        name: name.trim(),
+        position,
+      },
+    ]);
+
     setName("");
+    setPosition("MID");
     loadPlayers();
   }
 
   async function deletePlayer(id: string) {
     await supabase.from("players").delete().eq("id", id);
     loadPlayers();
+    loadAvailability();
   }
 
   function isAvailable(fixtureId: string, playerId: string) {
@@ -83,8 +113,35 @@ export default function Page() {
 
   function generateSquad(fixtureId: string) {
     const available = players.filter((p) => isAvailable(fixtureId, p.id));
-    const starters = available.slice(0, 7);
-    const bench = available.slice(7);
+
+    const goalkeepers = available.filter((p) => p.position === "GK");
+    const defenders = available.filter((p) => p.position === "DEF");
+    const midfielders = available.filter((p) => p.position === "MID");
+    const forwards = available.filter((p) => p.position === "FWD");
+    const others = available.filter(
+      (p) => !["GK", "DEF", "MID", "FWD"].includes(p.position || "")
+    );
+
+    const starters: Player[] = [
+      ...goalkeepers.slice(0, 1),
+      ...defenders.slice(0, 2),
+      ...midfielders.slice(0, 2),
+      ...forwards.slice(0, 2),
+    ];
+
+    const starterIds = new Set(starters.map((p) => p.id));
+
+    const remaining = available.filter((p) => !starterIds.has(p.id));
+
+    while (starters.length < 7 && remaining.length > 0) {
+      const next = remaining.shift();
+      if (next) starters.push(next);
+    }
+
+    const bench = [
+      ...remaining,
+      ...others.filter((p) => !starterIds.has(p.id) && !remaining.find((r) => r.id === p.id)),
+    ];
 
     setGeneratedSquads((prev) => ({
       ...prev,
@@ -96,7 +153,7 @@ export default function Page() {
     <main
       style={{
         padding: 16,
-        maxWidth: 480,
+        maxWidth: 520,
         margin: "0 auto",
         fontFamily: "Arial, sans-serif",
       }}
@@ -106,25 +163,39 @@ export default function Page() {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           gap: 8,
           marginBottom: 24,
         }}
       >
         <input
-  placeholder="Player name"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-/>
+          placeholder="Player name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
+        />
 
-<select
-  value={position}
-  onChange={(e) => setPosition(e.target.value)}
->
-  <option value="GK">GK</option>
-  <option value="DEF">DEF</option>
-  <option value="MID">MID</option>
-  <option value="FWD">FWD</option>
-</select>
+        <select
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+          style={{
+            padding: 12,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            fontSize: 16,
+          }}
+        >
+          <option value="GK">GK</option>
+          <option value="DEF">DEF</option>
+          <option value="MID">MID</option>
+          <option value="FWD">FWD</option>
+        </select>
+
         <button
           onClick={addPlayer}
           style={{
@@ -136,7 +207,7 @@ export default function Page() {
             fontWeight: 600,
           }}
         >
-          Add
+          Add Player
         </button>
       </div>
 
@@ -152,9 +223,12 @@ export default function Page() {
               alignItems: "center",
               padding: "10px 0",
               borderBottom: "1px solid #eee",
+              gap: 12,
             }}
           >
-            <span style={{ fontSize: 18 }}>{p.name}</span>
+            <span style={{ fontSize: 18 }}>
+              {p.name} {p.position ? `• ${p.position}` : ""}
+            </span>
             <button
               onClick={() => deletePlayer(p.id)}
               style={{
@@ -186,7 +260,7 @@ export default function Page() {
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{f.opponent}</div>
             <div style={{ color: "#555", marginTop: 4 }}>
-              {f.match_date} • {f.venue}
+              {f.match_date} • {f.venue || "No venue"}
             </div>
           </div>
 
@@ -217,7 +291,9 @@ export default function Page() {
               <div style={{ fontWeight: 700, marginBottom: 8 }}>Starting 7</div>
               {generatedSquads[f.id].starters.length > 0 ? (
                 generatedSquads[f.id].starters.map((p) => (
-                  <div key={p.id}>{p.name}</div>
+                  <div key={p.id}>
+                    {p.name} {p.position ? `• ${p.position}` : ""}
+                  </div>
                 ))
               ) : (
                 <div>None</div>
@@ -228,7 +304,9 @@ export default function Page() {
               </div>
               {generatedSquads[f.id].bench.length > 0 ? (
                 generatedSquads[f.id].bench.map((p) => (
-                  <div key={p.id}>{p.name}</div>
+                  <div key={p.id}>
+                    {p.name} {p.position ? `• ${p.position}` : ""}
+                  </div>
                 ))
               ) : (
                 <div>None</div>
@@ -256,7 +334,7 @@ export default function Page() {
                   }
                   style={{ width: 22, height: 22 }}
                 />
-                {player.name}
+                {player.name} {player.position ? `• ${player.position}` : ""}
               </label>
             ))}
           </div>
