@@ -7,6 +7,9 @@ export default function Page() {
   const [players, setPlayers] = useState<any[]>([]);
   const [fixtures, setFixtures] = useState<any[]>([]);
   const [availability, setAvailability] = useState<any[]>([]);
+  const [generatedSquads, setGeneratedSquads] = useState<
+    Record<string, { starters: any[]; bench: any[] }>
+  >({});
   const [name, setName] = useState("");
 
   async function loadPlayers() {
@@ -83,12 +86,10 @@ export default function Page() {
     const starters = available.slice(0, 7);
     const bench = available.slice(7);
 
-    alert(
-      "Starting 7:\n" +
-        (starters.map((p) => p.name).join("\n") || "None") +
-        "\n\nBench:\n" +
-        (bench.map((p) => p.name).join("\n") || "None")
-    );
+    setGeneratedSquads((prev) => ({
+      ...prev,
+      [fixtureId]: { starters, bench },
+    }));
   }
 
   return (
@@ -200,6 +201,37 @@ export default function Page() {
           >
             Generate Squad
           </button>
+
+          {generatedSquads[f.id] && (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: 12,
+                borderRadius: 12,
+                background: "#f7f7f7",
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Starting 7</div>
+              {generatedSquads[f.id].starters.length > 0 ? (
+                generatedSquads[f.id].starters.map((p) => (
+                  <div key={p.id}>{p.name}</div>
+                ))
+              ) : (
+                <div>None</div>
+              )}
+
+              <div style={{ fontWeight: 700, marginTop: 12, marginBottom: 8 }}>
+                Bench
+              </div>
+              {generatedSquads[f.id].bench.length > 0 ? (
+                generatedSquads[f.id].bench.map((p) => (
+                  <div key={p.id}>{p.name}</div>
+                ))
+              ) : (
+                <div>None</div>
+              )}
+            </div>
+          )}
 
           <div>
             {players.map((player) => (
