@@ -138,10 +138,7 @@ export default function Page() {
       if (next) starters.push(next);
     }
 
-    const bench = [
-      ...remaining,
-      ...others.filter((p) => !starterIds.has(p.id) && !remaining.find((r) => r.id === p.id)),
-    ];
+    const bench = available.filter((p) => !starterIds.has(p.id));
 
     setGeneratedSquads((prev) => ({
       ...prev,
