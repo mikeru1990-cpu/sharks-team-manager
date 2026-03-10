@@ -33,7 +33,7 @@ export default function Page() {
     { id: "5", name: "Darcy-Rae Russell", position: "GK" },
     { id: "6", name: "Ella Wilson", position: "MID" },
     { id: "7", name: "Elsy Harmer", position: "DEF" },
-    { id: "8", name: "Evelyn Evans", position: "FWD" },
+    { id: "8", name: "Evelyn Evans", position: "MID" },
     { id: "9", name: "Isabella Ogden", position: "DEF" },
     { id: "10", name: "Lyra Twinning", position: "MID" },
     { id: "11", name: "Martha Scrivens", position: "DEF" },
