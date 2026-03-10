@@ -63,8 +63,8 @@ type StoredPlan = {
   quarters_json: string | null
 }
 
-const STATUS_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF"]
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
+const STATUS_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF"]
 
 const FORMATIONS: Record<GameType, FormationConfig[]> = {
   "7v7": [
@@ -97,7 +97,7 @@ function eventTypeColor(type: EventType) {
 }
 
 function makeId() {
-  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random())
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 export default function Page() {
@@ -118,24 +118,29 @@ export default function Page() {
   const [isSaving, setIsSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const [showAddPlayer, setShowAddPlayer] = useState(false)
-  const [showAddEvent, setShowAddEvent] = useState(false)
+  const [showPlayerForm, setShowPlayerForm] = useState(false)
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
+  const [playerForm, setPlayerForm] = useState<Player>({
+    id: "",
+    name: "",
+    positions: ["MID"],
+    mainGK: false,
+    backupGK: false,
+  })
+
+  const [showEventForm, setShowEventForm] = useState(false)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
-
-  const [newPlayerName, setNewPlayerName] = useState("")
-  const [newPlayerPositions, setNewPlayerPositions] = useState<Position[]>(["MID"])
-  const [newPlayerMainGK, setNewPlayerMainGK] = useState(false)
-  const [newPlayerBackupGK, setNewPlayerBackupGK] = useState(false)
-
-  const [newEventDay, setNewEventDay] = useState("Sun")
-  const [newEventDate, setNewEventDate] = useState("")
-  const [newEventKickOff, setNewEventKickOff] = useState("")
-  const [newEventType, setNewEventType] = useState<EventType>("MATCH")
-  const [newEventTitle, setNewEventTitle] = useState("")
-  const [newEventHome, setNewEventHome] = useState("")
-  const [newEventAway, setNewEventAway] = useState("")
-  const [newEventNotes, setNewEventNotes] = useState("")
+  const [eventForm, setEventForm] = useState<EventItem>({
+    id: "",
+    date: "",
+    day: "",
+    kickOff: "",
+    type: "MATCH",
+    title: "",
+    home: "",
+    away: "",
+    notes: "",
+  })
 
   useEffect(() => {
     loadAll()
@@ -143,7 +148,7 @@ export default function Page() {
 
   useEffect(() => {
     if (selectedEventId) {
-      loadPlan(selectedEventId)
+      void loadPlan(selectedEventId)
     }
   }, [selectedEventId])
 
@@ -484,111 +489,11 @@ export default function Page() {
     setCurrentQuarter(0)
   }
 
-  async function addPlayer() {
-    if (!newPlayerName.trim()) return
-
-    const id = makeId()
-    const payload = {
-      id,
-      name: newPlayerName.trim(),
-      positions_json: JSON.stringify(newPlayerPositions),
-      main_gk: newPlayerMainGK,
-      backup_gk: newPlayerBackupGK,
-    }
-
-    const { error } = await supabase.from("players").insert(payload)
-    if (error) return
-
-    setPlayers((prev) => [
-      ...prev,
-      {
-        id,
-        name: newPlayerName.trim(),
-        positions: newPlayerPositions,
-        mainGK: newPlayerMainGK,
-        backupGK: newPlayerBackupGK,
-      },
-    ])
-
-    setNewPlayerName("")
-    setNewPlayerPositions(["MID"])
-    setNewPlayerMainGK(false)
-    setNewPlayerBackupGK(false)
-    setShowAddPlayer(false)
-  }
-
-  async function updatePlayer(player: Player) {
-    await supabase
-      .from("players")
-      .update({
-        name: player.name,
-        positions_json: JSON.stringify(player.positions),
-        main_gk: !!player.mainGK,
-        backup_gk: !!player.backupGK,
-      })
-      .eq("id", player.id)
-  }
-
-  async function addEvent() {
-    if (!newEventDate.trim() || !newEventTitle.trim()) return
-
-    const id = makeId()
-    const payload = {
-      id,
-      date: newEventDate.trim(),
-      day: newEventDay,
-      kick_off: newEventKickOff.trim() || "N/A",
-      type: newEventType,
-      title: newEventTitle.trim(),
-      home: newEventHome.trim(),
-      away: newEventAway.trim(),
-      notes: newEventNotes.trim(),
-    }
-
-    const { error } = await supabase.from("events").insert(payload)
-    if (error) return
-
-    const created: EventItem = {
-      id,
-      date: payload.date,
-      day: payload.day,
-      kickOff: payload.kick_off,
-      type: payload.type as EventType,
-      title: payload.title,
-      home: payload.home,
-      away: payload.away,
-      notes: payload.notes,
-    }
-
-    setEvents((prev) => [...prev, created])
-    setSelectedEventId(id)
-
-    setNewEventDay("Sun")
-    setNewEventDate("")
-    setNewEventKickOff("")
-    setNewEventType("MATCH")
-    setNewEventTitle("")
-    setNewEventHome("")
-    setNewEventAway("")
-    setNewEventNotes("")
-    setShowAddEvent(false)
-  }
-
-  async function updateEvent(event: EventItem) {
-    await supabase
-      .from("events")
-      .update({
-        date: event.date,
-        day: event.day,
-        kick_off: event.kickOff,
-        type: event.type,
-        title: event.title,
-        home: event.home || "",
-        away: event.away || "",
-        notes: event.notes || "",
-      })
-      .eq("id", event.id)
-  }
+  const currentTeam = quarters[currentQuarter] || []
+  const allQuarterPlayers = uniquePlayers(quarters.flat())
+  const currentBench = allQuarterPlayers.filter(
+    (p) => !currentTeam.find((f) => f.id === p.id)
+  )
 
   function getPlayersForLine(role: Position, used: Set<string>) {
     const indices: number[] = []
@@ -619,12 +524,6 @@ export default function Page() {
     )
   }
 
-  const currentTeam = quarters[currentQuarter] || []
-  const allQuarterPlayers = uniquePlayers(quarters.flat())
-  const currentBench = allQuarterPlayers.filter(
-    (p) => !currentTeam.find((f) => f.id === p.id)
-  )
-
   const lineGroups = useMemo(() => {
     const used = new Set<string>()
     return {
@@ -635,6 +534,113 @@ export default function Page() {
     }
   }, [currentTeam, currentFormation])
 
+  function resetPlayerForm() {
+    setPlayerForm({
+      id: "",
+      name: "",
+      positions: ["MID"],
+      mainGK: false,
+      backupGK: false,
+    })
+    setEditingPlayerId(null)
+    setShowPlayerForm(false)
+  }
+
+  function startEditPlayer(player: Player) {
+    setPlayerForm(player)
+    setEditingPlayerId(player.id)
+    setShowPlayerForm(true)
+  }
+
+  function togglePlayerFormPosition(position: Position) {
+    setPlayerForm((prev) => {
+      const has = prev.positions.includes(position)
+      let positions = has
+        ? prev.positions.filter((p) => p !== position)
+        : [...prev.positions, position]
+
+      if (positions.length === 0) positions = [position]
+
+      return { ...prev, positions }
+    })
+  }
+
+  async function savePlayer() {
+    const id = editingPlayerId || makeId()
+    const payload = {
+      id,
+      name: playerForm.name.trim(),
+      positions_json: JSON.stringify(playerForm.positions),
+      main_gk: !!playerForm.mainGK,
+      backup_gk: !!playerForm.backupGK,
+    }
+
+    if (!payload.name) {
+      alert("Player name required")
+      return
+    }
+
+    await supabase.from("players").upsert(payload, { onConflict: "id" })
+    await loadAll()
+    setPlayerForm({
+      id: "",
+      name: "",
+      positions: ["MID"],
+      mainGK: false,
+      backupGK: false,
+    })
+    setEditingPlayerId(null)
+    setShowPlayerForm(false)
+  }
+
+  function resetEventForm() {
+    setEventForm({
+      id: "",
+      date: "",
+      day: "",
+      kickOff: "",
+      type: "MATCH",
+      title: "",
+      home: "",
+      away: "",
+      notes: "",
+    })
+    setEditingEventId(null)
+    setShowEventForm(false)
+  }
+
+  function startEditEvent(event: EventItem) {
+    setEventForm(event)
+    setEditingEventId(event.id)
+    setShowEventForm(true)
+  }
+
+  async function saveEvent() {
+    const id = editingEventId || makeId()
+    const payload = {
+      id,
+      date: eventForm.date,
+      day: eventForm.day,
+      kick_off: eventForm.kickOff,
+      type: eventForm.type,
+      title: eventForm.title,
+      home: eventForm.home || "",
+      away: eventForm.away || "",
+      notes: eventForm.notes || "",
+    }
+
+    if (!payload.date || !payload.day || !payload.kick_off || !payload.title) {
+      alert("Date, day, kick off and title are required")
+      return
+    }
+
+    await supabase.from("events").upsert(payload, { onConflict: "id" })
+    await loadAll()
+    setEditingEventId(null)
+    setShowEventForm(false)
+    if (!selectedEventId) setSelectedEventId(id)
+  }
+
   if (loading) {
     return <main style={{ padding: 20, fontFamily: "Arial, sans-serif" }}>Loading...</main>
   }
@@ -643,43 +649,54 @@ export default function Page() {
     <main style={{ padding: 20, maxWidth: 900, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <h1>Sharks Team Manager</h1>
 
-      <h2 style={{ marginTop: 20 }}>Players</h2>
-
-      <button onClick={() => setShowAddPlayer(!showAddPlayer)}>
-        {showAddPlayer ? "Close Add Player" : "Add Player"}
+      <h2 style={{ marginTop: 20 }}>Players Manager</h2>
+      <button onClick={() => {
+        setPlayerForm({ id: "", name: "", positions: ["MID"], mainGK: false, backupGK: false })
+        setEditingPlayerId(null)
+        setShowPlayerForm(true)
+      }}>
+        Add Player
       </button>
 
-      {showAddPlayer && (
-        <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 12, background: "#f5f5f5" }}>
+      {showPlayerForm && (
+        <div style={{ marginTop: 12, padding: 16, background: "#f5f5f5", borderRadius: 12 }}>
+          <div style={{ marginBottom: 10 }}>
+            <strong>{editingPlayerId ? "Edit Player" : "Add Player"}</strong>
+          </div>
+
           <input
             placeholder="Player name"
-            value={newPlayerName}
-            onChange={(e) => setNewPlayerName(e.target.value)}
+            value={playerForm.name}
+            onChange={(e) => setPlayerForm((prev) => ({ ...prev, name: e.target.value }))}
             style={{ width: "100%", padding: 10, marginBottom: 10 }}
           />
 
-          {ALL_POSITIONS.map((pos) => (
-            <label key={pos} style={{ display: "block", marginBottom: 6 }}>
-              <input
-                type="checkbox"
-                checked={newPlayerPositions.includes(pos)}
-                onChange={() => {
-                  setNewPlayerPositions((prev) =>
-                    prev.includes(pos)
-                      ? prev.filter((p) => p !== pos)
-                      : [...prev, pos]
-                  )
-                }}
-              />{" "}
-              {pos}
-            </label>
-          ))}
+          <div style={{ marginBottom: 10 }}>
+            {ALL_POSITIONS.map((pos) => (
+              <label key={pos} style={{ display: "block", marginBottom: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={playerForm.positions.includes(pos)}
+                  onChange={() => togglePlayerFormPosition(pos)}
+                />{" "}
+                {pos}
+              </label>
+            ))}
+          </div>
 
           <label style={{ display: "block", marginBottom: 6 }}>
             <input
               type="checkbox"
-              checked={newPlayerMainGK}
-              onChange={(e) => setNewPlayerMainGK(e.target.checked)}
+              checked={!!playerForm.mainGK}
+              onChange={(e) =>
+                setPlayerForm((prev) => ({
+                  ...prev,
+                  mainGK: e.target.checked,
+                  positions: e.target.checked && !prev.positions.includes("GK")
+                    ? [...prev.positions, "GK"]
+                    : prev.positions,
+                }))
+              }
             />{" "}
             Main GK
           </label>
@@ -687,143 +704,163 @@ export default function Page() {
           <label style={{ display: "block", marginBottom: 10 }}>
             <input
               type="checkbox"
-              checked={newPlayerBackupGK}
-              onChange={(e) => setNewPlayerBackupGK(e.target.checked)}
+              checked={!!playerForm.backupGK}
+              onChange={(e) => setPlayerForm((prev) => ({ ...prev, backupGK: e.target.checked }))}
             />{" "}
             Backup GK
           </label>
 
-          <button onClick={addPlayer}>Save Player</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => void savePlayer()}>Save Player</button>
+            <button onClick={resetPlayerForm}>Cancel</button>
+          </div>
         </div>
       )}
 
       <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
         {players.map((player) => (
-          <div key={player.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12, background: "white" }}>
-            <div style={{ fontWeight: 700 }}>{player.name}</div>
-            <div style={{ color: "#555", marginBottom: 8 }}>
-              {player.positions.join("/")}
-              {player.mainGK ? " • Main GK" : ""}
-              {player.backupGK ? " • Backup GK" : ""}
+          <div
+            key={player.id}
+            style={{
+              padding: 12,
+              border: "1px solid #ddd",
+              borderRadius: 10,
+              background: "white",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>
+              {player.name} • {player.positions.join("/")}
+              {player.mainGK ? " (Main GK)" : ""}
+              {!player.mainGK && player.backupGK ? " (Backup GK)" : ""}
             </div>
-
-            <button onClick={() => setEditingPlayerId(editingPlayerId === player.id ? null : player.id)}>
-              {editingPlayerId === player.id ? "Close" : "Edit"}
+            <button style={{ marginTop: 8 }} onClick={() => startEditPlayer(player)}>
+              Edit Player
             </button>
-
-            {editingPlayerId === player.id && (
-              <div style={{ marginTop: 10 }}>
-                <input
-                  value={player.name}
-                  onChange={(e) => {
-                    setPlayers((prev) =>
-                      prev.map((p) => (p.id === player.id ? { ...p, name: e.target.value } : p))
-                    )
-                  }}
-                  style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                />
-
-                {ALL_POSITIONS.map((pos) => (
-                  <label key={pos} style={{ display: "block", marginBottom: 6 }}>
-                    <input
-                      type="checkbox"
-                      checked={player.positions.includes(pos)}
-                      onChange={() => {
-                        setPlayers((prev) =>
-                          prev.map((p) =>
-                            p.id === player.id
-                              ? {
-                                  ...p,
-                                  positions: p.positions.includes(pos)
-                                    ? p.positions.filter((x) => x !== pos)
-                                    : [...p.positions, pos],
-                                }
-                              : p
-                          )
-                        )
-                      }}
-                    />{" "}
-                    {pos}
-                  </label>
-                ))}
-
-                <label style={{ display: "block", marginBottom: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!player.mainGK}
-                    onChange={(e) => {
-                      setPlayers((prev) =>
-                        prev.map((p) =>
-                          p.id === player.id
-                            ? { ...p, mainGK: e.target.checked }
-                            : { ...p, mainGK: false }
-                        )
-                      )
-                    }}
-                  />{" "}
-                  Main GK
-                </label>
-
-                <label style={{ display: "block", marginBottom: 10 }}>
-                  <input
-                    type="checkbox"
-                    checked={!!player.backupGK}
-                    onChange={(e) => {
-                      setPlayers((prev) =>
-                        prev.map((p) =>
-                          p.id === player.id ? { ...p, backupGK: e.target.checked } : p
-                        )
-                      )
-                    }}
-                  />{" "}
-                  Backup GK
-                </label>
-
-                <button onClick={() => updatePlayer(player)}>Save Changes</button>
-              </div>
-            )}
           </div>
         ))}
       </div>
 
-      <h2 style={{ marginTop: 30 }}>Schedule</h2>
-
-      <button onClick={() => setShowAddEvent(!showAddEvent)}>
-        {showAddEvent ? "Close Add Event" : "Add Event"}
+      <h2 style={{ marginTop: 30 }}>Events Manager</h2>
+      <button onClick={() => {
+        setEventForm({
+          id: "",
+          date: "",
+          day: "",
+          kickOff: "",
+          type: "MATCH",
+          title: "",
+          home: "",
+          away: "",
+          notes: "",
+        })
+        setEditingEventId(null)
+        setShowEventForm(true)
+      }}>
+        Add Event
       </button>
 
-      {showAddEvent && (
-        <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 12, background: "#f5f5f5" }}>
-          <input placeholder="Day" value={newEventDay} onChange={(e) => setNewEventDay(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
-          <input placeholder="Date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
-          <input placeholder="Kick off" value={newEventKickOff} onChange={(e) => setNewEventKickOff(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
+      {showEventForm && (
+        <div style={{ marginTop: 12, padding: 16, background: "#f5f5f5", borderRadius: 12 }}>
+          <div style={{ marginBottom: 10 }}>
+            <strong>{editingEventId ? "Edit Event" : "Add Event"}</strong>
+          </div>
 
-          <select value={newEventType} onChange={(e) => setNewEventType(e.target.value as EventType)} style={{ width: "100%", padding: 10, marginBottom: 10 }}>
+          <input
+            placeholder="Day (Fri)"
+            value={eventForm.day}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, day: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <input
+            placeholder="Date (07-Dec)"
+            value={eventForm.date}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, date: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <input
+            placeholder="Kick off (10:00)"
+            value={eventForm.kickOff}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, kickOff: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <select
+            value={eventForm.type}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, type: e.target.value as EventType }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          >
             <option value="MATCH">MATCH</option>
             <option value="TRAINING">TRAINING</option>
             <option value="NO_GAME">NO GAME</option>
             <option value="HOLIDAY">HOLIDAY</option>
           </select>
 
-          <input placeholder="Title" value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
-          <input placeholder="Home" value={newEventHome} onChange={(e) => setNewEventHome(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
-          <input placeholder="Away" value={newEventAway} onChange={(e) => setNewEventAway(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
-          <input placeholder="Notes" value={newEventNotes} onChange={(e) => setNewEventNotes(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 10 }} />
+          <input
+            placeholder="Title"
+            value={eventForm.title}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, title: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
 
-          <button onClick={addEvent}>Save Event</button>
+          <input
+            placeholder="Home"
+            value={eventForm.home}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, home: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <input
+            placeholder="Away"
+            value={eventForm.away}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, away: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <input
+            placeholder="Notes"
+            value={eventForm.notes}
+            onChange={(e) => setEventForm((prev) => ({ ...prev, notes: e.target.value }))}
+            style={{ width: "100%", padding: 10, marginBottom: 8 }}
+          />
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => void saveEvent()}>Save Event</button>
+            <button onClick={resetEventForm}>Cancel</button>
+          </div>
         </div>
       )}
 
-      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+      <h2 style={{ marginTop: 30 }}>Schedule</h2>
+
+      <div style={{ display: "grid", gap: 10 }}>
         {events.map((event) => {
           const isSelected = selectedEventId === event.id
           return (
-            <div key={event.id} style={{ border: isSelected ? "3px solid #111" : "1px solid #ddd", borderRadius: 12, padding: 14, background: "white" }}>
+            <div
+              key={event.id}
+              style={{
+                padding: 14,
+                borderRadius: 12,
+                border: isSelected ? "3px solid #111" : "1px solid #ddd",
+                background: "white",
+              }}
+            >
               <button
                 onClick={() => setSelectedEventId(event.id)}
                 style={{ display: "block", width: "100%", textAlign: "left", background: "transparent", border: "none", padding: 0 }}
               >
-                <div style={{ display: "inline-block", padding: "4px 8px", borderRadius: 8, background: eventTypeColor(event.type), marginBottom: 8, fontWeight: 700 }}>
+                <div
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 8px",
+                    borderRadius: 8,
+                    background: eventTypeColor(event.type),
+                    marginBottom: 8,
+                    fontWeight: 700,
+                  }}
+                >
                   {event.type.replace("_", " ")}
                 </div>
 
@@ -840,61 +877,9 @@ export default function Page() {
                 )}
               </button>
 
-              <button onClick={() => setEditingEventId(editingEventId === event.id ? null : event.id)} style={{ marginTop: 8 }}>
-                {editingEventId === event.id ? "Close" : "Edit"}
+              <button style={{ marginTop: 8 }} onClick={() => startEditEvent(event)}>
+                Edit Event
               </button>
-
-              {editingEventId === event.id && (
-                <div style={{ marginTop: 10 }}>
-                  <input
-                    value={event.day}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, day: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <input
-                    value={event.date}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, date: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <input
-                    value={event.kickOff}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, kickOff: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <select
-                    value={event.type}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, type: e.target.value as EventType } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  >
-                    <option value="MATCH">MATCH</option>
-                    <option value="TRAINING">TRAINING</option>
-                    <option value="NO_GAME">NO GAME</option>
-                    <option value="HOLIDAY">HOLIDAY</option>
-                  </select>
-                  <input
-                    value={event.title}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, title: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <input
-                    value={event.home || ""}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, home: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <input
-                    value={event.away || ""}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, away: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-                  <input
-                    value={event.notes || ""}
-                    onChange={(e) => setEvents((prev) => prev.map((x) => x.id === event.id ? { ...x, notes: e.target.value } : x))}
-                    style={{ width: "100%", padding: 10, marginBottom: 10 }}
-                  />
-
-                  <button onClick={() => updateEvent(event)}>Save Changes</button>
-                </div>
-              )}
             </div>
           )
         })}
@@ -1053,7 +1038,7 @@ export default function Page() {
                   <strong>Current Formation:</strong> {currentFormation.label}
                 </div>
 
-                <button onClick={generateRotation} style={{ marginTop: 16 }}>
+                <button onClick={() => void generateRotation()} style={{ marginTop: 16 }}>
                   Generate Quarter Plan
                 </button>
               </div>
