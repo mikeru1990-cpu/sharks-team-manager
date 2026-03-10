@@ -245,17 +245,60 @@ const [players] = useState<Player[]>([
                   </h4>
 
                   <div style={{ marginBottom: 12 }}>
-                    <strong>On Field</strong>
-                    {currentQuarterPlayers.length > 0 ? (
-                      currentQuarterPlayers.map((p) => (
-                        <div key={`field-${currentQuarter}-${p.id}`}>
-                          {p.name}
-                        </div>
-                      ))
-                    ) : (
-                      <div>Generate a squad first</div>
-                    )}
-                  </div>
+                    <div
+  style={{
+    background: "#2e7d32",
+    color: "white",
+    padding: 20,
+    borderRadius: 12,
+    marginTop: 10
+  }}
+>
+
+<div style={{ textAlign: "center", marginBottom: 10 }}>
+<strong>Forward</strong>
+<div>{currentQuarterPlayers[6]?.name}</div>
+</div>
+
+<div style={{ display: "flex", justifyContent: "space-around", marginBottom: 10 }}>
+
+<div>
+<strong>Mid</strong>
+<div>{currentQuarterPlayers[3]?.name}</div>
+</div>
+
+<div>
+<strong>Mid</strong>
+<div>{currentQuarterPlayers[4]?.name}</div>
+</div>
+
+<div>
+<strong>Mid</strong>
+<div>{currentQuarterPlayers[5]?.name}</div>
+</div>
+
+</div>
+
+<div style={{ display: "flex", justifyContent: "space-around", marginBottom: 10 }}>
+
+<div>
+<strong>Def</strong>
+<div>{currentQuarterPlayers[1]?.name}</div>
+</div>
+
+<div>
+<strong>Def</strong>
+<div>{currentQuarterPlayers[2]?.name}</div>
+</div>
+
+</div>
+
+<div style={{ textAlign: "center" }}>
+<strong>GK</strong>
+<div>{currentQuarterPlayers[0]?.name}</div>
+</div>
+
+</div>
 
                   <div style={{ marginBottom: 12 }}>
                     <strong>Bench Pool</strong>
