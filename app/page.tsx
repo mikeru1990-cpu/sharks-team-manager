@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 
 type Player = {
-  id: string;
-  name: string;
-  position: string;
-};
+  id: string
+  name: string
+  positions: string[]
+  gkBackup?: boolean
+}
 
 type Fixture = {
   id: string;
@@ -22,19 +23,22 @@ type Squad = {
   quarters: Player[][];
 };
 
-export default function Page() {
-  const [players] = useState<Player[]>([
-    { id: "1", name: "Bailee Dowler-Rowles", position: "DEF" },
-    { id: "2", name: "Bella Bainbridge", position: "MID" },
-    { id: "3", name: "Betsy Rowland", position: "MID" },
-    { id: "4", name: "Connie Luff", position: "FWD" },
-    { id: "5", name: "Darcy-Rae Russell", position: "GK" },
-    { id: "6", name: "Ella Wilson", position: "MID" },
-    { id: "7", name: "Elsy Harmer", position: "DEF" },
-    { id: "8", name: "Evelyn Evans", position: "DEF" },
-    { id: "9", name: "Isabella Ogden", position: "DEF" },
-    { id: "10", name: "Lyra Twinning", position: "MID" },
-  ]);
+const [players] = useState<Player[]>([
+{ id:"1", name:"Bailee Dowler-Rowles", positions:["DEF"], gkBackup:true },
+{ id:"2", name:"Bella Bainbridge", positions:["MID"] },
+{ id:"3", name:"Betsy Rowland", positions:["MID","DEF"], gkBackup:true },
+{ id:"4", name:"Connie Luff", positions:["MID","FWD"] },
+{ id:"5", name:"Darcy-Rae Russell", positions:["GK"] },
+{ id:"6", name:"Ella Wilson", positions:["MID","DEF"] },
+{ id:"7", name:"Elsy Harmer", positions:["DEF"] },
+{ id:"8", name:"Evelyn Evans", positions:["MID","DEF"] },
+{ id:"9", name:"Isabella Ogden", positions:["DEF","MID"] },
+{ id:"10", name:"Lyra Twinning", positions:["MID","FWD"] },
+{ id:"11", name:"Martha Scrivens", positions:["MID","FWD"] },
+{ id:"12", name:"Olivia Hassall", positions:["DEF"] },
+{ id:"13", name:"Poppy Bennett", positions:["MID","FWD"], gkBackup:true },
+{ id:"14", name:"Ruby Salter", positions:["MID","DEF"] },
+])
 
   const [fixtures] = useState<Fixture[]>([
     {
