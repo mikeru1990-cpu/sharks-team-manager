@@ -2,28 +2,30 @@
 
 import { useState } from "react"
 
+type Position = "GK" | "DEF" | "MID" | "FWD"
+
 type Player = {
   id: string
   name: string
-  position: "GK" | "DEF" | "MID" | "FWD"
+  positions: Position[]
 }
 
 export default function Page() {
   const players: Player[] = [
-    { id: "1", name: "Bailee Dowler-Rowles", position: "DEF" },
-    { id: "2", name: "Bella Bainbridge", position: "MID" },
-    { id: "3", name: "Betsy Rowland", position: "MID" },
-    { id: "4", name: "Connie Luff", position: "FWD" },
-    { id: "5", name: "Darcy-Rae Russell", position: "GK" },
-    { id: "6", name: "Ella Wilson", position: "MID" },
-    { id: "7", name: "Elsy Harmer", position: "DEF" },
-    { id: "8", name: "Evelyn Evans", position: "MID" },
-    { id: "9", name: "Isabella Ogden", position: "DEF" },
-    { id: "10", name: "Lyra Twinning", position: "MID" },
-    { id: "11", name: "Martha Scrivens", position: "FWD" },
-    { id: "12", name: "Olivia Hassall", position: "DEF" },
-    { id: "13", name: "Poppy Bennett", position: "FWD" },
-    { id: "14", name: "Ruby Salter", position: "MID" },
+    { id: "1", name: "Bailee Dowler-Rowles", positions: ["DEF"] },
+    { id: "2", name: "Bella Bainbridge", positions: ["MID"] },
+    { id: "3", name: "Betsy Rowland", positions: ["MID", "DEF"] },
+    { id: "4", name: "Connie Luff", positions: ["MID", "FWD"] },
+    { id: "5", name: "Darcy-Rae Russell", positions: ["GK"] },
+    { id: "6", name: "Ella Wilson", positions: ["MID", "DEF"] },
+    { id: "7", name: "Elsy Harmer", positions: ["DEF"] },
+    { id: "8", name: "Evelyn Evans", positions: ["MID", "DEF"] },
+    { id: "9", name: "Isabella Ogden", positions: ["DEF", "MID"] },
+    { id: "10", name: "Lyra Twinning", positions: ["MID", "FWD"] },
+    { id: "11", name: "Martha Scrivens", positions: ["MID", "FWD"] },
+    { id: "12", name: "Olivia Hassall", positions: ["DEF"] },
+    { id: "13", name: "Poppy Bennett", positions: ["MID", "FWD"] },
+    { id: "14", name: "Ruby Salter", positions: ["MID", "DEF"] },
   ]
 
   const [available, setAvailable] = useState<string[]>([])
@@ -51,28 +53,55 @@ export default function Page() {
     })
   }
 
+  function takePlayers(
+    source: Player[],
+    count: number,
+    used: Set<string>,
+    position: Position
+  ) {
+    const picked = source
+      .filter((p) => !used.has(p.id) && p.positions.includes(position))
+      .slice(0, count)
+
+    picked.forEach((p) => used.add(p.id))
+    return picked
+  }
+
   function buildStartingSeven(availablePlayers: Player[]) {
-    const gk = shuffle(availablePlayers.filter((p) => p.position === "GK")).slice(0, 1)
-    const def = shuffle(availablePlayers.filter((p) => p.position === "DEF")).slice(0, 2)
-    const mid = shuffle(availablePlayers.filter((p) => p.position === "MID")).slice(0, 3)
-    const fwd = shuffle(availablePlayers.filter((p) => p.position === "FWD")).slice(0, 1)
+    const shuffled = shuffle(availablePlayers)
+    const used = new Set<string>()
 
-    let squad = uniquePlayers([...gk, ...def, ...mid, ...fwd])
+    const gk = takePlayers(shuffled, 1, used, "GK")
+    const def = takePlayers(shuffled, 2, used, "DEF")
+    const mid = takePlayers(shuffled, 3, used, "MID")
+    const fwd = takePlayers(shuffled, 1, used, "FWD")
 
-    const used = squad.map((p) => p.id)
-    const remaining = availablePlayers.filter((p) => !used.includes(p.id))
+    const starters = [...gk, ...def, ...mid, ...fwd]
 
-    while (squad.length < 7 && remaining.length) {
-      squad.push(remaining.shift()!)
+    const remaining = shuffled.filter((p) => !used.has(p.id))
+
+    while (starters.length < 7 && remaining.length > 0) {
+      const next = remaining.shift()
+      if (next) {
+        starters.push(next)
+        used.add(next.id)
+      }
     }
 
-    return squad
+    return starters
   }
 
   function generateRotation() {
     const availablePlayers = players.filter((p) => available.includes(p.id))
+
+    if (availablePlayers.length < 7) {
+      alert("Need at least 7 available players")
+      return
+    }
+
     const starters = buildStartingSeven(availablePlayers)
-    const bench = availablePlayers.filter((p) => !starters.find((s) => s.id === p.id))
+    const starterIds = new Set(starters.map((p) => p.id))
+    const bench = availablePlayers.filter((p) => !starterIds.has(p.id))
 
     const q1 = [...starters]
     const q2 = [...starters]
@@ -88,7 +117,11 @@ export default function Page() {
     if (bench[0] && q4[4]) q4[4] = bench[0]
     if (bench[1] && q4[3]) q4[3] = bench[1]
 
-    setQuarters([q1, q2, q3, q4])
+    const builtQuarters = [q1, q2, q3, q4].map((quarter) =>
+      uniquePlayers(quarter)
+    )
+
+    setQuarters(builtQuarters)
     setCurrentQuarter(0)
   }
 
@@ -111,7 +144,14 @@ export default function Page() {
   }
 
   return (
-    <main style={{ padding: 20, maxWidth: 600, margin: "auto", fontFamily: "Arial, sans-serif" }}>
+    <main
+      style={{
+        padding: 20,
+        maxWidth: 600,
+        margin: "auto",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
       <h1>Sharks Team Manager</h1>
 
       <h2>Players Available</h2>
@@ -123,7 +163,7 @@ export default function Page() {
             checked={available.includes(p.id)}
             onChange={() => togglePlayer(p.id)}
           />{" "}
-          {p.name} • {p.position}
+          {p.name} • {p.positions.join("/")}
         </label>
       ))}
 
@@ -140,7 +180,7 @@ export default function Page() {
               <strong>Quarter {index + 1}</strong>
               {quarter.map((p) => (
                 <div key={`${index}-${p.id}`}>
-                  {p.name} • {p.position}
+                  {p.name} • {p.positions.join("/")}
                 </div>
               ))}
             </div>
@@ -224,7 +264,7 @@ export default function Page() {
               {currentBench.length > 0 ? (
                 currentBench.map((p) => (
                   <div key={p.id}>
-                    {p.name} • {p.position}
+                    {p.name} • {p.positions.join("/")}
                   </div>
                 ))
               ) : (
