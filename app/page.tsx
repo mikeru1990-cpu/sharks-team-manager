@@ -41,7 +41,12 @@ export default function Page() {
   }
 
   function shuffle<T>(array: T[]) {
-    return [...array].sort(() => Math.random() - 0.5)
+    const arr = [...array]
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr
   }
 
   function uniquePlayers(list: Player[]) {
@@ -53,42 +58,56 @@ export default function Page() {
     })
   }
 
-  function takePlayers(
-    source: Player[],
+  function pickPlayersForRole(
+    pool: Player[],
     count: number,
-    used: Set<string>,
-    position: Position
+    role: Position,
+    usedIds: Set<string>
   ) {
-    const picked = source
-      .filter((p) => !used.has(p.id) && p.positions.includes(position))
-      .slice(0, count)
-
-    picked.forEach((p) => used.add(p.id))
+    const eligible = pool.filter(
+      (p) => !usedIds.has(p.id) && p.positions.includes(role)
+    )
+    const picked = shuffle(eligible).slice(0, count)
+    picked.forEach((p) => usedIds.add(p.id))
     return picked
   }
 
-  function buildStartingSeven(availablePlayers: Player[]) {
-    const shuffled = shuffle(availablePlayers)
-    const used = new Set<string>()
+  function fillRemainingSlots(
+    pool: Player[],
+    targetCount: number,
+    current: Player[],
+    usedIds: Set<string>
+  ) {
+    const remaining = shuffle(pool.filter((p) => !usedIds.has(p.id)))
+    const filled = [...current]
 
-    const gk = takePlayers(shuffled, 1, used, "GK")
-    const def = takePlayers(shuffled, 2, used, "DEF")
-    const mid = takePlayers(shuffled, 3, used, "MID")
-    const fwd = takePlayers(shuffled, 1, used, "FWD")
-
-    const starters = [...gk, ...def, ...mid, ...fwd]
-
-    const remaining = shuffled.filter((p) => !used.has(p.id))
-
-    while (starters.length < 7 && remaining.length > 0) {
+    while (filled.length < targetCount && remaining.length > 0) {
       const next = remaining.shift()
       if (next) {
-        starters.push(next)
-        used.add(next.id)
+        filled.push(next)
+        usedIds.add(next.id)
       }
     }
 
-    return starters
+    return filled
+  }
+
+  function buildQuarterTeam(pool: Player[]) {
+    const usedIds = new Set<string>()
+
+    const gk = pickPlayersForRole(pool, 1, "GK", usedIds)
+    const def = pickPlayersForRole(pool, 2, "DEF", usedIds)
+    const mid = pickPlayersForRole(pool, 3, "MID", usedIds)
+    const fwd = pickPlayersForRole(pool, 1, "FWD", usedIds)
+
+    const ordered = [...gk, ...def, ...mid, ...fwd]
+    return fillRemainingSlots(pool, 7, ordered, usedIds)
+  }
+
+  function rotatePool(playersPool: Player[], offset: number) {
+    if (playersPool.length === 0) return []
+    const amount = offset % playersPool.length
+    return [...playersPool.slice(amount), ...playersPool.slice(0, amount)]
   }
 
   function generateRotation() {
@@ -99,27 +118,13 @@ export default function Page() {
       return
     }
 
-    const starters = buildStartingSeven(availablePlayers)
-    const starterIds = new Set(starters.map((p) => p.id))
-    const bench = availablePlayers.filter((p) => !starterIds.has(p.id))
+    const builtQuarters: Player[][] = []
 
-    const q1 = [...starters]
-    const q2 = [...starters]
-    const q3 = [...starters]
-    const q4 = [...starters]
-
-    if (bench[0] && q2[6]) q2[6] = bench[0]
-    if (bench[1] && q2[5]) q2[5] = bench[1]
-
-    if (bench[2] && q3[6]) q3[6] = bench[2]
-    if (bench[3] && q3[5]) q3[5] = bench[3]
-
-    if (bench[0] && q4[4]) q4[4] = bench[0]
-    if (bench[1] && q4[3]) q4[3] = bench[1]
-
-    const builtQuarters = [q1, q2, q3, q4].map((quarter) =>
-      uniquePlayers(quarter)
-    )
+    for (let q = 0; q < 4; q++) {
+      const rotated = rotatePool(availablePlayers, q * 2)
+      const quarter = buildQuarterTeam(rotated)
+      builtQuarters.push(uniquePlayers(quarter))
+    }
 
     setQuarters(builtQuarters)
     setCurrentQuarter(0)
