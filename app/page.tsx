@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
 
 type Player = {
   id: string;
@@ -22,24 +23,18 @@ type Squad = {
 };
 
 export default function Page() {
-  const [name, setName] = useState("");
-  const [position, setPosition] = useState("GK");
 
   const [players, setPlayers] = useState<Player[]>([
     { id: "1", name: "Bailee Dowler-Rowles", position: "MID" },
     { id: "2", name: "Bella Bainbridge", position: "MID" },
     { id: "3", name: "Betsy Rowland", position: "DEF" },
     { id: "4", name: "Connie Luff", position: "FWD" },
-    { id: "5", name: "Darcy-Rae Russell", position: "GK" },
+    { id: "5", name: "Darcy-Rae Russell", position: "DEF" },
     { id: "6", name: "Ella Wilson", position: "MID" },
-    { id: "7", name: "Elsy Harmer", position: "DEF" },
-    { id: "8", name: "Evelyn Evans", position: "MID" },
+    { id: "7", name: "Elsy Harmer", position: "GK" },
+    { id: "8", name: "Evelyn Evans", position: "FWD" },
     { id: "9", name: "Isabella Ogden", position: "DEF" },
     { id: "10", name: "Lyra Twinning", position: "MID" },
-    { id: "11", name: "Martha Scrivens", position: "DEF" },
-    { id: "12", name: "Olivia Hassall", position: "FWD" },
-    { id: "13", name: "Poppy Bennett", position: "MID" },
-    { id: "14", name: "Ruby Salter", position: "FWD" },
   ]);
 
   const [fixtures] = useState<Fixture[]>([
@@ -51,47 +46,38 @@ export default function Page() {
     },
   ]);
 
-  const [availability, setAvailability] = useState<Record<string, Set<string>>>(
-    {}
-  );
+  const [availability, setAvailability] = useState<Record<string, Set<string>>>({});
+  const [generatedSquads, setGeneratedSquads] = useState<Record<string, Squad>>({});
 
-  const [generatedSquads, setGeneratedSquads] = useState<Record<string, Squad>>(
-    {}
-  );
+  useEffect(() => {
+    loadSavedSquads();
+  }, []);
 
-  const [currentQuarterByFixture, setCurrentQuarterByFixture] = useState<
-    Record<string, number>
-  >({});
+  async function loadSavedSquads() {
 
-  function addPlayer() {
-    if (!name.trim()) return;
+    const { data } = await supabase
+      .from("saved_squads")
+      .select("*");
 
-    const newPlayer: Player = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      position,
-    };
+    if (!data) return;
 
-    setPlayers((prev) => [...prev, newPlayer]);
-    setName("");
-    setPosition("GK");
-  }
+    const loaded: Record<string, Squad> = {};
 
-  function deletePlayer(id: string) {
-    setPlayers((prev) => prev.filter((p) => p.id !== id));
+    data.forEach((row: any) => {
 
-    setAvailability((prev) => {
-      const next: Record<string, Set<string>> = {};
-      for (const fixtureId of Object.keys(prev)) {
-        const updated = new Set(prev[fixtureId]);
-        updated.delete(id);
-        next[fixtureId] = updated;
-      }
-      return next;
+      loaded[row.fixture_id] = {
+        starters: JSON.parse(row.starters_json || "[]"),
+        bench: JSON.parse(row.bench_json || "[]"),
+        quarters: JSON.parse(row.quarters_json || "[]"),
+      };
+
     });
+
+    setGeneratedSquads(loaded);
   }
 
   function toggleAvailability(fixtureId: string, playerId: string) {
+
     const current = availability[fixtureId] || new Set<string>();
     const updated = new Set(current);
 
@@ -111,391 +97,115 @@ export default function Page() {
     return availability[fixtureId]?.has(playerId) || false;
   }
 
-  function generateSquad(fixtureId: string) {
+  async function generateSquad(fixtureId: string) {
+
     const available = players.filter((p) => isAvailable(fixtureId, p.id));
 
-    const gk = available.filter((p) => p.position === "GK");
-    const def = available.filter((p) => p.position === "DEF");
-    const mid = available.filter((p) => p.position === "MID");
-    const fwd = available.filter((p) => p.position === "FWD");
-    const other = available.filter(
-      (p) => !["GK", "DEF", "MID", "FWD"].includes(p.position)
-    );
+    const starters = available.slice(0, 7);
+    const bench = available.slice(7);
 
-    const starters: Player[] = [
-      ...gk.slice(0, 1),
-      ...def.slice(0, 2),
-      ...mid.slice(0, 2),
-      ...fwd.slice(0, 2),
+    const quarters = [
+      starters,
+      [...starters.slice(0,5), ...bench.slice(0,2)],
+      [...starters.slice(0,5), ...bench.slice(2,4)],
+      starters
     ];
 
-    const starterIds = new Set(starters.map((p) => p.id));
-    const remaining = available.filter((p) => !starterIds.has(p.id));
-
-    while (starters.length < 7 && remaining.length > 0) {
-      const next = remaining.shift();
-      if (next) starters.push(next);
-    }
-
-    while (starters.length < 7 && other.length > 0) {
-      const next = other.shift();
-      if (next && !starters.find((p) => p.id === next.id)) {
-        starters.push(next);
-      }
-    }
-
-    const finalStarterIds = new Set(starters.map((p) => p.id));
-    const bench = available.filter((p) => !finalStarterIds.has(p.id));
-
-    const quarters: Player[][] = [];
-
-    for (let q = 0; q < 4; q++) {
-      const quarter = [...starters];
-
-      if (bench.length > 0) {
-        const swaps = Math.min(bench.length, 2);
-
-        for (let s = 0; s < swaps; s++) {
-          const benchPlayer = bench[(q * 2 + s) % bench.length];
-          const swapIndex = 6 - s;
-
-          if (benchPlayer && quarter[swapIndex]) {
-            quarter[swapIndex] = benchPlayer;
-          }
-        }
-      }
-
-      const seen = new Set<string>();
-      const uniqueQuarter = quarter.filter((p) => {
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
-        return true;
-      });
-
-      quarters.push(uniqueQuarter);
-    }
+    const newSquad = { starters, bench, quarters };
 
     setGeneratedSquads((prev) => ({
       ...prev,
-      [fixtureId]: { starters, bench, quarters },
+      [fixtureId]: newSquad,
     }));
 
-    setCurrentQuarterByFixture((prev) => ({
-      ...prev,
-      [fixtureId]: 0,
-    }));
-  }
-
-  function nextQuarter(fixtureId: string) {
-    setCurrentQuarterByFixture((prev) => ({
-      ...prev,
-      [fixtureId]: ((prev[fixtureId] ?? 0) + 1) % 4,
-    }));
-  }
-
-  function previousQuarter(fixtureId: string) {
-    setCurrentQuarterByFixture((prev) => ({
-      ...prev,
-      [fixtureId]: ((prev[fixtureId] ?? 0) + 3) % 4,
-    }));
+    await supabase
+      .from("saved_squads")
+      .upsert(
+        {
+          fixture_id: fixtureId,
+          starters_json: JSON.stringify(starters),
+          bench_json: JSON.stringify(bench),
+          quarters_json: JSON.stringify(quarters),
+        },
+        { onConflict: "fixture_id" }
+      );
   }
 
   return (
-    <main
-      style={{
-        padding: 20,
-        maxWidth: 520,
-        margin: "0 auto",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1 style={{ fontSize: 32, marginBottom: 20 }}>Sharks Team Manager</h1>
 
-      <div style={{ marginBottom: 30 }}>
-        <input
-          placeholder="Player name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 10,
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            fontSize: 16,
-            boxSizing: "border-box",
-          }}
-        />
+    <main style={{ padding: 20, maxWidth: 500, margin: "auto" }}>
 
-        <select
-          value={position}
-          onChange={(e) => setPosition(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            marginBottom: 10,
-            borderRadius: 10,
-            border: "1px solid #ccc",
-            fontSize: 16,
-            boxSizing: "border-box",
-          }}
-        >
-          <option value="GK">GK</option>
-          <option value="DEF">DEF</option>
-          <option value="MID">MID</option>
-          <option value="FWD">FWD</option>
-        </select>
+      <h1>Sharks Team Manager</h1>
 
-        <button
-          onClick={addPlayer}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 10,
-            border: "none",
-            background: "#111",
-            color: "white",
-            fontWeight: 600,
-            fontSize: 16,
-          }}
-        >
-          Add Player
-        </button>
-      </div>
-
-      <h2 style={{ fontSize: 28, marginBottom: 12 }}>Players</h2>
+      <h2>Players</h2>
 
       {players.map((p) => (
-        <div
-          key={p.id}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 8,
-            paddingBottom: 8,
-            borderBottom: "1px solid #eee",
-            gap: 12,
-          }}
-        >
-          <span style={{ fontSize: 18 }}>
-            {p.name} • {p.position}
-          </span>
-          <button
-            onClick={() => deletePlayer(p.id)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              border: "none",
-              background: "#eee",
-            }}
-          >
-            Delete
-          </button>
+        <div key={p.id}>
+          {p.name} • {p.position}
         </div>
       ))}
 
-      <h2 style={{ fontSize: 28, marginTop: 40, marginBottom: 12 }}>
-        Fixtures
-      </h2>
+      <h2 style={{ marginTop: 40 }}>Fixtures</h2>
 
       {fixtures.map((f) => {
+
         const squad = generatedSquads[f.id];
-        const currentQuarter = currentQuarterByFixture[f.id] ?? 0;
-        const currentQuarterPlayers = squad?.quarters[currentQuarter] || [];
 
         return (
-          <div
-            key={f.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 24,
-              background: "#fff",
-            }}
-          >
-            <h3 style={{ fontSize: 24, marginBottom: 6 }}>{f.opponent}</h3>
-            <div style={{ color: "#555", marginBottom: 12 }}>
-              {f.match_date} • {f.venue}
-            </div>
 
-            <button
-              onClick={() => generateSquad(f.id)}
-              style={{
-                marginBottom: 16,
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "none",
-                background: "#111",
-                color: "white",
-                fontWeight: 600,
-                fontSize: 16,
-              }}
-            >
+          <div key={f.id} style={{ border: "1px solid #ddd", padding: 16, marginTop: 20 }}>
+
+            <h3>{f.opponent}</h3>
+            <p>{f.match_date} • {f.venue}</p>
+
+            <button onClick={() => generateSquad(f.id)}>
               Generate Squad
             </button>
 
             {squad && (
-              <>
-                <div
-                  style={{
-                    marginBottom: 16,
-                    background: "#f3f3f3",
-                    padding: 14,
-                    borderRadius: 14,
-                  }}
-                >
-                  <div style={{ marginBottom: 14 }}>
-                    <strong style={{ fontSize: 18 }}>Starting 7</strong>
-                    {squad.starters.length > 0 ? (
-                      squad.starters.map((p) => (
-                        <div key={p.id}>
-                          {p.name} • {p.position}
-                        </div>
-                      ))
-                    ) : (
-                      <div>None</div>
-                    )}
-                  </div>
 
-                  <div style={{ marginBottom: 14 }}>
-                    <strong style={{ fontSize: 18 }}>Bench</strong>
-                    {squad.bench.length > 0 ? (
-                      squad.bench.map((p) => (
-                        <div key={p.id}>
-                          {p.name} • {p.position}
-                        </div>
-                      ))
-                    ) : (
-                      <div>None</div>
-                    )}
-                  </div>
+              <div style={{ marginTop: 20 }}>
 
-                  <div>
-                    <strong style={{ fontSize: 18 }}>Quarter Plan</strong>
-                    {squad.quarters.map((quarter, i) => (
-                      <div key={i} style={{ marginTop: 12 }}>
-                        <strong>Quarter {i + 1}</strong>
-                        {quarter.length > 0 ? (
-                          quarter.map((p) => (
-                            <div key={`${i}-${p.id}`}>
-                              {p.name} • {p.position}
-                            </div>
-                          ))
-                        ) : (
-                          <div>None</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <h4>Starting 7</h4>
+                {squad.starters.map((p) => (
+                  <div key={p.id}>{p.name}</div>
+                ))}
 
-                <div
-                  style={{
-                    marginBottom: 16,
-                    background: "#eef3f8",
-                    padding: 14,
-                    borderRadius: 14,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <strong style={{ fontSize: 18 }}>
-                      Match Mode — Quarter {currentQuarter + 1}
-                    </strong>
-                  </div>
+                <h4>Bench</h4>
+                {squad.bench.map((p) => (
+                  <div key={p.id}>{p.name}</div>
+                ))}
 
-                  <div style={{ marginBottom: 12 }}>
-                    <strong>On Field</strong>
-                    {currentQuarterPlayers.length > 0 ? (
-                      currentQuarterPlayers.map((p) => (
-                        <div key={`field-${currentQuarter}-${p.id}`}>
-                          {p.name} • {p.position}
-                        </div>
-                      ))
-                    ) : (
-                      <div>Generate a squad first</div>
-                    )}
-                  </div>
+              </div>
 
-                  <div style={{ marginBottom: 12 }}>
-                    <strong>Bench Pool</strong>
-                    {squad.bench.length > 0 ? (
-                      squad.bench.map((p) => (
-                        <div key={`bench-${p.id}`}>
-                          {p.name} • {p.position}
-                        </div>
-                      ))
-                    ) : (
-                      <div>None</div>
-                    )}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button
-                      onClick={() => previousQuarter(f.id)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "1px solid #ccc",
-                        background: "white",
-                      }}
-                    >
-                      Previous Quarter
-                    </button>
-
-                    <button
-                      onClick={() => nextQuarter(f.id)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: "none",
-                        background: "#111",
-                        color: "white",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Next Quarter
-                    </button>
-                  </div>
-                </div>
-              </>
             )}
 
-            <div>
+            <div style={{ marginTop: 20 }}>
+
               {players.map((player) => (
-                <label
-                  key={player.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 0",
-                    fontSize: 18,
-                  }}
-                >
+
+                <label key={player.id} style={{ display: "block" }}>
+
                   <input
                     type="checkbox"
                     checked={isAvailable(f.id, player.id)}
                     onChange={() => toggleAvailability(f.id, player.id)}
-                    style={{ width: 22, height: 22 }}
                   />
-                  {player.name} • {player.position}
+
+                  {player.name}
+
                 </label>
+
               ))}
+
             </div>
+
           </div>
+
         );
+
       })}
+
     </main>
   );
 }
