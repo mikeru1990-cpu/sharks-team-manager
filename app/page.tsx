@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 type Position = "GK" | "DEF" | "MID" | "FWD"
 
@@ -8,6 +8,50 @@ type Player = {
   id: string
   name: string
   positions: Position[]
+}
+
+type GameType = "7v7" | "9v9" | "11v11"
+
+type FormationConfig = {
+  label: string
+  slots: Position[]
+}
+
+const FORMATIONS: Record<GameType, FormationConfig[]> = {
+  "7v7": [
+    {
+      label: "2-3-1",
+      slots: ["GK", "DEF", "DEF", "MID", "MID", "MID", "FWD"],
+    },
+    {
+      label: "3-2-1",
+      slots: ["GK", "DEF", "DEF", "DEF", "MID", "MID", "FWD"],
+    },
+  ],
+  "9v9": [
+    {
+      label: "3-3-2",
+      slots: ["GK", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD"],
+    },
+    {
+      label: "3-4-1",
+      slots: ["GK", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "FWD"],
+    },
+  ],
+  "11v11": [
+    {
+      label: "4-3-3",
+      slots: ["GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD", "FWD"],
+    },
+    {
+      label: "4-4-2",
+      slots: ["GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "FWD", "FWD"],
+    },
+    {
+      label: "3-5-2",
+      slots: ["GK", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "MID", "FWD", "FWD"],
+    },
+  ],
 }
 
 export default function Page() {
@@ -31,6 +75,12 @@ export default function Page() {
   const [available, setAvailable] = useState<string[]>([])
   const [quarters, setQuarters] = useState<Player[][]>([])
   const [currentQuarter, setCurrentQuarter] = useState(0)
+  const [gameType, setGameType] = useState<GameType>("7v7")
+  const [formationLabel, setFormationLabel] = useState("2-3-1")
+
+  const currentFormation = useMemo(() => {
+    return FORMATIONS[gameType].find((f) => f.label === formationLabel) || FORMATIONS[gameType][0]
+  }, [gameType, formationLabel])
 
   function togglePlayer(id: string) {
     if (available.includes(id)) {
@@ -58,50 +108,29 @@ export default function Page() {
     })
   }
 
-  function pickPlayersForRole(
-    pool: Player[],
-    count: number,
-    role: Position,
-    usedIds: Set<string>
-  ) {
-    const eligible = pool.filter(
-      (p) => !usedIds.has(p.id) && p.positions.includes(role)
-    )
-    const picked = shuffle(eligible).slice(0, count)
-    picked.forEach((p) => usedIds.add(p.id))
-    return picked
-  }
+  function buildTeamForSlots(pool: Player[], slots: Position[]) {
+    const usedIds = new Set<string>()
+    const ordered: Player[] = []
 
-  function fillRemainingSlots(
-    pool: Player[],
-    targetCount: number,
-    current: Player[],
-    usedIds: Set<string>
-  ) {
-    const remaining = shuffle(pool.filter((p) => !usedIds.has(p.id)))
-    const filled = [...current]
+    for (const slot of slots) {
+      const exact = shuffle(
+        pool.filter((p) => !usedIds.has(p.id) && p.positions.includes(slot))
+      )
 
-    while (filled.length < targetCount && remaining.length > 0) {
-      const next = remaining.shift()
-      if (next) {
-        filled.push(next)
-        usedIds.add(next.id)
+      if (exact.length > 0) {
+        ordered.push(exact[0])
+        usedIds.add(exact[0].id)
+        continue
+      }
+
+      const fallback = shuffle(pool.filter((p) => !usedIds.has(p.id)))
+      if (fallback.length > 0) {
+        ordered.push(fallback[0])
+        usedIds.add(fallback[0].id)
       }
     }
 
-    return filled
-  }
-
-  function buildQuarterTeam(pool: Player[]) {
-    const usedIds = new Set<string>()
-
-    const gk = pickPlayersForRole(pool, 1, "GK", usedIds)
-    const def = pickPlayersForRole(pool, 2, "DEF", usedIds)
-    const mid = pickPlayersForRole(pool, 3, "MID", usedIds)
-    const fwd = pickPlayersForRole(pool, 1, "FWD", usedIds)
-
-    const ordered = [...gk, ...def, ...mid, ...fwd]
-    return fillRemainingSlots(pool, 7, ordered, usedIds)
+    return ordered
   }
 
   function rotatePool(playersPool: Player[], offset: number) {
@@ -113,8 +142,8 @@ export default function Page() {
   function generateRotation() {
     const availablePlayers = players.filter((p) => available.includes(p.id))
 
-    if (availablePlayers.length < 7) {
-      alert("Need at least 7 available players")
+    if (availablePlayers.length < currentFormation.slots.length) {
+      alert(`Need at least ${currentFormation.slots.length} available players for ${gameType}`)
       return
     }
 
@@ -122,7 +151,7 @@ export default function Page() {
 
     for (let q = 0; q < 4; q++) {
       const rotated = rotatePool(availablePlayers, q * 2)
-      const quarter = buildQuarterTeam(rotated)
+      const quarter = buildTeamForSlots(rotated, currentFormation.slots)
       builtQuarters.push(uniquePlayers(quarter))
     }
 
@@ -138,26 +167,107 @@ export default function Page() {
     setCurrentQuarter((q) => Math.max(q - 1, 0))
   }
 
+  function handleGameTypeChange(value: GameType) {
+    setGameType(value)
+    setFormationLabel(FORMATIONS[value][0].label)
+    setQuarters([])
+    setCurrentQuarter(0)
+  }
+
   const currentTeam = quarters[currentQuarter] || []
   const allQuarterPlayers = uniquePlayers(quarters.flat())
   const currentBench = allQuarterPlayers.filter(
     (p) => !currentTeam.find((f) => f.id === p.id)
   )
 
-  function player(index: number) {
-    return currentTeam[index]?.name || "-"
+  function getPlayersForLine(role: Position, used: Set<string>) {
+    const indices: number[] = []
+    currentFormation.slots.forEach((slot, idx) => {
+      if (slot === role) indices.push(idx)
+    })
+
+    return indices
+      .map((idx) => currentTeam[idx])
+      .filter((p): p is Player => Boolean(p))
+      .filter((p) => {
+        if (used.has(p.id)) return false
+        used.add(p.id)
+        return true
+      })
+  }
+
+  const lineGroups = useMemo(() => {
+    const used = new Set<string>()
+    return {
+      gk: getPlayersForLine("GK", used),
+      def: getPlayersForLine("DEF", used),
+      mid: getPlayersForLine("MID", used),
+      fwd: getPlayersForLine("FWD", used),
+    }
+  }, [currentTeam, currentFormation])
+
+  function renderLine(title: string, group: Player[]) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-around",
+          gap: 10,
+          marginBottom: 18,
+          flexWrap: "wrap",
+        }}
+      >
+        {group.map((p) => (
+          <div key={`${title}-${p.id}`} style={{ textAlign: "center", minWidth: 90 }}>
+            <div style={{ fontWeight: "bold" }}>{title}</div>
+            <div>{p.name}</div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
     <main
       style={{
         padding: 20,
-        maxWidth: 600,
+        maxWidth: 700,
         margin: "auto",
         fontFamily: "Arial, sans-serif",
       }}
     >
       <h1>Sharks Team Manager</h1>
+
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 10 }}>
+          <strong>Game Type</strong>
+        </div>
+        <select
+          value={gameType}
+          onChange={(e) => handleGameTypeChange(e.target.value as GameType)}
+          style={{ padding: 10, marginRight: 10 }}
+        >
+          <option value="7v7">7v7</option>
+          <option value="9v9">9v9</option>
+          <option value="11v11">11v11</option>
+        </select>
+
+        <select
+          value={formationLabel}
+          onChange={(e) => {
+            setFormationLabel(e.target.value)
+            setQuarters([])
+            setCurrentQuarter(0)
+          }}
+          style={{ padding: 10 }}
+        >
+          {FORMATIONS[gameType].map((f) => (
+            <option key={f.label} value={f.label}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <h2>Players Available</h2>
 
@@ -183,9 +293,9 @@ export default function Page() {
           {quarters.map((quarter, index) => (
             <div key={index} style={{ marginBottom: 14 }}>
               <strong>Quarter {index + 1}</strong>
-              {quarter.map((p) => (
+              {quarter.map((p, idx) => (
                 <div key={`${index}-${p.id}`}>
-                  {p.name} • {p.positions.join("/")}
+                  {currentFormation.slots[idx]} — {p.name} • {p.positions.join("/")}
                 </div>
               ))}
             </div>
@@ -201,7 +311,9 @@ export default function Page() {
               marginBottom: 16,
             }}
           >
-            <strong>Current Quarter: {currentQuarter + 1}</strong>
+            <strong>
+              Current Quarter: {currentQuarter + 1} • {gameType} • {formationLabel}
+            </strong>
 
             <div
               style={{
@@ -212,56 +324,15 @@ export default function Page() {
                 marginTop: 12,
               }}
             >
-              <div style={{ textAlign: "center", marginBottom: 18 }}>
-                <div style={{ fontWeight: "bold" }}>FWD</div>
-                <div>{player(6)}</div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-around",
-                  marginBottom: 18,
-                }}
-              >
+              {lineGroups.fwd.length > 0 && renderLine("FWD", lineGroups.fwd)}
+              {lineGroups.mid.length > 0 && renderLine("MID", lineGroups.mid)}
+              {lineGroups.def.length > 0 && renderLine("DEF", lineGroups.def)}
+              {lineGroups.gk.length > 0 && (
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: "bold" }}>MID</div>
-                  <div>{player(3)}</div>
+                  <div style={{ fontWeight: "bold" }}>GK</div>
+                  <div>{lineGroups.gk[0].name}</div>
                 </div>
-
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: "bold" }}>MID</div>
-                  <div>{player(4)}</div>
-                </div>
-
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: "bold" }}>MID</div>
-                  <div>{player(5)}</div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-around",
-                  marginBottom: 18,
-                }}
-              >
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: "bold" }}>DEF</div>
-                  <div>{player(1)}</div>
-                </div>
-
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontWeight: "bold" }}>DEF</div>
-                  <div>{player(2)}</div>
-                </div>
-              </div>
-
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontWeight: "bold" }}>GK</div>
-                <div>{player(0)}</div>
-              </div>
+              )}
             </div>
 
             <div style={{ marginTop: 16 }}>
