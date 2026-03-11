@@ -1,21 +1,9 @@
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "Sharks Team Manager",
-  description: "Team management for players, attendance and live match tracking",
-  manifest: "/manifest.json",
-  themeColor: "#0f172a",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Sharks Manager",
-  },
-}
+import type { ReactNode } from "react"
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="en">
