@@ -1,4 +1,6 @@
-export const metadata = {
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
   title: "Sharks Team Manager",
   description: "Team management for players, attendance and live match tracking",
   manifest: "/manifest.json",
