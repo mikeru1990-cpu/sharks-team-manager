@@ -319,10 +319,7 @@ export default function Page() {
     setLoading(false)
   }
 
-  function normalizeLineup(lineup: (string | null)[], length: number) {
-    const next = Array(length).fill(null) as (string | null)[]
-    for (let i = 0; i < length; i++) next[i] = lineup[i] || null
-    return next
+ 
   }
 
   function resetPlayerForm() {
