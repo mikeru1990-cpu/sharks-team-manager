@@ -100,6 +100,11 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function percent(numerator: number, denominator: number) {
+  if (!denominator) return "0%"
+  return `${Math.round((numerator / denominator) * 100)}%`
+}
+
 export default function Page() {
   const [players, setPlayers] = useState<Player[]>([])
   const [events, setEvents] = useState<EventItem[]>([])
@@ -143,7 +148,7 @@ export default function Page() {
   })
 
   useEffect(() => {
-    loadAll()
+    void loadAll()
   }, [])
 
   useEffect(() => {
@@ -314,6 +319,71 @@ export default function Page() {
     if (!selectedEvent) return 0
     return players.filter((p) => getStatus(selectedEvent.id, p.id) === "R").length
   }, [players, attendance, selectedEvent])
+
+  const matchEvents = useMemo(() => events.filter((e) => e.type === "MATCH"), [events])
+  const trainingEvents = useMemo(() => events.filter((e) => e.type === "TRAINING"), [events])
+
+  const averageMatchAvailability = useMemo(() => {
+    if (matchEvents.length === 0 || players.length === 0) return "0%"
+    const totalP = matchEvents.reduce((sum, event) => {
+      return sum + players.filter((p) => getStatus(event.id, p.id) === "P").length
+    }, 0)
+    const possible = matchEvents.length * players.length
+    return percent(totalP, possible)
+  }, [matchEvents, players, attendance])
+
+  const playerSeasonStats = useMemo(() => {
+    return players.map((player) => {
+      const totals = { P: 0, R: 0, NO: 0, OFF: 0 }
+
+      events.forEach((event) => {
+        const status = getStatus(event.id, player.id)
+        totals[status] += 1
+      })
+
+      const matchP = matchEvents.filter((e) => getStatus(e.id, player.id) === "P").length
+      const trainingP = trainingEvents.filter((e) => getStatus(e.id, player.id) === "P").length
+      const activeStatuses = totals.P + totals.R + totals.NO
+
+      return {
+        player,
+        totals,
+        overallAttendancePct: percent(totals.P + totals.R, activeStatuses || events.length),
+        matchAttendancePct: percent(matchP, matchEvents.length),
+        trainingAttendancePct: percent(trainingP, trainingEvents.length),
+      }
+    })
+  }, [players, events, matchEvents, trainingEvents, attendance])
+
+  const coachAlerts = useMemo(() => {
+    const alerts: string[] = []
+
+    if (selectedEvent?.type === "MATCH") {
+      const availableKeepers = players.filter(
+        (p) =>
+          getStatus(selectedEvent.id, p.id) === "P" &&
+          (p.mainGK || p.backupGK || p.positions.includes("GK"))
+      )
+
+      if (availableKeepers.length === 0) {
+        alerts.push("No goalkeeper available for selected match.")
+      }
+
+      const needed = currentFormation.slots.length
+      if (headCount < needed) {
+        alerts.push(`Only ${headCount} players marked P. Need ${needed} for ${gameType}.`)
+      }
+    }
+
+    playerSeasonStats.forEach((row) => {
+      const unavailableCount = row.totals.NO
+      if (unavailableCount >= 3) {
+        alerts.push(`${row.player.name} has ${unavailableCount} unavailable records.`)
+      }
+    })
+
+    return alerts
+  }, [selectedEvent, players, attendance, headCount, currentFormation, gameType, playerSeasonStats])
 
   function shuffle<T>(array: T[]) {
     const arr = [...array]
@@ -582,15 +652,7 @@ export default function Page() {
 
     await supabase.from("players").upsert(payload, { onConflict: "id" })
     await loadAll()
-    setPlayerForm({
-      id: "",
-      name: "",
-      positions: ["MID"],
-      mainGK: false,
-      backupGK: false,
-    })
-    setEditingPlayerId(null)
-    setShowPlayerForm(false)
+    resetPlayerForm()
   }
 
   function resetEventForm() {
@@ -649,7 +711,59 @@ export default function Page() {
     <main style={{ padding: 20, maxWidth: 900, margin: "0 auto", fontFamily: "Arial, sans-serif" }}>
       <h1>Sharks Team Manager</h1>
 
-      <h2 style={{ marginTop: 20 }}>Players Manager</h2>
+      <h2 style={{ marginTop: 20 }}>Season Dashboard</h2>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+        <div style={{ padding: 14, borderRadius: 12, background: "#f5f5f5" }}>
+          <strong>Total Players</strong>
+          <div style={{ fontSize: 28, marginTop: 6 }}>{players.length}</div>
+        </div>
+        <div style={{ padding: 14, borderRadius: 12, background: "#f5f5f5" }}>
+          <strong>Total Events</strong>
+          <div style={{ fontSize: 28, marginTop: 6 }}>{events.length}</div>
+        </div>
+        <div style={{ padding: 14, borderRadius: 12, background: "#f5f5f5" }}>
+          <strong>Total Matches</strong>
+          <div style={{ fontSize: 28, marginTop: 6 }}>{matchEvents.length}</div>
+        </div>
+        <div style={{ padding: 14, borderRadius: 12, background: "#f5f5f5" }}>
+          <strong>Total Training</strong>
+          <div style={{ fontSize: 28, marginTop: 6 }}>{trainingEvents.length}</div>
+        </div>
+        <div style={{ padding: 14, borderRadius: 12, background: "#f5f5f5" }}>
+          <strong>Avg Match Availability</strong>
+          <div style={{ fontSize: 28, marginTop: 6 }}>{averageMatchAvailability}</div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#fff4e5", border: "1px solid #ffd591" }}>
+        <strong>Coach Alerts</strong>
+        {coachAlerts.length > 0 ? (
+          coachAlerts.map((alert, index) => (
+            <div key={index} style={{ marginTop: 8 }}>{alert}</div>
+          ))
+        ) : (
+          <div style={{ marginTop: 8 }}>No alerts right now.</div>
+        )}
+      </div>
+
+      <h3 style={{ marginTop: 20 }}>Player Season Stats</h3>
+      <div style={{ display: "grid", gap: 8 }}>
+        {playerSeasonStats.map((row) => (
+          <div key={row.player.id} style={{ padding: 12, border: "1px solid #ddd", borderRadius: 10, background: "white" }}>
+            <div style={{ fontWeight: 700 }}>{row.player.name}</div>
+            <div style={{ color: "#555", marginTop: 4 }}>{row.player.positions.join("/")}</div>
+            <div style={{ marginTop: 8 }}>
+              P: {row.totals.P} • R: {row.totals.R} • NO: {row.totals.NO} • OFF: {row.totals.OFF}
+            </div>
+            <div style={{ marginTop: 4 }}>
+              Overall: {row.overallAttendancePct} • Match: {row.matchAttendancePct} • Training: {row.trainingAttendancePct}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 style={{ marginTop: 30 }}>Players Manager</h2>
       <button onClick={() => {
         setPlayerForm({ id: "", name: "", positions: ["MID"], mainGK: false, backupGK: false })
         setEditingPlayerId(null)
