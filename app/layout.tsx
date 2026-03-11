@@ -1,6 +1,6 @@
 export const metadata = {
   title: "Sharks Team Manager",
-  description: "Team management app for players, attendance, formations, and live match tracking",
+  description: "Team management for players, attendance and live match tracking",
   manifest: "/manifest.json",
   themeColor: "#0f172a",
   appleWebApp: {
@@ -8,4 +8,25 @@ export const metadata = {
     statusBarStyle: "default",
     title: "Sharks Manager",
   },
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          padding: 0,
+          background: "#ffffff",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        {children}
+      </body>
+    </html>
+  )
 }
