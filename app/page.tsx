@@ -1,4 +1,4 @@
-import { generateRotation } from "../lib/rotation"
+import { buildSmartQuarterLineup } from "../lib/rotation"
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
