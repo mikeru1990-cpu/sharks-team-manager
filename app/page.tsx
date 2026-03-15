@@ -427,52 +427,7 @@ export default function Page() {
     })
   }
 
-  async function savePlayer() {
-    const trimmedName = playerForm.name.trim()
-    if (!trimmedName) {
-      alert("Player name required")
-      return
-    }
-
-    const id = editingPlayerId || makeId()
-
-    const payload = {
-      id,
-      name: trimmedName,
-      positions_json: JSON.stringify(playerForm.positions),
-      main_gk: !!playerForm.mainGK,
-      backup_gk: !!playerForm.backupGK,
-    }
-
-    const { error } = await supabase.from("players").upsert(payload, { onConflict: "id" })
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    await loadAll()
-    resetPlayerForm()
-  }
-
-  function resetEventForm() {
-    setEventForm({
-      id: "",
-      day: "",
-      date: "",
-      kickOff: "",
-      type: "MATCH",
-      title: "",
-      home: "",
-      away: "",
-      notes: "",
-    })
-    setEditingEventId(null)
-    setShowEventForm(false)
-  }
-
   async function saveEvent() {
-    if (!eventForm.day
-async function saveEvent() {
   if (!eventForm.day || !eventForm.date || !eventForm.kickOff || !eventForm.title) {
     alert("Day, date, kick off and title are required")
     return
@@ -492,7 +447,10 @@ async function saveEvent() {
     notes: eventForm.notes || "",
   }
 
-  const { error } = await supabase.from("events").upsert(payload, { onConflict: "id" })
+  const { error } = await supabase
+    .from("events")
+    .upsert(payload, { onConflict: "id" })
+
   if (error) {
     alert(error.message)
     return
