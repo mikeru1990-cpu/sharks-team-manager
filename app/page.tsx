@@ -1,6 +1,17 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import {
+  DndContext,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import { supabase } from "../supabase"
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../supabase"
 
 type Position = "GK" | "DEF" | "MID" | "FWD"
@@ -190,7 +201,134 @@ function pitchBtnStyle() {
     fontSize: 12,
   } as const
 }
+function DraggablePlayerCard({
+  id,
+  name,
+  subtitle,
+  background = "#fef3c7",
+}: {
+  id: string
+  name: string
+  subtitle?: string
+  background?: string
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id,
+  })
 
+  const style = {
+    transform: transform
+      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      : undefined,
+    opacity: isDragging ? 0.6 : 1,
+    touchAction: "none" as const,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        ...style,
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "16px 14px",
+        borderRadius: 16,
+        border: "1px solid #d1d5db",
+        background,
+        fontSize: 16,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        fontWeight: 700,
+        cursor: "grab",
+      }}
+    >
+      <span>{name}</span>
+      {subtitle ? <span>{subtitle}</span> : null}
+    </div>
+  )
+}
+
+function DroppablePitchSlot({
+  dropId,
+  slot,
+  player,
+  selected,
+  onClick,
+  onBench,
+  onInjure,
+  timeText,
+}: {
+  dropId: string
+  slot: Position
+  player: Player | null
+  selected: boolean
+  onClick: () => void
+  onBench: () => void
+  onInjure: () => void
+  timeText: string
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: dropId,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      onClick={onClick}
+      style={{
+        minHeight: 122,
+        borderRadius: 18,
+        border: selected
+          ? "3px solid #fde68a"
+          : isOver
+          ? "3px solid #93c5fd"
+          : "2px solid rgba(255,255,255,0.65)",
+        background: isOver ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.12)",
+        padding: 10,
+        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {player ? (
+        <div style={{ width: "100%" }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{slot}</div>
+          <div style={{ marginTop: 6, fontSize: 18, fontWeight: 800 }}>{player.name}</div>
+          <div style={{ marginTop: 6, fontSize: 14 }}>{timeText}</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onBench()
+              }}
+              style={pitchBtnStyle()}
+            >
+              Bench
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onInjure()
+              }}
+              style={pitchBtnStyle()}
+            >
+              Injured
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>{slot}</div>
+          <div style={{ marginTop: 8, fontSize: 18 }}>Drop Here</div>
+        </div>
+      )}
+    </div>
+  )
+}
 export default function Page() {
   const [tab, setTab] = useState<AppTab>("home")
 
@@ -951,7 +1089,44 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
   }
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over) return
 
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    if (!overId.startsWith("slot-")) return
+
+    const slotIndex = Number(overId.replace("slot-", ""))
+    if (Number.isNaN(slotIndex)) return
+
+    const draggedPlayer = availablePlayers.find((p) => p.id === activeId)
+    if (!draggedPlayer) return
+
+    const slot = pitchSlots[slotIndex]
+    if (!slot) return
+
+    if (!playerCanPlaySlot(draggedPlayer, slot)) {
+      alert(`${draggedPlayer.name} cannot play ${slot}`)
+      return
+    }
+
+    const next = [...pitchIds]
+    const existingIndex = next.findIndex((id) => id === activeId)
+    const occupyingId = next[slotIndex]
+
+    if (existingIndex !== -1) {
+      next[existingIndex] = occupyingId || null
+      next[slotIndex] = activeId
+    } else {
+      next[slotIndex] = activeId
+    }
+
+    setPitchIds(next)
+    setSelectedBenchId(null)
+    setSelectedPitchSlot(null)
+  }
   function removeFromPitch(slotIndex: number) {
     const next = [...pitchIds]
     next[slotIndex] = null
