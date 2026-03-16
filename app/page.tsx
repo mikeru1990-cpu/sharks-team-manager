@@ -791,7 +791,28 @@ export default function Page() {
       const lineup = Array(pitchSlots.length).fill(null) as (string | null)[]
       const used = new Set<string>()
 
+      const forcedPlayers = availablePlayers.filter((p) => previousBenchIds.includes(p.id))
+
+      for (const forcedPlayer of forcedPlayers) {
+        let bestSlotIndex = -1
+
+        for (let i = 0; i < pitchSlots.length; i++) {
+          if (lineup[i]) continue
+          const slot = pitchSlots[i]
+          if (!playerCanPlaySlot(forcedPlayer, slot)) continue
+          bestSlotIndex = i
+          break
+        }
+
+        if (bestSlotIndex !== -1) {
+          lineup[bestSlotIndex] = forcedPlayer.id
+          used.add(forcedPlayer.id)
+        }
+      }
+
       for (let i = 0; i < pitchSlots.length; i++) {
+        if (lineup[i]) continue
+
         const slot = pitchSlots[i]
 
         const eligible = availablePlayers.filter((p) => {
@@ -830,6 +851,7 @@ export default function Page() {
 
           if (!playerCanPlaySlot(benchPlayer, slot)) continue
           if (previousBenchIds.includes(currentPlayer.id)) continue
+          if (slot === "GK" && currentPlayer.mainGK) continue
 
           const currentMinutes = projectedMinutes[currentPlayer.id] || 0
           const benchMinutes = projectedMinutes[benchPlayer.id] || 0
@@ -872,7 +894,7 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
-    alert("Smart quarter planner generated")
+    alert("Upgrade 2 planner generated")
   }
 
   function loadQuarter(quarterNumber: number) {
@@ -953,6 +975,8 @@ export default function Page() {
 
   const totalMatches = events.filter((e) => e.type === "MATCH").length
   const totalTraining = events.filter((e) => e.type === "TRAINING").length
+  const totalNoGame = events.filter((e) => e.type === "NO_GAME").length
+  const totalHoliday = events.filter((e) => e.type === "HOLIDAY").length
   const avgAvailability = selectedEvent ? percent(availablePlayers.length, players.length || 1) : "0%"
   const upcomingEvents = [...events].slice(0, 5)
 
@@ -1053,6 +1077,14 @@ export default function Page() {
               <div style={cardStyle()}>
                 <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Training</div>
                 <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalTraining}</div>
+              </div>
+              <div style={cardStyle()}>
+                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>No Game</div>
+                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalNoGame}</div>
+              </div>
+              <div style={cardStyle()}>
+                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Holiday</div>
+                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalHoliday}</div>
               </div>
             </div>
 
