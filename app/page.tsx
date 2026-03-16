@@ -743,111 +743,119 @@ export default function Page() {
 
   async function generateQuarterPlans() {
     if (!selectedEvent) return
+
     if (availablePlayers.length === 0) {
       alert("Mark players as P first")
       return
     }
 
+    const quarterCount = 4
     const nextQuarterPlans: Record<number, (string | null)[]> = {}
-    let projectedMinutes: Record<string, number> = {}
+
+    const projectedMinutes: Record<string, number> = {}
     players.forEach((p) => {
       projectedMinutes[p.id] = getPlayerStat(selectedEvent.id, p.id).minutes || 0
     })
 
-    let previousLineup: (string | null)[] = []
     let previousBenchIds: string[] = []
+    let previousLineup: (string | null)[] = []
 
-    for (let quarter = 1; quarter <= 4; quarter++) {
-      const lineup = Array(pitchSlots.length).fill(null) as (string | null)[]
-      const used = new Set<string>()
-      const previousOnFieldIds = new Set(previousLineup.filter(Boolean) as string[])
-
-      const priorityPlayers = [...availablePlayers].sort((a, b) => {
-        const aWasBenched = previousBenchIds.includes(a.id)
-        const bWasBenched = previousBenchIds.includes(b.id)
-        if (aWasBenched !== bWasBenched) return aWasBenched ? -1 : 1
-
+    function sortByFairness(pool: Player[], slot: Position) {
+      return [...pool].sort((a, b) => {
         const aMinutes = projectedMinutes[a.id] || 0
         const bMinutes = projectedMinutes[b.id] || 0
+
+        const aWasBenchedLast = previousBenchIds.includes(a.id)
+        const bWasBenchedLast = previousBenchIds.includes(b.id)
+
+        if (aWasBenchedLast !== bWasBenchedLast) {
+          return aWasBenchedLast ? -1 : 1
+        }
+
+        if (slot === "GK") {
+          if (a.mainGK !== b.mainGK) return a.mainGK ? -1 : 1
+          if (a.backupGK !== b.backupGK) return a.backupGK ? -1 : 1
+        }
+
         if (aMinutes !== bMinutes) return aMinutes - bMinutes
 
-        const aPlayedLast = previousOnFieldIds.has(a.id)
-        const bPlayedLast = previousOnFieldIds.has(b.id)
+        const aPlayedLast = previousLineup.includes(a.id)
+        const bPlayedLast = previousLineup.includes(b.id)
         if (aPlayedLast !== bPlayedLast) return aPlayedLast ? 1 : -1
 
         return a.name.localeCompare(b.name)
       })
+    }
+
+    for (let quarter = 1; quarter <= quarterCount; quarter++) {
+      const lineup = Array(pitchSlots.length).fill(null) as (string | null)[]
+      const used = new Set<string>()
 
       for (let i = 0; i < pitchSlots.length; i++) {
         const slot = pitchSlots[i]
-        const candidates = priorityPlayers.filter((p) => !used.has(p.id) && playerCanPlaySlot(p, slot))
-        if (candidates.length === 0) continue
 
-        const ranked = [...candidates].sort((a, b) => {
-          const aMinutes = projectedMinutes[a.id] || 0
-          const bMinutes = projectedMinutes[b.id] || 0
-
-          if (slot === "GK") {
-            if (aMinutes !== bMinutes) return aMinutes - bMinutes
-            if (!!a.backupGK !== !!b.backupGK) return a.backupGK ? -1 : 1
-            if (!!a.mainGK !== !!b.mainGK) return a.mainGK ? 1 : -1
-            return a.name.localeCompare(b.name)
-          }
-
-          if (aMinutes !== bMinutes) return aMinutes - bMinutes
-          return a.name.localeCompare(b.name)
+        const eligible = availablePlayers.filter((p) => {
+          if (used.has(p.id)) return false
+          return playerCanPlaySlot(p, slot)
         })
 
+        if (eligible.length === 0) continue
+
+        const ranked = sortByFairness(eligible, slot)
         const chosen = ranked[0]
+
         lineup[i] = chosen.id
         used.add(chosen.id)
       }
 
-      const onFieldIds = new Set(lineup.filter(Boolean) as string[])
-      const stillBenched = previousBenchIds.filter((id) => !onFieldIds.has(id))
+      const onFieldIds = lineup.filter(Boolean) as string[]
+      let benchIds = availablePlayers.map((p) => p.id).filter((id) => !onFieldIds.includes(id))
 
-      for (const benchedId of stillBenched) {
-        const benchPlayer = availablePlayers.find((p) => p.id === benchedId)
+      const repeatedBenchers = benchIds.filter((id) => previousBenchIds.includes(id))
+
+      for (const repeatedBencherId of repeatedBenchers) {
+        const benchPlayer = availablePlayers.find((p) => p.id === repeatedBencherId)
         if (!benchPlayer) continue
 
         let bestSwapIndex = -1
-        let bestSwapScore = -Infinity
+        let bestSwapGain = -Infinity
 
         for (let i = 0; i < pitchSlots.length; i++) {
           const slot = pitchSlots[i]
           const currentId = lineup[i]
           if (!currentId) continue
-          if (!playerCanPlaySlot(benchPlayer, slot)) continue
 
           const currentPlayer = availablePlayers.find((p) => p.id === currentId)
           if (!currentPlayer) continue
+
+          if (!playerCanPlaySlot(benchPlayer, slot)) continue
           if (previousBenchIds.includes(currentPlayer.id)) continue
 
           const currentMinutes = projectedMinutes[currentPlayer.id] || 0
           const benchMinutes = projectedMinutes[benchPlayer.id] || 0
-          const swapScore = currentMinutes - benchMinutes
+          const gain = currentMinutes - benchMinutes
 
-          if (swapScore > bestSwapScore) {
-            bestSwapScore = swapScore
+          if (gain > bestSwapGain) {
+            bestSwapGain = gain
             bestSwapIndex = i
           }
         }
 
         if (bestSwapIndex !== -1) {
-          lineup[bestSwapIndex] = benchPlayer.id
+          lineup[bestSwapIndex] = repeatedBencherId
         }
       }
 
-      lineup.forEach((playerId) => {
-        if (!playerId) return
-        projectedMinutes[playerId] = (projectedMinutes[playerId] || 0) + 15
+      const finalOnFieldIds = lineup.filter(Boolean) as string[]
+      benchIds = availablePlayers.map((p) => p.id).filter((id) => !finalOnFieldIds.includes(id))
+
+      finalOnFieldIds.forEach((id) => {
+        projectedMinutes[id] = (projectedMinutes[id] || 0) + 15
       })
 
       nextQuarterPlans[quarter] = lineup
+      previousBenchIds = benchIds
       previousLineup = lineup
-      previousBenchIds = availablePlayers
-        .map((p) => p.id)
-        .filter((id) => !(new Set(lineup.filter(Boolean) as string[])).has(id))
 
       await saveQuarterPlan(selectedEvent.id, quarter, lineup)
     }
@@ -864,7 +872,7 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
-    alert("Smart fair quarter plans generated")
+    alert("Smart quarter planner generated")
   }
 
   function loadQuarter(quarterNumber: number) {
