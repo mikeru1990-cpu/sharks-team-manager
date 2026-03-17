@@ -6,7 +6,4 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim())
 })
 
-self.addEventListener("fetch", () => {
-  // Minimal service worker.
-  // Add caching later if you want offline pages/assets.
-})
+self.addEventListener("fetch", () => {})
