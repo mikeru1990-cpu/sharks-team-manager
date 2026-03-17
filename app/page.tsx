@@ -83,6 +83,16 @@ type DbQuarterPlan = {
   lineup_json: string
 }
 
+type SubHistoryItem = {
+  id: string
+  eventId: string
+  quarter: number
+  time: number
+  offPlayerId: string | null
+  onPlayerId: string | null
+  reason: "SUB" | "INJURY" | "RETURN" | "BENCH" | "DRAG"
+}
+
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
 const ATTENDANCE_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF", "INJ"]
 
@@ -329,6 +339,7 @@ export default function Page() {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, AttendanceStatus>>>({})
   const [statsMap, setStatsMap] = useState<Record<string, Record<string, PlayerMatchStat>>>({})
   const [quarterPlans, setQuarterPlans] = useState<Record<string, Record<number, (string | null)[]>>>({})
+  const [subHistoryMap, setSubHistoryMap] = useState<Record<string, SubHistoryItem[]>>({})
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -424,6 +435,7 @@ export default function Page() {
     const cachedAttendance = localStorage.getItem("sharks_attendance")
     const cachedStats = localStorage.getItem("sharks_stats")
     const cachedQuarterPlans = localStorage.getItem("sharks_quarter_plans")
+    const cachedSubHistory = localStorage.getItem("sharks_sub_history")
 
     if (cachedPlayers) {
       try {
@@ -448,6 +460,11 @@ export default function Page() {
     if (cachedQuarterPlans) {
       try {
         setQuarterPlans(JSON.parse(cachedQuarterPlans))
+      } catch {}
+    }
+    if (cachedSubHistory) {
+      try {
+        setSubHistoryMap(JSON.parse(cachedSubHistory))
       } catch {}
     }
 
@@ -521,6 +538,13 @@ export default function Page() {
       localStorage.setItem("sharks_attendance", JSON.stringify(nextAttendance))
       localStorage.setItem("sharks_stats", JSON.stringify(nextStats))
       localStorage.setItem("sharks_quarter_plans", JSON.stringify(nextQuarterPlans))
+
+      const existingSubHistory = localStorage.getItem("sharks_sub_history")
+      if (existingSubHistory) {
+        try {
+          setSubHistoryMap(JSON.parse(existingSubHistory))
+        } catch {}
+      }
 
       if (!selectedEventId && parsedEvents.length > 0) {
         setSelectedEventId(parsedEvents[0].id)
@@ -650,6 +674,11 @@ export default function Page() {
     await supabase.from("player_match_stats").delete().eq("event_id", eventId)
     await supabase.from("match_quarter_plans").delete().eq("event_id", eventId)
 
+    const nextSubHistory = { ...subHistoryMap }
+    delete nextSubHistory[eventId]
+    setSubHistoryMap(nextSubHistory)
+    localStorage.setItem("sharks_sub_history", JSON.stringify(nextSubHistory))
+
     if (selectedEventId === eventId) setSelectedEventId(null)
     await loadAll()
   }
@@ -702,13 +731,16 @@ export default function Page() {
     setAttendanceMap(nextAttendanceMap)
     localStorage.setItem("sharks_attendance", JSON.stringify(nextAttendanceMap))
 
+    let nextPitchIds = [...pitchIds]
     if (typeof slotIndex === "number") {
-      const next = [...pitchIds]
-      next[slotIndex] = null
-      setPitchIds(next)
+      nextPitchIds[slotIndex] = null
+      setPitchIds(nextPitchIds)
     } else {
-      setPitchIds((prev) => prev.map((id) => (id === playerId ? null : id)))
+      nextPitchIds = pitchIds.map((id) => (id === playerId ? null : id))
+      setPitchIds(nextPitchIds)
     }
+
+    recordSubHistory(playerId, null, "INJURY")
 
     const { error } = await supabase.from("event_attendance").upsert(
       {
@@ -718,6 +750,10 @@ export default function Page() {
       },
       { onConflict: "event_id,player_id" }
     )
+
+    if (selectedEvent) {
+      void saveQuarterPlan(selectedEvent.id, currentQuarter, nextPitchIds)
+    }
 
     if (error) alert(error.message)
   }
@@ -735,6 +771,7 @@ export default function Page() {
 
     setAttendanceMap(nextAttendanceMap)
     localStorage.setItem("sharks_attendance", JSON.stringify(nextAttendanceMap))
+    recordSubHistory(null, playerId, "RETURN")
 
     const { error } = await supabase.from("event_attendance").upsert(
       {
@@ -893,6 +930,47 @@ export default function Page() {
       }
     })
   }, [players, events, attendanceMap, statsMap])
+
+  function getPlayerName(playerId: string | null) {
+    if (!playerId) return "-"
+    return players.find((p) => p.id === playerId)?.name || "Unknown"
+  }
+
+  function getSubHistoryForEvent(eventId: string) {
+    return subHistoryMap[eventId] || []
+  }
+
+  function recordSubHistory(
+    offPlayerId: string | null,
+    onPlayerId: string | null,
+    reason: "SUB" | "INJURY" | "RETURN" | "BENCH" | "DRAG"
+  ) {
+    if (!selectedEvent) return
+
+    const item: SubHistoryItem = {
+      id: makeId(),
+      eventId: selectedEvent.id,
+      quarter: currentQuarter,
+      time: matchSeconds,
+      offPlayerId,
+      onPlayerId,
+      reason,
+    }
+
+    const next = {
+      ...subHistoryMap,
+      [selectedEvent.id]: [...(subHistoryMap[selectedEvent.id] || []), item],
+    }
+
+    setSubHistoryMap(next)
+    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
+  }
+
+  function clearSubHistoryForEvent(eventId: string) {
+    const next = { ...subHistoryMap, [eventId]: [] }
+    setSubHistoryMap(next)
+    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
+  }
 
   async function generateQuarterPlans() {
     if (!selectedEvent) return
@@ -1130,13 +1208,19 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
+    recordSubHistory(occupyingId || null, selectedBenchId, "SUB")
     void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   function removeFromPitch(slotIndex: number) {
     const next = [...pitchIds]
+    const offPlayerId = next[slotIndex]
     next[slotIndex] = null
     setPitchIds(next)
+
+    if (offPlayerId) {
+      recordSubHistory(offPlayerId, null, "BENCH")
+    }
 
     if (selectedEvent) {
       void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
@@ -1180,6 +1264,10 @@ export default function Page() {
     setPitchIds(next)
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
+
+    if (occupyingId !== activeId) {
+      recordSubHistory(occupyingId || null, activeId, "DRAG")
+    }
 
     void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
@@ -1994,6 +2082,58 @@ export default function Page() {
                               <span>{projectedSummaryMinutes[player.id] || 0} mins</span>
                             </div>
                           ))}
+                        </div>
+                      </div>
+
+                      <div style={cardStyle()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
+                          <div style={{ fontSize: 22, fontWeight: 800 }}>Substitution History</div>
+                          {selectedEvent ? (
+                            <button
+                              onClick={() => clearSubHistoryForEvent(selectedEvent.id)}
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                border: "1px solid #d1d5db",
+                                background: "white",
+                                fontWeight: 700,
+                              }}
+                            >
+                              Clear
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {!selectedEvent || getSubHistoryForEvent(selectedEvent.id).length === 0 ? (
+                            <div style={{ color: "#64748b" }}>No substitutions yet.</div>
+                          ) : (
+                            [...getSubHistoryForEvent(selectedEvent.id)]
+                              .sort((a, b) => {
+                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
+                                return a.time - b.time
+                              })
+                              .map((item) => (
+                                <div
+                                  key={item.id}
+                                  style={{
+                                    padding: 12,
+                                    borderRadius: 14,
+                                    background: "#f8fafc",
+                                  }}
+                                >
+                                  <div style={{ fontWeight: 800 }}>
+                                    Q{item.quarter} {formatSeconds(item.time)}
+                                  </div>
+                                  <div style={{ marginTop: 4, color: "#475569" }}>
+                                    {getPlayerName(item.offPlayerId)} → {getPlayerName(item.onPlayerId)}
+                                  </div>
+                                  <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>
+                                    {item.reason}
+                                  </div>
+                                </div>
+                              ))
+                          )}
                         </div>
                       </div>
                     </div>
