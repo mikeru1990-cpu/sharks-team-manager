@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next"
-import ServiceWorkerRegister from "./components/ServiceWorkerRegister"
-import "./globals.css"
+import ServiceWorkerRegister from "./app/components/ServiceWorkerRegister"
+import "../globals.css"
 
 export const metadata: Metadata = {
   title: "Sharks Team Manager",
