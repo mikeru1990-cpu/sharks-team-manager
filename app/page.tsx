@@ -967,12 +967,7 @@ export default function Page() {
         if (lineup[i]) continue
 
         const slot = pitchSlots[i]
-
-        const eligible = availablePlayers.filter((p) => {
-          if (used.has(p.id)) return false
-          return playerCanPlaySlot(p, slot)
-        })
-
+        const eligible = availablePlayers.filter((p) => !used.has(p.id) && playerCanPlaySlot(p, slot))
         if (eligible.length === 0) continue
 
         const ranked = sortByFairness(eligible, slot)
@@ -1089,19 +1084,29 @@ export default function Page() {
     setPitchIds(next)
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
+
+    if (selectedEvent) {
+      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
+    }
   }
 
   function clearPitch() {
-    setPitchIds(Array(pitchSlots.length).fill(null))
+    const next = Array(pitchSlots.length).fill(null) as (string | null)[]
+    setPitchIds(next)
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
     setTimerRunning(false)
     setMatchSeconds(0)
     setPlayerSeconds({})
+
+    if (selectedEvent) {
+      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
+    }
   }
 
   function placeBenchPlayer(slotIndex: number) {
-    if (!selectedBenchId) return
+    if (!selectedBenchId || !selectedEvent) return
+
     const selectedPlayer = availablePlayers.find((p) => p.id === selectedBenchId)
     const slot = pitchSlots[slotIndex]
     if (!selectedPlayer || !slot) return
@@ -1120,20 +1125,27 @@ export default function Page() {
     }
 
     next[slotIndex] = selectedBenchId
+
     setPitchIds(next)
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
+
+    void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   function removeFromPitch(slotIndex: number) {
     const next = [...pitchIds]
     next[slotIndex] = null
     setPitchIds(next)
+
+    if (selectedEvent) {
+      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
+    }
   }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over) return
+    if (!over || !selectedEvent) return
 
     const activeId = String(active.id)
     const overId = String(over.id)
@@ -1168,6 +1180,8 @@ export default function Page() {
     setPitchIds(next)
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
+
+    void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   async function saveLiveMinutesToStats() {
