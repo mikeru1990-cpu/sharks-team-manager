@@ -10,9 +10,9 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core"
 
+type MainTab = "home" | "players" | "events" | "match" | "stats"
+type MatchTab = "overview" | "lineup" | "live" | "quarters" | "stats"
 type EventType = "match" | "training" | "none"
-type MainTab = "home" | "events" | "match" | "stats"
-type MatchTab = "overview" | "lineup" | "live" | "stats"
 type MatchFormat = "7v7" | "9v9" | "11v11"
 type PitchPosition = "GK" | "DEF" | "MID" | "FWD"
 type TimelineEventType = "goal" | "assist" | "sub" | "injury" | "note"
@@ -28,8 +28,6 @@ type Player = {
   id: string
   name: string
   positions: PitchPosition[]
-  goals: number
-  assists: number
 }
 
 type TimelineItem = {
@@ -62,6 +60,13 @@ type MatchEventDraft = {
   note: string
 }
 
+type QuarterPlan = {
+  lineup: Record<string, string | null>
+  bench: string[]
+}
+
+const ALL_POSITIONS: PitchPosition[] = ["GK", "DEF", "MID", "FWD"]
+
 const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = {
   "7v7": {
     "2-3-1": ["FWD", "MID", "MID", "MID", "DEF", "DEF", "GK"],
@@ -78,18 +83,16 @@ const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = {
 }
 
 const initialPlayers: Player[] = [
-  { id: "1", name: "Lyra Twinning", positions: ["FWD"], goals: 0, assists: 0 },
-  { id: "2", name: "Bella Bainbridge", positions: ["MID"], goals: 0, assists: 0 },
-  { id: "3", name: "Betsy Rowland", positions: ["MID"], goals: 0, assists: 0 },
-  { id: "4", name: "Ella Wilson", positions: ["MID", "DEF"], goals: 0, assists: 0 },
-  { id: "5", name: "Bailee Dowler-Rowles", positions: ["DEF"], goals: 0, assists: 0 },
-  { id: "6", name: "Evelyn Evans", positions: ["DEF"], goals: 0, assists: 0 },
-  { id: "7", name: "Darcy-Rae Russell", positions: ["GK"], goals: 0, assists: 0 },
-  { id: "8", name: "Isabella Ogden", positions: ["MID", "FWD"], goals: 0, assists: 0 },
-  { id: "9", name: "Martha Scrivens", positions: ["MID"], goals: 0, assists: 0 },
-  { id: "10", name: "Poppy Bennett", positions: ["GK"], goals: 0, assists: 0 },
-  { id: "11", name: "Lacey Green", positions: ["DEF", "MID"], goals: 0, assists: 0 },
-  { id: "12", name: "Harper Cole", positions: ["FWD", "MID"], goals: 0, assists: 0 },
+  { id: "1", name: "Lyra Twinning", positions: ["FWD"] },
+  { id: "2", name: "Bella Bainbridge", positions: ["MID"] },
+  { id: "3", name: "Betsy Rowland", positions: ["MID"] },
+  { id: "4", name: "Ella Wilson", positions: ["MID", "DEF"] },
+  { id: "5", name: "Bailee Dowler-Rowles", positions: ["DEF"] },
+  { id: "6", name: "Evelyn Evans", positions: ["DEF"] },
+  { id: "7", name: "Darcy-Rae Russell", positions: ["GK"] },
+  { id: "8", name: "Isabella Ogden", positions: ["MID", "FWD"] },
+  { id: "9", name: "Martha Scrivens", positions: ["MID"] },
+  { id: "10", name: "Poppy Bennett", positions: ["GK"] },
 ]
 
 const initialEvents: EventItem[] = [
@@ -117,15 +120,6 @@ const initialTrainingTemplates: TrainingTemplate[] = [
     game: "4-goal game with bonus for one-touch finish",
     notes: "Coach timing of runs and composure in the box.",
   },
-  {
-    id: "t3",
-    name: "Defending Shape",
-    warmUp: "Movement prep + mirror defending",
-    drill1: "1v1 channel defending",
-    drill2: "Back line shifting against 3 attackers",
-    game: "6v6 protecting mini goals",
-    notes: "Distances, communication, and delaying the attacker.",
-  },
 ]
 
 function getToday() {
@@ -147,6 +141,10 @@ function formatClock(seconds: number) {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+function formatMinutes(seconds: number) {
+  return (seconds / 60).toFixed(1)
 }
 
 function formatShortDate(date: string) {
@@ -224,7 +222,10 @@ function makeLabel(position: PitchPosition, count: number, total: number) {
   if (position === "GK") return "Goalkeeper"
   if (position === "FWD") return total === 1 ? "Striker" : `Forward ${count}`
   if (position === "DEF") return total === 2 ? (count === 1 ? "Left Def" : "Right Def") : `Defender ${count}`
-  if (position === "MID") return total === 3 ? (count === 1 ? "Left Mid" : count === 2 ? "Center Mid" : "Right Mid") : `Midfielder ${count}`
+  if (position === "MID") {
+    if (total === 3) return count === 1 ? "Left Mid" : count === 2 ? "Center Mid" : "Right Mid"
+    return `Midfielder ${count}`
+  }
   return `${position} ${count}`
 }
 
@@ -244,20 +245,6 @@ function buildPitchSlots(format: MatchFormat, formation: string): PitchSlot[] {
       position,
     }
   })
-}
-
-function autoBuildLineup(players: Player[], slots: PitchSlot[]) {
-  const used = new Set<string>()
-  const lineup: Record<string, string | null> = {}
-
-  slots.forEach((slot) => {
-    const player = players.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
-    lineup[slot.id] = player ? player.id : null
-    if (player) used.add(player.id)
-  })
-
-  const bench = players.filter((p) => !used.has(p.id)).map((p) => p.id)
-  return { lineup, bench }
 }
 
 function parseDragId(value: string) {
@@ -289,10 +276,12 @@ function DraggablePlayerCard({
   player,
   originId,
   compact = false,
+  subtitle,
 }: {
   player: Player
   originId: string
   compact?: boolean
+  subtitle?: string
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `player::${player.id}::from::${originId}`,
@@ -340,6 +329,7 @@ function DraggablePlayerCard({
         </div>
         <div style={{ marginTop: 8, fontWeight: 900, fontSize: 14, lineHeight: 1.1 }}>{player.name}</div>
         <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>{player.positions.join("/")}</div>
+        {subtitle ? <div style={{ marginTop: 4, fontSize: 11 }}>{subtitle}</div> : null}
       </div>
     )
   }
@@ -379,9 +369,8 @@ function DraggablePlayerCard({
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 900, fontSize: 18 }}>{player.name}</div>
-        <div style={{ color: "#64748b", marginTop: 4 }}>
-          {player.positions.join("/")} • {player.goals}G • {player.assists}A
-        </div>
+        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+        {subtitle ? <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div> : null}
       </div>
     </div>
   )
@@ -391,10 +380,12 @@ function PitchDropSlot({
   slot,
   player,
   activePlayer,
+  liveSeconds,
 }: {
   slot: PitchSlot
   player?: Player
   activePlayer?: Player | null
+  liveSeconds?: number
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: slot.id })
   const invalid = activePlayer ? !canPlaySlot(activePlayer, slot.position) : false
@@ -422,7 +413,12 @@ function PitchDropSlot({
       }}
     >
       {player ? (
-        <DraggablePlayerCard player={player} originId={slot.id} compact />
+        <DraggablePlayerCard
+          player={player}
+          originId={slot.id}
+          compact
+          subtitle={typeof liveSeconds === "number" ? `${formatMinutes(liveSeconds)} min` : undefined}
+        />
       ) : (
         <div style={{ textAlign: "center", color: "rgba(255,255,255,0.9)" }}>
           <div style={{ fontWeight: 800, fontSize: 12 }}>{slot.label}</div>
@@ -436,10 +432,8 @@ function PitchDropSlot({
 
 function BenchDropZone({
   children,
-  isActive,
 }: {
   children: React.ReactNode
-  isActive?: boolean
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: "bench" })
 
@@ -450,7 +444,7 @@ function BenchDropZone({
         padding: 14,
         borderRadius: 20,
         border: isOver ? "2px solid #93c5fd" : "1px solid #e2e8f0",
-        background: isOver ? "#eff6ff" : isActive ? "#fff7ed" : "#fff7ed",
+        background: isOver ? "#eff6ff" : "#fff7ed",
       }}
     >
       {children}
@@ -476,8 +470,8 @@ export default function Page() {
 
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("7v7")
   const [formation, setFormation] = useState("2-3-1")
-
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
+
   const [lineupMap, setLineupMap] = useState<Record<string, string | null>>({})
   const [benchIds, setBenchIds] = useState<string[]>([])
 
@@ -512,28 +506,57 @@ export default function Page() {
 
   const [activeDragPlayerId, setActiveDragPlayerId] = useState<string | null>(null)
 
+  const [liveSecondsMap, setLiveSecondsMap] = useState<Record<string, number>>({})
+  const [seasonSecondsMap, setSeasonSecondsMap] = useState<Record<string, number>>({})
+  const [currentQuarter, setCurrentQuarter] = useState(1)
+  const [quarterPlans, setQuarterPlans] = useState<Record<number, QuarterPlan>>({})
+  const [quarterWarnings, setQuarterWarnings] = useState<string[]>([])
+
+  const [showPlayerForm, setShowPlayerForm] = useState(false)
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
+  const [playerForm, setPlayerForm] = useState<{ name: string; positions: PitchPosition[] }>({
+    name: "",
+    positions: ["MID"],
+  })
+
   useEffect(() => {
-    const auto = autoBuildLineup(initialPlayers, currentSlots)
-    setLineupMap(auto.lineup)
-    setBenchIds(auto.bench)
+    const firstLineup: Record<string, string | null> = {}
+    const used = new Set<string>()
+
+    currentSlots.forEach((slot) => {
+      const player = players.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+      firstLineup[slot.id] = player ? player.id : null
+      if (player) used.add(player.id)
+    })
+
+    setLineupMap(firstLineup)
+    setBenchIds(players.filter((p) => !used.has(p.id)).map((p) => p.id))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (!running) return
+
     const interval = window.setInterval(() => {
       setSeconds((prev) => prev + 1)
+      setLiveSecondsMap((prev) => {
+        const next = { ...prev }
+        Object.values(lineupMap)
+          .filter(Boolean)
+          .forEach((playerId) => {
+            const id = playerId as string
+            next[id] = (next[id] || 0) + 1
+          })
+        return next
+      })
     }, 1000)
+
     return () => window.clearInterval(interval)
-  }, [running])
+  }, [running, lineupMap])
 
-  const visibleEvents = useMemo(() => {
-    return events.filter((e) => e.date === selectedDate)
-  }, [events, selectedDate])
-
-  const totalGoals = useMemo(() => players.reduce((a, p) => a + p.goals, 0), [players])
-  const totalAssists = useMemo(() => players.reduce((a, p) => a + p.assists, 0), [players])
-
+  const visibleEvents = useMemo(() => events.filter((e) => e.date === selectedDate), [events, selectedDate])
+  const totalGoals = useMemo(() => timeline.filter((t) => t.type === "goal").length, [timeline])
+  const totalAssists = useMemo(() => timeline.filter((t) => t.type === "assist").length, [timeline])
   const lineupPlayerIds = useMemo(() => Object.values(lineupMap).filter(Boolean) as string[], [lineupMap])
 
   const lineupPlayers = useMemo(
@@ -551,42 +574,19 @@ export default function Page() {
     [players, activeDragPlayerId]
   )
 
-  const pitchRows = useMemo(() => {
-    return [
+  const pitchRows = useMemo(
+    () => [
       currentSlots.filter((s) => s.position === "FWD"),
       currentSlots.filter((s) => s.position === "MID"),
       currentSlots.filter((s) => s.position === "DEF"),
       currentSlots.filter((s) => s.position === "GK"),
-    ]
-  }, [currentSlots])
-
-  function stepClock(delta: number) {
-    setSeconds((prev) => Math.max(0, prev + delta))
-  }
+    ],
+    [currentSlots]
+  )
 
   function addTimeline(type: TimelineEventType, text: string) {
     const minute = Math.floor(seconds / 60)
     setTimeline((prev) => [...prev, { id: makeId(), minute, type, text }])
-  }
-
-  function updateStat(id: string, type: "goal" | "assist", delta: number) {
-    const player = players.find((p) => p.id === id)
-    if (!player) return
-
-    setPlayers((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              goals: type === "goal" ? Math.max(0, p.goals + delta) : p.goals,
-              assists: type === "assist" ? Math.max(0, p.assists + delta) : p.assists,
-            }
-          : p
-      )
-    )
-
-    if (delta > 0 && type === "goal") addTimeline("goal", `${player.name} scored`)
-    if (delta > 0 && type === "assist") addTimeline("assist", `${player.name} got an assist`)
   }
 
   function loadTrainingTemplate(templateId: string) {
@@ -604,20 +604,54 @@ export default function Page() {
     })
   }
 
-  function applyCurrentFormationReset() {
-    const auto = autoBuildLineup(players, currentSlots)
-    setLineupMap(auto.lineup)
-    setBenchIds(auto.bench)
-    addTimeline("note", `Auto lineup set for ${matchFormat} ${formation}`)
+  function rebuildLineupForCurrentShape(nextPlayers: Player[]) {
+    const freshLineup: Record<string, string | null> = {}
+    const used = new Set<string>()
+
+    currentSlots.forEach((slot) => {
+      const existingId = lineupMap[slot.id]
+      const existingPlayer = nextPlayers.find((p) => p.id === existingId)
+      if (existingPlayer && canPlaySlot(existingPlayer, slot.position) && !used.has(existingPlayer.id)) {
+        freshLineup[slot.id] = existingPlayer.id
+        used.add(existingPlayer.id)
+        return
+      }
+
+      const fallback = nextPlayers.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+      freshLineup[slot.id] = fallback ? fallback.id : null
+      if (fallback) used.add(fallback.id)
+    })
+
+    setLineupMap(freshLineup)
+    setBenchIds(nextPlayers.filter((p) => !used.has(p.id)).map((p) => p.id))
   }
 
   function onChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
     const slots = buildPitchSlots(nextFormat, nextFormation)
-    const auto = autoBuildLineup(players, slots)
+    const used = new Set<string>()
+    const nextLineup: Record<string, string | null> = {}
+
+    slots.forEach((slot) => {
+      const currentPlayer = players.find(
+        (p) =>
+          !used.has(p.id) &&
+          lineupPlayerIds.includes(p.id) &&
+          canPlaySlot(p, slot.position)
+      )
+      if (currentPlayer) {
+        nextLineup[slot.id] = currentPlayer.id
+        used.add(currentPlayer.id)
+      } else {
+        const fallback = players.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+        nextLineup[slot.id] = fallback ? fallback.id : null
+        if (fallback) used.add(fallback.id)
+      }
+    })
+
     setMatchFormat(nextFormat)
     setFormation(nextFormation)
-    setLineupMap(auto.lineup)
-    setBenchIds(auto.bench)
+    setLineupMap(nextLineup)
+    setBenchIds(players.filter((p) => !used.has(p.id)).map((p) => p.id))
     addTimeline("note", `Formation changed to ${nextFormation}`)
   }
 
@@ -713,8 +747,9 @@ export default function Page() {
       if (fromId === overId) return
 
       const swappedPlayer = targetPlayerId ? players.find((p) => p.id === targetPlayerId) : null
-      if (swappedPlayer && !canPlaySlot(swappedPlayer, currentSlots.find((s) => s.id === fromId)?.position || "MID")) {
-        addTimeline("note", `Swap blocked because ${swappedPlayer.name} cannot play that role`)
+      const previousSlot = currentSlots.find((s) => s.id === fromId)
+      if (swappedPlayer && previousSlot && !canPlaySlot(swappedPlayer, previousSlot.position)) {
+        addTimeline("note", `Swap blocked because ${swappedPlayer.name} cannot play ${previousSlot.position}`)
         return
       }
 
@@ -727,9 +762,7 @@ export default function Page() {
 
       addTimeline(
         "sub",
-        targetPlayerId
-          ? `${player.name} swapped with ${swappedPlayer?.name || "player"}`
-          : `${player.name} moved to ${targetSlot.label}`
+        targetPlayerId ? `${player.name} swapped with ${swappedPlayer?.name || "player"}` : `${player.name} moved to ${targetSlot.label}`
       )
     }
   }
@@ -741,16 +774,14 @@ export default function Page() {
     if (eventDraft.type === "goal") {
       if (!player) return alert("Choose a scorer")
       setHomeScore((prev) => prev + 1)
-      updateStat(player.id, "goal", 1)
-      if (secondPlayer) updateStat(secondPlayer.id, "assist", 1)
-      if (secondPlayer) addTimeline("goal", `${player.name} scored, assist ${secondPlayer.name}`)
+      addTimeline("goal", secondPlayer ? `${player.name} scored, assist ${secondPlayer.name}` : `${player.name} scored`)
       setShowEventModal(false)
       return
     }
 
     if (eventDraft.type === "assist") {
       if (!player) return alert("Choose a player")
-      updateStat(player.id, "assist", 1)
+      addTimeline("assist", `${player.name} assist`)
       setShowEventModal(false)
       return
     }
@@ -774,6 +805,176 @@ export default function Page() {
       addTimeline("note", eventDraft.note.trim())
       setShowEventModal(false)
     }
+  }
+
+  function saveQuarterPlan(quarterNumber: number) {
+    setQuarterPlans((prev) => ({
+      ...prev,
+      [quarterNumber]: {
+        lineup: { ...lineupMap },
+        bench: [...benchIds],
+      },
+    }))
+  }
+
+  function loadQuarterPlan(quarterNumber: number) {
+    const plan = quarterPlans[quarterNumber]
+    if (!plan) {
+      alert(`No saved plan for Q${quarterNumber}`)
+      return
+    }
+    setCurrentQuarter(quarterNumber)
+    setLineupMap(plan.lineup)
+    setBenchIds(plan.bench)
+  }
+
+  function commitLiveMinutesToSeason() {
+    setSeasonSecondsMap((prev) => {
+      const next = { ...prev }
+      Object.entries(liveSecondsMap).forEach(([playerId, secs]) => {
+        next[playerId] = (next[playerId] || 0) + secs
+      })
+      return next
+    })
+    setLiveSecondsMap({})
+  }
+
+  function generateQuarterPlans() {
+    const quarterCount = 4
+    const plans: Record<number, QuarterPlan> = {}
+    const playerIds = players.map((p) => p.id)
+    const benchHistory: Record<string, number[]> = {}
+    const projectedSeconds: Record<string, number> = {}
+
+    playerIds.forEach((id) => {
+      benchHistory[id] = []
+      projectedSeconds[id] = (seasonSecondsMap[id] || 0) + (liveSecondsMap[id] || 0)
+    })
+
+    for (let quarter = 1; quarter <= quarterCount; quarter++) {
+      const lineup: Record<string, string | null> = {}
+      const used = new Set<string>()
+
+      currentSlots.forEach((slot) => {
+        const eligible = players
+          .filter((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+          .sort((a, b) => {
+            const aConsecutiveBench = benchHistory[a.id].slice(-1)[0] === quarter - 1 ? 1 : 0
+            const bConsecutiveBench = benchHistory[b.id].slice(-1)[0] === quarter - 1 ? 1 : 0
+            if (aConsecutiveBench !== bConsecutiveBench) return aConsecutiveBench - bConsecutiveBench
+
+            const aSeconds = projectedSeconds[a.id] || 0
+            const bSeconds = projectedSeconds[b.id] || 0
+            if (aSeconds !== bSeconds) return aSeconds - bSeconds
+
+            return a.name.localeCompare(b.name)
+          })
+
+        const chosen = eligible[0]
+        lineup[slot.id] = chosen ? chosen.id : null
+        if (chosen) {
+          used.add(chosen.id)
+          projectedSeconds[chosen.id] = (projectedSeconds[chosen.id] || 0) + 15 * 60
+        }
+      })
+
+      const bench = players.filter((p) => !used.has(p.id)).map((p) => p.id)
+      bench.forEach((id) => benchHistory[id].push(quarter))
+
+      plans[quarter] = { lineup, bench }
+    }
+
+    const warnings: string[] = []
+    Object.entries(benchHistory).forEach(([playerId, history]) => {
+      for (let i = 1; i < history.length; i++) {
+        if (history[i] === history[i - 1] + 1) {
+          const name = players.find((p) => p.id === playerId)?.name || "Player"
+          warnings.push(`${name} is benched in consecutive quarters`)
+          break
+        }
+      }
+    })
+
+    setQuarterPlans(plans)
+    setQuarterWarnings(warnings)
+    setCurrentQuarter(1)
+    setLineupMap(plans[1].lineup)
+    setBenchIds(plans[1].bench)
+  }
+
+  function resetPlayerForm() {
+    setPlayerForm({ name: "", positions: ["MID"] })
+    setEditingPlayerId(null)
+    setShowPlayerForm(false)
+  }
+
+  function togglePlayerPosition(position: PitchPosition) {
+    setPlayerForm((prev) => {
+      const exists = prev.positions.includes(position)
+      let next = exists ? prev.positions.filter((p) => p !== position) : [...prev.positions, position]
+      if (next.length === 0) next = [position]
+      return { ...prev, positions: next }
+    })
+  }
+
+  function startEditPlayer(player: Player) {
+    setPlayerForm({ name: player.name, positions: player.positions })
+    setEditingPlayerId(player.id)
+    setShowPlayerForm(true)
+  }
+
+  function savePlayer() {
+    const trimmed = playerForm.name.trim()
+    if (!trimmed) {
+      alert("Player name required")
+      return
+    }
+
+    if (editingPlayerId) {
+      const nextPlayers = players.map((p) =>
+        p.id === editingPlayerId ? { ...p, name: trimmed, positions: playerForm.positions } : p
+      )
+      setPlayers(nextPlayers)
+      rebuildLineupForCurrentShape(nextPlayers)
+      resetPlayerForm()
+      return
+    }
+
+    const newPlayer: Player = {
+      id: makeId(),
+      name: trimmed,
+      positions: playerForm.positions,
+    }
+
+    const nextPlayers = [...players, newPlayer]
+    setPlayers(nextPlayers)
+    rebuildLineupForCurrentShape(nextPlayers)
+    resetPlayerForm()
+  }
+
+  function deletePlayer(playerId: string) {
+    const name = players.find((p) => p.id === playerId)?.name || "Player"
+    const nextPlayers = players.filter((p) => p.id !== playerId)
+    setPlayers(nextPlayers)
+    setBenchIds((prev) => prev.filter((id) => id !== playerId))
+    setLineupMap((prev) => {
+      const next = { ...prev }
+      Object.keys(next).forEach((slotId) => {
+        if (next[slotId] === playerId) next[slotId] = null
+      })
+      return next
+    })
+    setLiveSecondsMap((prev) => {
+      const next = { ...prev }
+      delete next[playerId]
+      return next
+    })
+    setSeasonSecondsMap((prev) => {
+      const next = { ...prev }
+      delete next[playerId]
+      return next
+    })
+    addTimeline("note", `${name} removed from squad`)
   }
 
   return (
@@ -804,7 +1005,7 @@ export default function Page() {
           borderRadius: 28,
           padding: 10,
           display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
+          gridTemplateColumns: "repeat(5, 1fr)",
           gap: 8,
           boxShadow: "0 10px 30px rgba(15,23,42,0.12)",
           zIndex: 50,
@@ -812,6 +1013,7 @@ export default function Page() {
       >
         {[
           ["home", "Home", "⌂"],
+          ["players", "Players", "👥"],
           ["events", "Events", "📅"],
           ["match", "Match", "⚽"],
           ["stats", "Stats", "📊"],
@@ -826,7 +1028,7 @@ export default function Page() {
               background: tab === value ? "#061b5b" : "transparent",
               color: tab === value ? "white" : "#475569",
               fontWeight: 800,
-              fontSize: 14,
+              fontSize: 13,
             }}
           >
             <div style={{ fontSize: 18 }}>{icon}</div>
@@ -846,7 +1048,7 @@ export default function Page() {
             <div style={{ fontSize: 14, opacity: 0.8, fontWeight: 800 }}>Club Dashboard</div>
             <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>Ready for Matchday</div>
             <div style={{ marginTop: 10, opacity: 0.9, fontSize: 18 }}>
-              Smarter formations, real tactics board, one event flow, saved lineups.
+              Live minutes, quarter planning, team editing and drag-and-drop lineups.
             </div>
           </div>
 
@@ -864,9 +1066,124 @@ export default function Page() {
               <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{totalGoals}</div>
             </div>
             <div style={cardStyle()}>
-              <div style={{ color: "#64748b", fontWeight: 800 }}>Assists</div>
-              <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{totalAssists}</div>
+              <div style={{ color: "#64748b", fontWeight: 800 }}>Saved Quarters</div>
+              <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{Object.keys(quarterPlans).length}</div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "players" ? (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ ...cardStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>Team Members</div>
+              <div style={{ color: "#64748b", marginTop: 4 }}>Add, edit and remove squad members.</div>
+            </div>
+            <button
+              onClick={() => {
+                resetPlayerForm()
+                setShowPlayerForm(true)
+              }}
+              style={buttonPrimary()}
+            >
+              + Add Player
+            </button>
+          </div>
+
+          {showPlayerForm ? (
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+                {editingPlayerId ? "Edit Player" : "Add Player"}
+              </div>
+
+              <input
+                value={playerForm.name}
+                onChange={(e) => setPlayerForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Player name"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 16,
+                  marginBottom: 12,
+                }}
+              />
+
+              <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+                {ALL_POSITIONS.map((position) => (
+                  <label key={position} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input
+                      type="checkbox"
+                      checked={playerForm.positions.includes(position)}
+                      onChange={() => togglePlayerPosition(position)}
+                    />
+                    <span style={{ fontWeight: 700 }}>{position}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={savePlayer} style={{ ...buttonPrimary(), flex: 1 }}>
+                  Save
+                </button>
+                <button onClick={resetPlayerForm} style={{ ...buttonSecondary(), flex: 1 }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {players.map((player) => (
+              <div
+                key={player.id}
+                style={{
+                  ...cardStyle(),
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: 58,
+                    height: 58,
+                    borderRadius: "50%",
+                    background: "linear-gradient(180deg,#ffffff 0%,#dbeafe 100%)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontWeight: 900,
+                    fontSize: 24,
+                    color: "#0f172a",
+                  }}
+                >
+                  {initials(player.name)}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 900, fontSize: 18 }}>{player.name}</div>
+                  <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                </div>
+
+                <button onClick={() => startEditPlayer(player)} style={buttonSecondary()}>
+                  Edit
+                </button>
+                <button
+                  onClick={() => deletePlayer(player.id)}
+                  style={{
+                    ...buttonSecondary(),
+                    color: "#b91c1c",
+                    border: "1px solid #fecaca",
+                    background: "#fff1f2",
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -967,6 +1284,7 @@ export default function Page() {
               ["overview", "Overview"],
               ["lineup", "Lineup"],
               ["live", "Live"],
+              ["quarters", "Quarters"],
               ["stats", "Stats"],
             ].map(([value, label]) => (
               <button
@@ -1031,7 +1349,7 @@ export default function Page() {
               </div>
 
               <div style={cardStyle("#ecfccb")}>
-                <div style={{ color: "#4d7c0f", fontWeight: 900, fontSize: 16 }}>Quarter 1</div>
+                <div style={{ color: "#4d7c0f", fontWeight: 900, fontSize: 16 }}>Quarter {currentQuarter}</div>
                 <div style={{ fontSize: 52, fontWeight: 900, marginTop: 8 }}>{formatClock(seconds)}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginTop: 14 }}>
                   <button onClick={() => setRunning(true)} style={buttonPrimary()}>
@@ -1044,13 +1362,14 @@ export default function Page() {
                     onClick={() => {
                       setRunning(false)
                       setSeconds(0)
+                      setLiveSecondsMap({})
                     }}
                     style={buttonSecondary()}
                   >
                     Reset
                   </button>
-                  <button onClick={() => stepClock(60)} style={buttonSecondary()}>
-                    +1 min
+                  <button onClick={commitLiveMinutesToSeason} style={buttonSecondary()}>
+                    Save Minutes
                   </button>
                 </div>
               </div>
@@ -1060,15 +1379,15 @@ export default function Page() {
           {matchTab === "lineup" ? (
             <div style={{ display: "grid", gap: 16 }}>
               <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Formation Engine</div>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Formation & Saved Lineups</div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
                   <select
                     value={matchFormat}
                     onChange={(e) => {
                       const nextFormat = e.target.value as MatchFormat
-                      const firstFormation = Object.keys(FORMATIONS[nextFormat])[0]
-                      onChangeFormation(nextFormat, firstFormation)
+                      const nextFormation = Object.keys(FORMATIONS[nextFormat])[0]
+                      onChangeFormation(nextFormat, nextFormation)
                     }}
                     style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
                   >
@@ -1099,12 +1418,6 @@ export default function Page() {
                   />
                   <button onClick={saveCurrentLineup} style={buttonPrimary()}>
                     Save
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-                  <button onClick={applyCurrentFormationReset} style={buttonSecondary()}>
-                    Auto Fill
                   </button>
                 </div>
               </div>
@@ -1150,7 +1463,7 @@ export default function Page() {
               <div style={cardStyle()}>
                 <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Real Drag-and-Drop Tactics Board</div>
                 <div style={{ color: "#64748b", marginBottom: 12 }}>
-                  Wrong-role drops are blocked. Keepers only go in GK. Save any lineup you like.
+                  Drag from bench to pitch, swap players, and live minutes update while the clock runs.
                 </div>
 
                 <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1217,6 +1530,7 @@ export default function Page() {
                                 slot={slot}
                                 player={player}
                                 activePlayer={activeDragPlayer}
+                                liveSeconds={playerId ? liveSecondsMap[playerId] || 0 : 0}
                               />
                             )
                           })}
@@ -1227,13 +1541,18 @@ export default function Page() {
 
                   <div style={{ marginTop: 16 }}>
                     <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Bench</div>
-                    <BenchDropZone isActive={!!activeDragPlayer}>
+                    <BenchDropZone>
                       <div style={{ display: "grid", gap: 10 }}>
                         {benchPlayers.length === 0 ? (
                           <div style={{ color: "#64748b" }}>No players on the bench.</div>
                         ) : (
                           benchPlayers.map((player) => (
-                            <DraggablePlayerCard key={player.id} player={player} originId="bench" />
+                            <DraggablePlayerCard
+                              key={player.id}
+                              player={player}
+                              originId="bench"
+                              subtitle={`${formatMinutes(liveSecondsMap[player.id] || 0)} min live`}
+                            />
                           ))
                         )}
                       </div>
@@ -1248,59 +1567,12 @@ export default function Page() {
             <div style={{ display: "grid", gap: 16 }}>
               <div style={cardStyle()}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                  <div style={{ fontSize: 22, fontWeight: 900 }}>Single Match Event System</div>
-                  <button
-                    onClick={() => setShowEventModal(true)}
-                    style={buttonPrimary()}
-                  >
+                  <div style={{ fontSize: 22, fontWeight: 900 }}>Match Events</div>
+                  <button onClick={() => setShowEventModal(true)} style={buttonPrimary()}>
                     Add Event
                   </button>
                 </div>
 
-                <div style={{ display: "grid", gap: 10 }}>
-                  {players.map((p) => (
-                    <div
-                      key={p.id}
-                      style={{
-                        border: "1px solid #e2e8f0",
-                        padding: 14,
-                        borderRadius: 18,
-                        background: "#ffffff",
-                      }}
-                    >
-                      <div style={{ fontWeight: 900, fontSize: 18 }}>{p.name}</div>
-                      <div style={{ color: "#64748b", marginTop: 4 }}>
-                        {p.positions.join("/")} • Goals: {p.goals} • Assists: {p.assists}
-                      </div>
-
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(4, 1fr)",
-                          gap: 8,
-                          marginTop: 12,
-                        }}
-                      >
-                        <button onClick={() => updateStat(p.id, "goal", 1)} style={buttonPrimary()}>
-                          + Goal
-                        </button>
-                        <button onClick={() => updateStat(p.id, "goal", -1)} style={buttonSecondary()}>
-                          - Goal
-                        </button>
-                        <button onClick={() => updateStat(p.id, "assist", 1)} style={buttonPrimary()}>
-                          + Assist
-                        </button>
-                        <button onClick={() => updateStat(p.id, "assist", -1)} style={buttonSecondary()}>
-                          - Assist
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Timeline</div>
                 <div style={{ display: "grid", gap: 10 }}>
                   {[...timeline]
                     .sort((a, b) => a.minute - b.minute)
@@ -1326,17 +1598,146 @@ export default function Page() {
                     ))}
                 </div>
               </div>
+
+              <div style={cardStyle()}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Live Minutes</div>
+                <div style={{ display: "grid", gap: 10 }}>
+                  {players.map((player) => (
+                    <div
+                      key={player.id}
+                      style={{
+                        padding: 14,
+                        borderRadius: 16,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 900 }}>{player.name}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: 900 }}>{formatMinutes(liveSecondsMap[player.id] || 0)} min</div>
+                        <div style={{ color: "#64748b", fontSize: 13 }}>
+                          season {formatMinutes(seasonSecondsMap[player.id] || 0)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {matchTab === "quarters" ? (
+            <div style={{ display: "grid", gap: 16 }}>
+              <div style={cardStyle()}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Quarter Planner Engine</div>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                  {[1, 2, 3, 4].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => setCurrentQuarter(q)}
+                      style={{
+                        ...chipStyle(currentQuarter === q),
+                        minWidth: 56,
+                      }}
+                    >
+                      Q{q}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                  <button onClick={() => saveQuarterPlan(currentQuarter)} style={buttonPrimary()}>
+                    Save Q{currentQuarter}
+                  </button>
+                  <button onClick={() => loadQuarterPlan(currentQuarter)} style={buttonSecondary()}>
+                    Load Q{currentQuarter}
+                  </button>
+                  <button onClick={generateQuarterPlans} style={buttonSecondary()}>
+                    Auto Generate Q1-Q4
+                  </button>
+                </div>
+              </div>
+
+              {quarterWarnings.length > 0 ? (
+                <div style={{ ...cardStyle("#fff7ed"), border: "1px solid #fed7aa" }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>Quarter Warnings</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {quarterWarnings.map((warning, index) => (
+                      <div key={index} style={{ color: "#9a3412", fontWeight: 700 }}>
+                        {warning}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div style={cardStyle()}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Quarter Plans</div>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {[1, 2, 3, 4].map((q) => {
+                    const plan = quarterPlans[q]
+                    return (
+                      <div
+                        key={q}
+                        style={{
+                          padding: 14,
+                          borderRadius: 16,
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                          <div style={{ fontWeight: 900, fontSize: 18 }}>Quarter {q}</div>
+                          <button onClick={() => loadQuarterPlan(q)} style={buttonSecondary()}>
+                            Load
+                          </button>
+                        </div>
+
+                        {!plan ? (
+                          <div style={{ marginTop: 8, color: "#64748b" }}>No saved plan.</div>
+                        ) : (
+                          <>
+                            <div style={{ marginTop: 10, fontWeight: 800 }}>Lineup</div>
+                            <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+                              {currentSlots.map((slot) => (
+                                <div key={`${q}-${slot.id}`} style={{ color: "#475569" }}>
+                                  {slot.label}: {players.find((p) => p.id === plan.lineup[slot.id])?.name || "Empty"}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div style={{ marginTop: 10, fontWeight: 800 }}>Bench</div>
+                            <div style={{ color: "#475569", marginTop: 6 }}>
+                              {plan.bench.length === 0
+                                ? "No bench"
+                                : plan.bench.map((id) => players.find((p) => p.id === id)?.name || "").join(", ")}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           ) : null}
 
           {matchTab === "stats" ? (
             <div style={{ display: "grid", gap: 16 }}>
               <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Player Match Stats</div>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Player Minutes</div>
                 <div style={{ display: "grid", gap: 10 }}>
-                  {players.map((p) => (
+                  {players.map((player) => (
                     <div
-                      key={p.id}
+                      key={player.id}
                       style={{
                         padding: 14,
                         borderRadius: 16,
@@ -1344,9 +1745,9 @@ export default function Page() {
                         border: "1px solid #e2e8f0",
                       }}
                     >
-                      <div style={{ fontWeight: 900 }}>{p.name}</div>
+                      <div style={{ fontWeight: 900 }}>{player.name}</div>
                       <div style={{ color: "#64748b", marginTop: 4 }}>
-                        {p.positions.join("/")} • {p.goals} goals • {p.assists} assists
+                        Live: {formatMinutes(liveSecondsMap[player.id] || 0)} min • Season: {formatMinutes(seasonSecondsMap[player.id] || 0)} min
                       </div>
                     </div>
                   ))}
@@ -1360,19 +1761,20 @@ export default function Page() {
       {tab === "stats" ? (
         <div style={{ display: "grid", gap: 16 }}>
           <div style={cardStyle()}>
-            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Team Stats</div>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Club Stats</div>
             <div style={{ display: "grid", gap: 10 }}>
               <div style={{ fontWeight: 800 }}>Total goals: {totalGoals}</div>
               <div style={{ fontWeight: 800 }}>Total assists: {totalAssists}</div>
+              <div style={{ fontWeight: 800 }}>Players: {players.length}</div>
             </div>
           </div>
 
           <div style={cardStyle()}>
-            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Squad</div>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Season Minutes</div>
             <div style={{ display: "grid", gap: 10 }}>
-              {players.map((p) => (
+              {players.map((player) => (
                 <div
-                  key={p.id}
+                  key={player.id}
                   style={{
                     padding: 14,
                     borderRadius: 16,
@@ -1380,10 +1782,8 @@ export default function Page() {
                     border: "1px solid #e2e8f0",
                   }}
                 >
-                  <div style={{ fontWeight: 900 }}>{p.name}</div>
-                  <div style={{ color: "#64748b", marginTop: 4 }}>
-                    {p.positions.join("/")} • {p.goals}G • {p.assists}A
-                  </div>
+                  <div style={{ fontWeight: 900 }}>{player.name}</div>
+                  <div style={{ color: "#64748b", marginTop: 4 }}>{formatMinutes(seasonSecondsMap[player.id] || 0)} min</div>
                 </div>
               ))}
             </div>
@@ -1410,13 +1810,12 @@ export default function Page() {
               <select
                 value={eventDraft.type}
                 onChange={(e) =>
-                  setEventDraft((prev) => ({
-                    ...prev,
+                  setEventDraft({
                     type: e.target.value as TimelineEventType,
                     playerId: "",
                     secondPlayerId: "",
                     note: "",
-                  }))
+                  })
                 }
                 style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
               >
