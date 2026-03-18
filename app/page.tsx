@@ -98,6 +98,18 @@ type MatchScore = {
   away: number
 }
 
+type MatchLogItem = {
+  id: string
+  eventId: string
+  quarter: number
+  time: number
+  type: "GOAL" | "NOTE"
+  team: "home" | "away"
+  scorerId: string | null
+  assisterId: string | null
+  note: string
+}
+
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
 const ATTENDANCE_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF", "INJ"]
 
@@ -362,6 +374,7 @@ export default function Page() {
   const [quarterPlans, setQuarterPlans] = useState<Record<string, Record<number, (string | null)[]>>>({})
   const [subHistoryMap, setSubHistoryMap] = useState<Record<string, SubHistoryItem[]>>({})
   const [scoreMap, setScoreMap] = useState<Record<string, MatchScore>>({})
+  const [matchLogMap, setMatchLogMap] = useState<Record<string, MatchLogItem[]>>({})
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -401,6 +414,11 @@ export default function Page() {
   const [timerRunning, setTimerRunning] = useState(false)
   const [playerSeconds, setPlayerSeconds] = useState<Record<string, number>>({})
   const [currentQuarter, setCurrentQuarter] = useState(1)
+
+  const [showGoalModal, setShowGoalModal] = useState(false)
+  const [goalTeam, setGoalTeam] = useState<"home" | "away">("home")
+  const [goalScorerId, setGoalScorerId] = useState<string>("")
+  const [goalAssisterId, setGoalAssisterId] = useState<string>("")
 
   const pitchSlots = useMemo(() => FORMATIONS[matchFormat][formation] || [], [matchFormat, formation])
 
@@ -459,6 +477,7 @@ export default function Page() {
     const cachedQuarterPlans = localStorage.getItem("sharks_quarter_plans")
     const cachedSubHistory = localStorage.getItem("sharks_sub_history")
     const cachedScores = localStorage.getItem("sharks_scores")
+    const cachedMatchLogs = localStorage.getItem("sharks_match_logs")
 
     if (cachedPlayers) {
       try {
@@ -493,6 +512,11 @@ export default function Page() {
     if (cachedScores) {
       try {
         setScoreMap(JSON.parse(cachedScores))
+      } catch {}
+    }
+    if (cachedMatchLogs) {
+      try {
+        setMatchLogMap(JSON.parse(cachedMatchLogs))
       } catch {}
     }
 
@@ -584,6 +608,14 @@ export default function Page() {
     return subHistoryMap[eventId] || []
   }
 
+  function getMatchScore(eventId: string): MatchScore {
+    return scoreMap[eventId] || { home: 0, away: 0 }
+  }
+
+  function getMatchLog(eventId: string): MatchLogItem[] {
+    return matchLogMap[eventId] || []
+  }
+
   function recordSubHistory(
     offPlayerId: string | null,
     onPlayerId: string | null,
@@ -616,8 +648,26 @@ export default function Page() {
     localStorage.setItem("sharks_sub_history", JSON.stringify(next))
   }
 
-  function getMatchScore(eventId: string): MatchScore {
-    return scoreMap[eventId] || { home: 0, away: 0 }
+  function addMatchLog(item: MatchLogItem) {
+    const next = {
+      ...matchLogMap,
+      [item.eventId]: [...(matchLogMap[item.eventId] || []), item],
+    }
+    setMatchLogMap(next)
+    localStorage.setItem("sharks_match_logs", JSON.stringify(next))
+  }
+
+  function clearMatchLog(eventId: string) {
+    const next = { ...matchLogMap, [eventId]: [] }
+    setMatchLogMap(next)
+    localStorage.setItem("sharks_match_logs", JSON.stringify(next))
+  }
+
+  function openGoalModal() {
+    setGoalTeam("home")
+    setGoalScorerId("")
+    setGoalAssisterId("")
+    setShowGoalModal(true)
   }
 
   function adjustTeamScore(side: "home" | "away", delta: number) {
@@ -632,6 +682,53 @@ export default function Page() {
     }
     setScoreMap(next)
     localStorage.setItem("sharks_scores", JSON.stringify(next))
+  }
+
+  async function confirmGoalFlow() {
+    if (!selectedEvent) return
+    if (!goalScorerId) {
+      alert("Choose a scorer")
+      return
+    }
+
+    const currentScore = getMatchScore(selectedEvent.id)
+    const nextScore = {
+      ...scoreMap,
+      [selectedEvent.id]: {
+        ...currentScore,
+        [goalTeam]: currentScore[goalTeam] + 1,
+      },
+    }
+    setScoreMap(nextScore)
+    localStorage.setItem("sharks_scores", JSON.stringify(nextScore))
+
+    const scorerStat = getPlayerStat(selectedEvent.id, goalScorerId)
+    await savePlayerStat(selectedEvent.id, goalScorerId, {
+      goals: scorerStat.goals + 1,
+    })
+
+    if (goalAssisterId && goalAssisterId !== goalScorerId) {
+      const assisterStat = getPlayerStat(selectedEvent.id, goalAssisterId)
+      await savePlayerStat(selectedEvent.id, goalAssisterId, {
+        assists: assisterStat.assists + 1,
+      })
+    }
+
+    addMatchLog({
+      id: makeId(),
+      eventId: selectedEvent.id,
+      quarter: currentQuarter,
+      time: matchSeconds,
+      type: "GOAL",
+      team: goalTeam,
+      scorerId: goalScorerId,
+      assisterId: goalAssisterId || null,
+      note: "",
+    })
+
+    setShowGoalModal(false)
+    setGoalScorerId("")
+    setGoalAssisterId("")
   }
 
   function resetPlayerForm() {
@@ -763,6 +860,11 @@ export default function Page() {
     delete nextScores[eventId]
     setScoreMap(nextScores)
     localStorage.setItem("sharks_scores", JSON.stringify(nextScores))
+
+    const nextLogs = { ...matchLogMap }
+    delete nextLogs[eventId]
+    setMatchLogMap(nextLogs)
+    localStorage.setItem("sharks_match_logs", JSON.stringify(nextLogs))
 
     if (selectedEventId === eventId) setSelectedEventId(null)
     await loadAll()
@@ -1027,7 +1129,6 @@ export default function Page() {
 
   async function generateQuarterPlans() {
     if (!selectedEvent) return
-
     if (availablePlayers.length === 0) {
       alert("Mark players as P first")
       return
@@ -1072,12 +1173,10 @@ export default function Page() {
     for (let quarter = 1; quarter <= quarterCount; quarter++) {
       const lineup = Array(pitchSlots.length).fill(null) as (string | null)[]
       const used = new Set<string>()
-
       const forcedPlayers = availablePlayers.filter((p) => previousBenchIds.includes(p.id))
 
       for (const forcedPlayer of forcedPlayers) {
         let bestSlotIndex = -1
-
         for (let i = 0; i < pitchSlots.length; i++) {
           if (lineup[i]) continue
           const slot = pitchSlots[i]
@@ -1108,7 +1207,6 @@ export default function Page() {
 
       const onFieldIds = lineup.filter(Boolean) as string[]
       let benchIds = availablePlayers.map((p) => p.id).filter((id) => !onFieldIds.includes(id))
-
       const repeatedBenchers = benchIds.filter((id) => previousBenchIds.includes(id))
 
       for (const repeatedBencherId of repeatedBenchers) {
@@ -1125,7 +1223,6 @@ export default function Page() {
 
           const currentPlayer = availablePlayers.find((p) => p.id === currentId)
           if (!currentPlayer) continue
-
           if (!playerCanPlaySlot(benchPlayer, slot)) continue
           if (previousBenchIds.includes(currentPlayer.id)) continue
           if (slot === "GK" && currentPlayer.mainGK) continue
@@ -1227,34 +1324,6 @@ export default function Page() {
     if (selectedEvent) void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
-  function placeBenchPlayer(slotIndex: number) {
-    if (!selectedBenchId || !selectedEvent) return
-
-    const selectedPlayer = availablePlayers.find((p) => p.id === selectedBenchId)
-    const slot = pitchSlots[slotIndex]
-    if (!selectedPlayer || !slot) return
-
-    if (!playerCanPlaySlot(selectedPlayer, slot)) {
-      alert(`${selectedPlayer.name} cannot play ${slot}`)
-      return
-    }
-
-    const next = [...pitchIds]
-    const existingIndex = next.findIndex((id) => id === selectedBenchId)
-    const occupyingId = next[slotIndex]
-
-    if (existingIndex !== -1) next[existingIndex] = occupyingId || null
-
-    next[slotIndex] = selectedBenchId
-
-    setPitchIds(next)
-    setSelectedBenchId(null)
-    setSelectedPitchSlot(null)
-
-    recordSubHistory(occupyingId || null, selectedBenchId, "SUB")
-    void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
-  }
-
   function removeFromPitch(slotIndex: number) {
     const next = [...pitchIds]
     const offPlayerId = next[slotIndex]
@@ -1304,7 +1373,6 @@ export default function Page() {
     setSelectedPitchSlot(null)
 
     if (occupyingId !== activeId) recordSubHistory(occupyingId || null, activeId, "DRAG")
-
     void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
@@ -2010,12 +2078,26 @@ export default function Page() {
                     </div>
 
                     <div style={cardStyle()}>
-                      <div style={sectionTitleStyle()}>Live Goals & Assists</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <div style={sectionTitleStyle()}>Goal Recorder</div>
+                        <button
+                          onClick={openGoalModal}
+                          style={{
+                            padding: "12px 16px",
+                            borderRadius: 14,
+                            border: "none",
+                            background: "#0f172a",
+                            color: "white",
+                            fontWeight: 800,
+                          }}
+                        >
+                          Record Goal
+                        </button>
+                      </div>
 
                       <div style={{ display: "grid", gap: 10 }}>
                         {players.map((player) => {
                           const stat = getPlayerStat(selectedEvent.id, player.id)
-
                           return (
                             <div
                               key={player.id}
@@ -2041,21 +2123,18 @@ export default function Page() {
                                 >
                                   + Goal
                                 </button>
-
                                 <button
                                   onClick={() => adjustPlayerStat(player.id, "goals", -1)}
                                   style={smallActionBtn("white", "#0f172a")}
                                 >
                                   - Goal
                                 </button>
-
                                 <button
                                   onClick={() => adjustPlayerStat(player.id, "assists", 1)}
                                   style={smallActionBtn("#0f172a", "white")}
                                 >
                                   + Assist
                                 </button>
-
                                 <button
                                   onClick={() => adjustPlayerStat(player.id, "assists", -1)}
                                   style={smallActionBtn("white", "#0f172a")}
@@ -2126,6 +2205,52 @@ export default function Page() {
                     </DndContext>
 
                     <div style={{ display: "grid", gap: 12 }}>
+                      <div style={cardStyle()}>
+                        <div style={sectionTitleStyle()}>Match Log</div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                          <button
+                            onClick={() => clearMatchLog(selectedEvent.id)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: "1px solid #d1d5db",
+                              background: "white",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {getMatchLog(selectedEvent.id).length === 0 ? (
+                            <div style={{ color: "#64748b" }}>No match events yet.</div>
+                          ) : (
+                            [...getMatchLog(selectedEvent.id)]
+                              .sort((a, b) => {
+                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
+                                return a.time - b.time
+                              })
+                              .map((item) => (
+                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
+                                  <div style={{ fontWeight: 800 }}>
+                                    Q{item.quarter} {formatSeconds(item.time)}
+                                  </div>
+                                  {item.type === "GOAL" ? (
+                                    <div style={{ marginTop: 4, color: "#475569" }}>
+                                      {item.team === "home" ? (selectedEvent.home || "Home") : (selectedEvent.away || "Away")} goal —
+                                      {" "}{getPlayerName(item.scorerId)}
+                                      {item.assisterId ? ` (assist ${getPlayerName(item.assisterId)})` : ""}
+                                    </div>
+                                  ) : (
+                                    <div style={{ marginTop: 4, color: "#475569" }}>{item.note}</div>
+                                  )}
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+
                       <div style={cardStyle()}>
                         <div style={sectionTitleStyle()}>Injured</div>
                         <div style={{ display: "grid", gap: 10 }}>
@@ -2213,14 +2338,7 @@ export default function Page() {
                                 return a.time - b.time
                               })
                               .map((item) => (
-                                <div
-                                  key={item.id}
-                                  style={{
-                                    padding: 12,
-                                    borderRadius: 14,
-                                    background: "#f8fafc",
-                                  }}
-                                >
+                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
                                   <div style={{ fontWeight: 800 }}>
                                     Q{item.quarter} {formatSeconds(item.time)}
                                   </div>
@@ -2314,6 +2432,93 @@ export default function Page() {
           ))}
         </div>
       </div>
+
+      {showGoalModal ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 100,
+            padding: 16,
+          }}
+        >
+          <div style={{ ...cardStyle(), width: "100%", maxWidth: 520 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Record Goal</div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <select
+                value={goalTeam}
+                onChange={(e) => setGoalTeam(e.target.value as "home" | "away")}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #d1d5db" }}
+              >
+                <option value="home">{selectedEvent?.home || "Home"}</option>
+                <option value="away">{selectedEvent?.away || "Away"}</option>
+              </select>
+
+              <select
+                value={goalScorerId}
+                onChange={(e) => setGoalScorerId(e.target.value)}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #d1d5db" }}
+              >
+                <option value="">Choose scorer</option>
+                {players.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={goalAssisterId}
+                onChange={(e) => setGoalAssisterId(e.target.value)}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #d1d5db" }}
+              >
+                <option value="">No assist</option>
+                {players
+                  .filter((player) => player.id !== goalScorerId)
+                  .map((player) => (
+                    <option key={player.id} value={player.id}>
+                      {player.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button
+                onClick={() => void confirmGoalFlow()}
+                style={{
+                  flex: 1,
+                  padding: "14px 16px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: "#0f172a",
+                  color: "white",
+                  fontWeight: 800,
+                }}
+              >
+                Save Goal
+              </button>
+              <button
+                onClick={() => setShowGoalModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "14px 16px",
+                  borderRadius: 14,
+                  border: "1px solid #d1d5db",
+                  background: "white",
+                  fontWeight: 800,
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
