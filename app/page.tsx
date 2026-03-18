@@ -8,7 +8,7 @@ import {
   useDroppable,
   type DragEndEvent,
 } from "@dnd-kit/core"
-import { supabase } from "../supabase"
+import { supabase } from "./lib/supabase"
 
 type Position = "GK" | "DEF" | "MID" | "FWD"
 type MatchFormat = "7v7" | "9v9" | "11v11"
@@ -93,6 +93,11 @@ type SubHistoryItem = {
   reason: "SUB" | "INJURY" | "RETURN" | "BENCH" | "DRAG"
 }
 
+type MatchScore = {
+  home: number
+  away: number
+}
+
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
 const ATTENDANCE_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF", "INJ"]
 
@@ -169,19 +174,25 @@ function percent(numerator: number, denominator: number) {
 }
 
 function playerCanPlaySlot(player: Player, slot: Position) {
-  if (slot === "GK") {
-    return player.positions.includes("GK") || player.mainGK || player.backupGK
-  }
+  if (slot === "GK") return player.positions.includes("GK") || player.mainGK || player.backupGK
   return player.positions.includes(slot)
 }
 
 function cardStyle(background = "#ffffff") {
   return {
     background,
-    borderRadius: 20,
+    borderRadius: 22,
     border: "1px solid #e5e7eb",
     padding: 16,
-    boxShadow: "0 4px 14px rgba(15,23,42,0.06)",
+    boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
+  } as const
+}
+
+function sectionTitleStyle() {
+  return {
+    fontSize: 22,
+    fontWeight: 800,
+    marginBottom: 12,
   } as const
 }
 
@@ -208,6 +219,20 @@ function pitchBtnStyle() {
   } as const
 }
 
+function chipStyle(background: string, color = "#0f172a") {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background,
+    color,
+    fontWeight: 800,
+    fontSize: 12,
+  } as const
+}
+
 function DraggablePlayerCard({
   id,
   name,
@@ -219,9 +244,7 @@ function DraggablePlayerCard({
   subtitle?: string
   background?: string
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id,
-  })
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id })
 
   const style = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -275,16 +298,14 @@ function DroppablePitchSlot({
   onInjure: () => void
   timeText: string
 }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: dropId,
-  })
+  const { setNodeRef, isOver } = useDroppable({ id: dropId })
 
   return (
     <div
       ref={setNodeRef}
       onClick={onClick}
       style={{
-        minHeight: 122,
+        minHeight: 126,
         borderRadius: 18,
         border: selected ? "3px solid #fde68a" : isOver ? "3px solid #93c5fd" : "2px solid rgba(255,255,255,0.65)",
         background: isOver ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.12)",
@@ -297,7 +318,7 @@ function DroppablePitchSlot({
     >
       {player ? (
         <div style={{ width: "100%" }}>
-          <div style={{ fontWeight: 800, fontSize: 14 }}>{slot}</div>
+          <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.95 }}>{slot}</div>
           <div style={{ marginTop: 6, fontSize: 18, fontWeight: 800 }}>{player.name}</div>
           <div style={{ marginTop: 6, fontSize: 14 }}>{timeText}</div>
           <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10, flexWrap: "wrap" }}>
@@ -323,7 +344,7 @@ function DroppablePitchSlot({
         </div>
       ) : (
         <div>
-          <div style={{ fontWeight: 800, fontSize: 14 }}>{slot}</div>
+          <div style={{ fontWeight: 800, fontSize: 13 }}>{slot}</div>
           <div style={{ marginTop: 8, fontSize: 18 }}>Drop Here</div>
         </div>
       )}
@@ -340,6 +361,7 @@ export default function Page() {
   const [statsMap, setStatsMap] = useState<Record<string, Record<string, PlayerMatchStat>>>({})
   const [quarterPlans, setQuarterPlans] = useState<Record<string, Record<number, (string | null)[]>>>({})
   const [subHistoryMap, setSubHistoryMap] = useState<Record<string, SubHistoryItem[]>>({})
+  const [scoreMap, setScoreMap] = useState<Record<string, MatchScore>>({})
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -436,6 +458,7 @@ export default function Page() {
     const cachedStats = localStorage.getItem("sharks_stats")
     const cachedQuarterPlans = localStorage.getItem("sharks_quarter_plans")
     const cachedSubHistory = localStorage.getItem("sharks_sub_history")
+    const cachedScores = localStorage.getItem("sharks_scores")
 
     if (cachedPlayers) {
       try {
@@ -465,6 +488,11 @@ export default function Page() {
     if (cachedSubHistory) {
       try {
         setSubHistoryMap(JSON.parse(cachedSubHistory))
+      } catch {}
+    }
+    if (cachedScores) {
+      try {
+        setScoreMap(JSON.parse(cachedScores))
       } catch {}
     }
 
@@ -539,19 +567,71 @@ export default function Page() {
       localStorage.setItem("sharks_stats", JSON.stringify(nextStats))
       localStorage.setItem("sharks_quarter_plans", JSON.stringify(nextQuarterPlans))
 
-      const existingSubHistory = localStorage.getItem("sharks_sub_history")
-      if (existingSubHistory) {
-        try {
-          setSubHistoryMap(JSON.parse(existingSubHistory))
-        } catch {}
-      }
-
       if (!selectedEventId && parsedEvents.length > 0) {
         setSelectedEventId(parsedEvents[0].id)
       }
     }
 
     setLoading(false)
+  }
+
+  function getPlayerName(playerId: string | null) {
+    if (!playerId) return "-"
+    return players.find((p) => p.id === playerId)?.name || "Unknown"
+  }
+
+  function getSubHistoryForEvent(eventId: string) {
+    return subHistoryMap[eventId] || []
+  }
+
+  function recordSubHistory(
+    offPlayerId: string | null,
+    onPlayerId: string | null,
+    reason: "SUB" | "INJURY" | "RETURN" | "BENCH" | "DRAG"
+  ) {
+    if (!selectedEvent) return
+
+    const item: SubHistoryItem = {
+      id: makeId(),
+      eventId: selectedEvent.id,
+      quarter: currentQuarter,
+      time: matchSeconds,
+      offPlayerId,
+      onPlayerId,
+      reason,
+    }
+
+    const next = {
+      ...subHistoryMap,
+      [selectedEvent.id]: [...(subHistoryMap[selectedEvent.id] || []), item],
+    }
+
+    setSubHistoryMap(next)
+    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
+  }
+
+  function clearSubHistoryForEvent(eventId: string) {
+    const next = { ...subHistoryMap, [eventId]: [] }
+    setSubHistoryMap(next)
+    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
+  }
+
+  function getMatchScore(eventId: string): MatchScore {
+    return scoreMap[eventId] || { home: 0, away: 0 }
+  }
+
+  function adjustTeamScore(side: "home" | "away", delta: number) {
+    if (!selectedEvent) return
+    const current = getMatchScore(selectedEvent.id)
+    const next = {
+      ...scoreMap,
+      [selectedEvent.id]: {
+        ...current,
+        [side]: Math.max(0, current[side] + delta),
+      },
+    }
+    setScoreMap(next)
+    localStorage.setItem("sharks_scores", JSON.stringify(next))
   }
 
   function resetPlayerForm() {
@@ -679,6 +759,11 @@ export default function Page() {
     setSubHistoryMap(nextSubHistory)
     localStorage.setItem("sharks_sub_history", JSON.stringify(nextSubHistory))
 
+    const nextScores = { ...scoreMap }
+    delete nextScores[eventId]
+    setScoreMap(nextScores)
+    localStorage.setItem("sharks_scores", JSON.stringify(nextScores))
+
     if (selectedEventId === eventId) setSelectedEventId(null)
     await loadAll()
   }
@@ -751,9 +836,7 @@ export default function Page() {
       { onConflict: "event_id,player_id" }
     )
 
-    if (selectedEvent) {
-      void saveQuarterPlan(selectedEvent.id, currentQuarter, nextPitchIds)
-    }
+    void saveQuarterPlan(selectedEvent.id, currentQuarter, nextPitchIds)
 
     if (error) alert(error.message)
   }
@@ -823,6 +906,17 @@ export default function Page() {
     )
 
     if (error) alert(error.message)
+  }
+
+  function adjustPlayerStat(playerId: string, field: "goals" | "assists", delta: number) {
+    if (!selectedEvent) return
+
+    const current = getPlayerStat(selectedEvent.id, playerId)
+    const nextValue = Math.max(0, (current[field] || 0) + delta)
+
+    void savePlayerStat(selectedEvent.id, playerId, {
+      [field]: nextValue,
+    })
   }
 
   async function saveQuarterPlan(eventId: string, quarterNumber: number, lineup: (string | null)[]) {
@@ -931,47 +1025,6 @@ export default function Page() {
     })
   }, [players, events, attendanceMap, statsMap])
 
-  function getPlayerName(playerId: string | null) {
-    if (!playerId) return "-"
-    return players.find((p) => p.id === playerId)?.name || "Unknown"
-  }
-
-  function getSubHistoryForEvent(eventId: string) {
-    return subHistoryMap[eventId] || []
-  }
-
-  function recordSubHistory(
-    offPlayerId: string | null,
-    onPlayerId: string | null,
-    reason: "SUB" | "INJURY" | "RETURN" | "BENCH" | "DRAG"
-  ) {
-    if (!selectedEvent) return
-
-    const item: SubHistoryItem = {
-      id: makeId(),
-      eventId: selectedEvent.id,
-      quarter: currentQuarter,
-      time: matchSeconds,
-      offPlayerId,
-      onPlayerId,
-      reason,
-    }
-
-    const next = {
-      ...subHistoryMap,
-      [selectedEvent.id]: [...(subHistoryMap[selectedEvent.id] || []), item],
-    }
-
-    setSubHistoryMap(next)
-    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
-  }
-
-  function clearSubHistoryForEvent(eventId: string) {
-    const next = { ...subHistoryMap, [eventId]: [] }
-    setSubHistoryMap(next)
-    localStorage.setItem("sharks_sub_history", JSON.stringify(next))
-  }
-
   async function generateQuarterPlans() {
     if (!selectedEvent) return
 
@@ -999,9 +1052,7 @@ export default function Page() {
         const aWasBenchedLast = previousBenchIds.includes(a.id)
         const bWasBenchedLast = previousBenchIds.includes(b.id)
 
-        if (aWasBenchedLast !== bWasBenchedLast) {
-          return aWasBenchedLast ? -1 : 1
-        }
+        if (aWasBenchedLast !== bWasBenchedLast) return aWasBenchedLast ? -1 : 1
 
         if (slot === "GK") {
           if (a.mainGK !== b.mainGK) return a.mainGK ? -1 : 1
@@ -1089,9 +1140,7 @@ export default function Page() {
           }
         }
 
-        if (bestSwapIndex !== -1) {
-          lineup[bestSwapIndex] = repeatedBencherId
-        }
+        if (bestSwapIndex !== -1) lineup[bestSwapIndex] = repeatedBencherId
       }
 
       const finalOnFieldIds = lineup.filter(Boolean) as string[]
@@ -1163,9 +1212,7 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
-    if (selectedEvent) {
-      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
-    }
+    if (selectedEvent) void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   function clearPitch() {
@@ -1177,9 +1224,7 @@ export default function Page() {
     setMatchSeconds(0)
     setPlayerSeconds({})
 
-    if (selectedEvent) {
-      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
-    }
+    if (selectedEvent) void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   function placeBenchPlayer(slotIndex: number) {
@@ -1198,9 +1243,7 @@ export default function Page() {
     const existingIndex = next.findIndex((id) => id === selectedBenchId)
     const occupyingId = next[slotIndex]
 
-    if (existingIndex !== -1) {
-      next[existingIndex] = occupyingId || null
-    }
+    if (existingIndex !== -1) next[existingIndex] = occupyingId || null
 
     next[slotIndex] = selectedBenchId
 
@@ -1218,13 +1261,8 @@ export default function Page() {
     next[slotIndex] = null
     setPitchIds(next)
 
-    if (offPlayerId) {
-      recordSubHistory(offPlayerId, null, "BENCH")
-    }
-
-    if (selectedEvent) {
-      void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
-    }
+    if (offPlayerId) recordSubHistory(offPlayerId, null, "BENCH")
+    if (selectedEvent) void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -1265,9 +1303,7 @@ export default function Page() {
     setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
-    if (occupyingId !== activeId) {
-      recordSubHistory(occupyingId || null, activeId, "DRAG")
-    }
+    if (occupyingId !== activeId) recordSubHistory(occupyingId || null, activeId, "DRAG")
 
     void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
   }
@@ -1293,6 +1329,7 @@ export default function Page() {
   const totalHoliday = events.filter((e) => e.type === "HOLIDAY").length
   const avgAvailability = selectedEvent ? percent(availablePlayers.length, players.length || 1) : "0%"
   const upcomingEvents = [...events].slice(0, 5)
+  const liveScore = selectedEvent ? getMatchScore(selectedEvent.id) : { home: 0, away: 0 }
 
   if (loading) {
     return (
@@ -1321,23 +1358,17 @@ export default function Page() {
           borderBottom: "1px solid #e5e7eb",
         }}
       >
-        <div
-          style={{
-            maxWidth: 960,
-            margin: "0 auto",
-            padding: "16px 16px 14px",
-          }}
-        >
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "16px 16px 14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
               <div style={{ fontSize: 14, color: "#64748b", fontWeight: 700 }}>Sharks App</div>
-              <div style={{ fontSize: 28, fontWeight: 800 }}>Team Manager</div>
+              <div style={{ fontSize: 28, fontWeight: 800 }}>Team Manager Pro</div>
             </div>
 
             <div
               style={{
-                width: 44,
-                height: 44,
+                width: 46,
+                height: 46,
                 borderRadius: 14,
                 background: "#0f172a",
                 color: "white",
@@ -1354,24 +1385,16 @@ export default function Page() {
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
         {errorMessage ? (
-          <div
-            style={{
-              ...cardStyle("#fff1f2"),
-              border: "1px solid #fecdd3",
-              marginBottom: 16,
-            }}
-          >
-            {errorMessage}
-          </div>
+          <div style={{ ...cardStyle("#fff1f2"), border: "1px solid #fecdd3", marginBottom: 16 }}>{errorMessage}</div>
         ) : null}
 
         {tab === "home" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ ...cardStyle("#0f172a"), color: "white" }}>
-              <div style={{ fontSize: 14, opacity: 0.75 }}>Live Overview</div>
+              <div style={{ fontSize: 14, opacity: 0.75 }}>Club Dashboard</div>
               <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>Ready for Matchday</div>
               <div style={{ marginTop: 10, opacity: 0.85 }}>
-                Players, attendance, quarter planning and live minutes in one app.
+                Players, attendance, scoring, quarter planning and live subs in one place.
               </div>
             </div>
 
@@ -1403,7 +1426,7 @@ export default function Page() {
             </div>
 
             <div style={cardStyle()}>
-              <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>Upcoming</div>
+              <div style={{ ...sectionTitleStyle(), marginBottom: 10 }}>Upcoming</div>
               <div style={{ display: "grid", gap: 10 }}>
                 {upcomingEvents.map((event) => (
                   <button
@@ -1420,18 +1443,7 @@ export default function Page() {
                       background: "white",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "inline-block",
-                        padding: "4px 8px",
-                        borderRadius: 999,
-                        background: eventTypeColor(event.type),
-                        fontWeight: 800,
-                        fontSize: 12,
-                      }}
-                    >
-                      {event.type}
-                    </div>
+                    <div style={chipStyle(eventTypeColor(event.type))}>{event.type}</div>
                     <div style={{ marginTop: 8, fontWeight: 800 }}>{event.title}</div>
                     <div style={{ marginTop: 4, color: "#64748b" }}>
                       {event.day} {event.date} • {event.kickOff}
@@ -1445,8 +1457,10 @@ export default function Page() {
               <div style={cardStyle("#fff7ed")}>
                 <div style={{ fontSize: 13, color: "#9a3412", fontWeight: 700 }}>Selected Event</div>
                 <div style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{selectedEvent.title}</div>
-                <div style={{ marginTop: 6, color: "#7c2d12" }}>
-                  Availability: {avgAvailability} • Playing: {availablePlayers.length} • Reserve: {reservePlayers.length}
+                <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={chipStyle("#ffedd5", "#7c2d12")}>Availability {avgAvailability}</div>
+                  <div style={chipStyle("#ecfccb", "#365314")}>Playing {availablePlayers.length}</div>
+                  <div style={chipStyle("#fef3c7", "#854d0e")}>Reserve {reservePlayers.length}</div>
                 </div>
               </div>
             ) : null}
@@ -1729,18 +1743,7 @@ export default function Page() {
                         padding: 0,
                       }}
                     >
-                      <div
-                        style={{
-                          display: "inline-block",
-                          padding: "5px 10px",
-                          borderRadius: 999,
-                          background: eventTypeColor(event.type),
-                          fontWeight: 800,
-                          fontSize: 12,
-                        }}
-                      >
-                        {event.type}
-                      </div>
+                      <div style={chipStyle(eventTypeColor(event.type))}>{event.type}</div>
                       <div style={{ marginTop: 10, fontSize: 20, fontWeight: 800 }}>{event.title}</div>
                       <div style={{ marginTop: 6, color: "#64748b" }}>
                         {event.day} {event.date} • {event.kickOff}
@@ -1802,8 +1805,51 @@ export default function Page() {
                   </div>
                 </div>
 
+                {selectedEvent.type === "MATCH" ? (
+                  <div style={{ ...cardStyle("#111827"), color: "white" }}>
+                    <div style={{ fontSize: 14, opacity: 0.75 }}>Live Scoreboard</div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto 1fr",
+                        gap: 12,
+                        alignItems: "center",
+                        marginTop: 14,
+                      }}
+                    >
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.home || "Home"}</div>
+                        <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.home}</div>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                          <button onClick={() => adjustTeamScore("home", 1)} style={smallActionBtn("white", "#0f172a")}>
+                            +1
+                          </button>
+                          <button onClick={() => adjustTeamScore("home", -1)} style={smallActionBtn("#1f2937", "white")}>
+                            -1
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: 24, fontWeight: 900 }}>v</div>
+
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.away || "Away"}</div>
+                        <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.away}</div>
+                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                          <button onClick={() => adjustTeamScore("away", 1)} style={smallActionBtn("white", "#0f172a")}>
+                            +1
+                          </button>
+                          <button onClick={() => adjustTeamScore("away", -1)} style={smallActionBtn("#1f2937", "white")}>
+                            -1
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div style={cardStyle()}>
-                  <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Attendance</div>
+                  <div style={sectionTitleStyle()}>Attendance</div>
                   <div style={{ display: "grid", gap: 10 }}>
                     {players.map((player) => {
                       const status = getAttendanceStatus(selectedEvent.id, player.id)
@@ -1846,7 +1892,7 @@ export default function Page() {
                 {selectedEvent.type === "MATCH" ? (
                   <>
                     <div style={cardStyle()}>
-                      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Quarter Planner</div>
+                      <div style={sectionTitleStyle()}>Quarter Planner</div>
 
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                         <select
@@ -1963,14 +2009,69 @@ export default function Page() {
                       </div>
                     </div>
 
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Live Goals & Assists</div>
+
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {players.map((player) => {
+                          const stat = getPlayerStat(selectedEvent.id, player.id)
+
+                          return (
+                            <div
+                              key={player.id}
+                              style={{
+                                padding: 12,
+                                borderRadius: 14,
+                                background: "#f8fafc",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                <div>
+                                  <div style={{ fontWeight: 800 }}>{player.name}</div>
+                                  <div style={{ color: "#64748b", fontSize: 14 }}>
+                                    Goals: {stat.goals} • Assists: {stat.assists}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+                                <button
+                                  onClick={() => adjustPlayerStat(player.id, "goals", 1)}
+                                  style={smallActionBtn("#0f172a", "white")}
+                                >
+                                  + Goal
+                                </button>
+
+                                <button
+                                  onClick={() => adjustPlayerStat(player.id, "goals", -1)}
+                                  style={smallActionBtn("white", "#0f172a")}
+                                >
+                                  - Goal
+                                </button>
+
+                                <button
+                                  onClick={() => adjustPlayerStat(player.id, "assists", 1)}
+                                  style={smallActionBtn("#0f172a", "white")}
+                                >
+                                  + Assist
+                                </button>
+
+                                <button
+                                  onClick={() => adjustPlayerStat(player.id, "assists", -1)}
+                                  style={smallActionBtn("white", "#0f172a")}
+                                >
+                                  - Assist
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
                     <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <div
-                        style={{
-                          ...cardStyle("#166534"),
-                          color: "white",
-                        }}
-                      >
-                        <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Pitch</div>
+                      <div style={{ ...cardStyle("#166534"), color: "white" }}>
+                        <div style={sectionTitleStyle()}>Pitch</div>
 
                         {selectedBenchId ? (
                           <div style={{ marginBottom: 12, padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.15)" }}>
@@ -2010,7 +2111,7 @@ export default function Page() {
                       </div>
 
                       <div style={cardStyle()}>
-                        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Bench</div>
+                        <div style={sectionTitleStyle()}>Bench</div>
                         <div style={{ display: "grid", gap: 10 }}>
                           {benchPlayers.map((player) => (
                             <DraggablePlayerCard
@@ -2026,7 +2127,7 @@ export default function Page() {
 
                     <div style={{ display: "grid", gap: 12 }}>
                       <div style={cardStyle()}>
-                        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Injured</div>
+                        <div style={sectionTitleStyle()}>Injured</div>
                         <div style={{ display: "grid", gap: 10 }}>
                           {injuredPlayers.length === 0 ? (
                             <div style={{ color: "#64748b" }}>No injured players.</div>
@@ -2064,7 +2165,7 @@ export default function Page() {
                       </div>
 
                       <div style={cardStyle()}>
-                        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>Projected Minutes</div>
+                        <div style={sectionTitleStyle()}>Projected Minutes</div>
                         <div style={{ display: "grid", gap: 10 }}>
                           {players.map((player) => (
                             <div
@@ -2088,24 +2189,22 @@ export default function Page() {
                       <div style={cardStyle()}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
                           <div style={{ fontSize: 22, fontWeight: 800 }}>Substitution History</div>
-                          {selectedEvent ? (
-                            <button
-                              onClick={() => clearSubHistoryForEvent(selectedEvent.id)}
-                              style={{
-                                padding: "10px 12px",
-                                borderRadius: 12,
-                                border: "1px solid #d1d5db",
-                                background: "white",
-                                fontWeight: 700,
-                              }}
-                            >
-                              Clear
-                            </button>
-                          ) : null}
+                          <button
+                            onClick={() => clearSubHistoryForEvent(selectedEvent.id)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: "1px solid #d1d5db",
+                              background: "white",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Clear
+                          </button>
                         </div>
 
                         <div style={{ display: "grid", gap: 10 }}>
-                          {!selectedEvent || getSubHistoryForEvent(selectedEvent.id).length === 0 ? (
+                          {getSubHistoryForEvent(selectedEvent.id).length === 0 ? (
                             <div style={{ color: "#64748b" }}>No substitutions yet.</div>
                           ) : (
                             [...getSubHistoryForEvent(selectedEvent.id)]
@@ -2128,9 +2227,7 @@ export default function Page() {
                                   <div style={{ marginTop: 4, color: "#475569" }}>
                                     {getPlayerName(item.offPlayerId)} → {getPlayerName(item.onPlayerId)}
                                   </div>
-                                  <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>
-                                    {item.reason}
-                                  </div>
+                                  <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{item.reason}</div>
                                 </div>
                               ))
                           )}
@@ -2147,7 +2244,7 @@ export default function Page() {
         {tab === "stats" ? (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={cardStyle()}>
-              <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Season Stats</div>
+              <div style={sectionTitleStyle()}>Season Stats</div>
               <div style={{ display: "grid", gap: 12 }}>
                 {seasonStats.map((row) => (
                   <div key={row.player.id} style={{ padding: 14, borderRadius: 16, background: "#f8fafc" }}>
