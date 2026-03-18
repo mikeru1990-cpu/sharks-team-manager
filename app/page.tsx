@@ -110,6 +110,24 @@ type MatchLogItem = {
   note: string
 }
 
+type TimelineItem =
+  | {
+      id: string
+      quarter: number
+      time: number
+      kind: "GOAL"
+      title: string
+      detail: string
+    }
+  | {
+      id: string
+      quarter: number
+      time: number
+      kind: "SUB"
+      title: string
+      detail: string
+    }
+
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
 const ATTENDANCE_OPTIONS: AttendanceStatus[] = ["P", "R", "NO", "OFF", "INJ"]
 
@@ -317,10 +335,10 @@ function DroppablePitchSlot({
       ref={setNodeRef}
       onClick={onClick}
       style={{
-        minHeight: 126,
+        minHeight: 112,
         borderRadius: 18,
-        border: selected ? "3px solid #fde68a" : isOver ? "3px solid #93c5fd" : "2px solid rgba(255,255,255,0.65)",
-        background: isOver ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.12)",
+        border: selected ? "3px solid #fde68a" : isOver ? "3px solid #93c5fd" : "2px solid rgba(255,255,255,0.7)",
+        background: isOver ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.14)",
         padding: 10,
         textAlign: "center",
         display: "flex",
@@ -330,10 +348,10 @@ function DroppablePitchSlot({
     >
       {player ? (
         <div style={{ width: "100%" }}>
-          <div style={{ fontWeight: 800, fontSize: 13, opacity: 0.95 }}>{slot}</div>
-          <div style={{ marginTop: 6, fontSize: 18, fontWeight: 800 }}>{player.name}</div>
-          <div style={{ marginTop: 6, fontSize: 14 }}>{timeText}</div>
-          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10, flexWrap: "wrap" }}>
+          <div style={{ fontWeight: 800, fontSize: 12, opacity: 0.95 }}>{slot}</div>
+          <div style={{ marginTop: 5, fontSize: 17, fontWeight: 800, lineHeight: 1.1 }}>{player.name}</div>
+          <div style={{ marginTop: 5, fontSize: 13 }}>{timeText}</div>
+          <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -356,8 +374,8 @@ function DroppablePitchSlot({
         </div>
       ) : (
         <div>
-          <div style={{ fontWeight: 800, fontSize: 13 }}>{slot}</div>
-          <div style={{ marginTop: 8, fontSize: 18 }}>Drop Here</div>
+          <div style={{ fontWeight: 800, fontSize: 12 }}>{slot}</div>
+          <div style={{ marginTop: 8, fontSize: 16 }}>Drop Here</div>
         </div>
       )}
     </div>
@@ -1127,6 +1145,44 @@ export default function Page() {
     })
   }, [players, events, attendanceMap, statsMap])
 
+  const liveTimeline = useMemo(() => {
+    if (!selectedEvent) return []
+
+    const goalItems: TimelineItem[] = getMatchLog(selectedEvent.id)
+      .filter((item) => item.type === "GOAL")
+      .map((item) => ({
+        id: item.id,
+        quarter: item.quarter,
+        time: item.time,
+        kind: "GOAL" as const,
+        title: `${item.team === "home" ? selectedEvent.home || "Home" : selectedEvent.away || "Away"} goal`,
+        detail: `${getPlayerName(item.scorerId)}${item.assisterId ? ` • assist ${getPlayerName(item.assisterId)}` : ""}`,
+      }))
+
+    const subItems: TimelineItem[] = getSubHistoryForEvent(selectedEvent.id).map((item) => ({
+      id: item.id,
+      quarter: item.quarter,
+      time: item.time,
+      kind: "SUB" as const,
+      title: item.reason,
+      detail: `${getPlayerName(item.offPlayerId)} → ${getPlayerName(item.onPlayerId)}`,
+    }))
+
+    return [...goalItems, ...subItems].sort((a, b) => {
+      if (a.quarter !== b.quarter) return a.quarter - b.quarter
+      return a.time - b.time
+    })
+  }, [selectedEvent, matchLogMap, subHistoryMap, players])
+
+  const pitchRows = useMemo(() => {
+    const order: Position[] = ["FWD", "MID", "DEF", "GK"]
+    return order.map((position) =>
+      pitchSlots
+        .map((slot, index) => ({ slot, index, player: pitchPlayers[index] }))
+        .filter((item) => item.slot === position)
+    )
+  }, [pitchSlots, pitchPlayers])
+
   async function generateQuarterPlans() {
     if (!selectedEvent) return
     if (availablePlayers.length === 0) {
@@ -1874,91 +1930,89 @@ export default function Page() {
                 </div>
 
                 {selectedEvent.type === "MATCH" ? (
-                  <div style={{ ...cardStyle("#111827"), color: "white" }}>
-                    <div style={{ fontSize: 14, opacity: 0.75 }}>Live Scoreboard</div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto 1fr",
-                        gap: 12,
-                        alignItems: "center",
-                        marginTop: 14,
-                      }}
-                    >
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.home || "Home"}</div>
-                        <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.home}</div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
-                          <button onClick={() => adjustTeamScore("home", 1)} style={smallActionBtn("white", "#0f172a")}>
-                            +1
-                          </button>
-                          <button onClick={() => adjustTeamScore("home", -1)} style={smallActionBtn("#1f2937", "white")}>
-                            -1
-                          </button>
+                  <>
+                    <div style={{ ...cardStyle("#111827"), color: "white" }}>
+                      <div style={{ fontSize: 14, opacity: 0.75 }}>Live Scoreboard</div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr auto 1fr",
+                          gap: 12,
+                          alignItems: "center",
+                          marginTop: 14,
+                        }}
+                      >
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.home || "Home"}</div>
+                          <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.home}</div>
+                          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                            <button onClick={() => adjustTeamScore("home", 1)} style={smallActionBtn("white", "#0f172a")}>
+                              +1
+                            </button>
+                            <button onClick={() => adjustTeamScore("home", -1)} style={smallActionBtn("#1f2937", "white")}>
+                              -1
+                            </button>
+                          </div>
                         </div>
-                      </div>
 
-                      <div style={{ fontSize: 24, fontWeight: 900 }}>v</div>
+                        <div style={{ fontSize: 24, fontWeight: 900 }}>v</div>
 
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.away || "Away"}</div>
-                        <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.away}</div>
-                        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
-                          <button onClick={() => adjustTeamScore("away", 1)} style={smallActionBtn("white", "#0f172a")}>
-                            +1
-                          </button>
-                          <button onClick={() => adjustTeamScore("away", -1)} style={smallActionBtn("#1f2937", "white")}>
-                            -1
-                          </button>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.away || "Away"}</div>
+                          <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.away}</div>
+                          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
+                            <button onClick={() => adjustTeamScore("away", 1)} style={smallActionBtn("white", "#0f172a")}>
+                              +1
+                            </button>
+                            <button onClick={() => adjustTeamScore("away", -1)} style={smallActionBtn("#1f2937", "white")}>
+                              -1
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ) : null}
 
-                <div style={cardStyle()}>
-                  <div style={sectionTitleStyle()}>Attendance</div>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {players.map((player) => {
-                      const status = getAttendanceStatus(selectedEvent.id, player.id)
-                      return (
-                        <div
-                          key={player.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 12,
-                            padding: 12,
-                            borderRadius: 14,
-                            background: "#f8fafc",
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 800 }}>{player.name}</div>
-                            <div style={{ color: "#64748b", fontSize: 14 }}>{player.positions.join("/")}</div>
-                          </div>
-                          <button
-                            onClick={() => void cycleAttendance(player.id)}
-                            style={{
-                              minWidth: 72,
-                              padding: "10px 12px",
-                              borderRadius: 999,
-                              border: "none",
-                              background: attendanceColor(status),
-                              fontWeight: 800,
-                            }}
-                          >
-                            {status}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Attendance</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {players.map((player) => {
+                          const status = getAttendanceStatus(selectedEvent.id, player.id)
+                          return (
+                            <div
+                              key={player.id}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: 12,
+                                padding: 12,
+                                borderRadius: 14,
+                                background: "#f8fafc",
+                              }}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 800 }}>{player.name}</div>
+                                <div style={{ color: "#64748b", fontSize: 14 }}>{player.positions.join("/")}</div>
+                              </div>
+                              <button
+                                onClick={() => void cycleAttendance(player.id)}
+                                style={{
+                                  minWidth: 72,
+                                  padding: "10px 12px",
+                                  borderRadius: 999,
+                                  border: "none",
+                                  background: attendanceColor(status),
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {status}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
 
-                {selectedEvent.type === "MATCH" ? (
-                  <>
                     <div style={cardStyle()}>
                       <div style={sectionTitleStyle()}>Quarter Planner</div>
 
@@ -2077,176 +2131,240 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div style={cardStyle()}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                        <div style={sectionTitleStyle()}>Goal Recorder</div>
-                        <button
-                          onClick={openGoalModal}
-                          style={{
-                            padding: "12px 16px",
-                            borderRadius: 14,
-                            border: "none",
-                            background: "#0f172a",
-                            color: "white",
-                            fontWeight: 800,
-                          }}
-                        >
-                          Record Goal
-                        </button>
-                      </div>
+                    <div style={{ display: "grid", gap: 12 }}>
+                      <div style={cardStyle()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                          <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Goal Recorder</div>
+                          <button
+                            onClick={openGoalModal}
+                            style={{
+                              padding: "12px 16px",
+                              borderRadius: 14,
+                              border: "none",
+                              background: "#0f172a",
+                              color: "white",
+                              fontWeight: 800,
+                            }}
+                          >
+                            Record Goal
+                          </button>
+                        </div>
 
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {players.map((player) => {
-                          const stat = getPlayerStat(selectedEvent.id, player.id)
-                          return (
-                            <div
-                              key={player.id}
-                              style={{
-                                padding: 12,
-                                borderRadius: 14,
-                                background: "#f8fafc",
-                              }}
-                            >
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                                <div>
-                                  <div style={{ fontWeight: 800 }}>{player.name}</div>
-                                  <div style={{ color: "#64748b", fontSize: 14 }}>
-                                    Goals: {stat.goals} • Assists: {stat.assists}
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {players.map((player) => {
+                            const stat = getPlayerStat(selectedEvent.id, player.id)
+                            return (
+                              <div
+                                key={player.id}
+                                style={{
+                                  padding: 12,
+                                  borderRadius: 14,
+                                  background: "#f8fafc",
+                                }}
+                              >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                  <div>
+                                    <div style={{ fontWeight: 800 }}>{player.name}</div>
+                                    <div style={{ color: "#64748b", fontSize: 14 }}>
+                                      Goals: {stat.goals} • Assists: {stat.assists}
+                                    </div>
                                   </div>
                                 </div>
+
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+                                  <button
+                                    onClick={() => adjustPlayerStat(player.id, "goals", 1)}
+                                    style={smallActionBtn("#0f172a", "white")}
+                                  >
+                                    + Goal
+                                  </button>
+                                  <button
+                                    onClick={() => adjustPlayerStat(player.id, "goals", -1)}
+                                    style={smallActionBtn("white", "#0f172a")}
+                                  >
+                                    - Goal
+                                  </button>
+                                  <button
+                                    onClick={() => adjustPlayerStat(player.id, "assists", 1)}
+                                    style={smallActionBtn("#0f172a", "white")}
+                                  >
+                                    + Assist
+                                  </button>
+                                  <button
+                                    onClick={() => adjustPlayerStat(player.id, "assists", -1)}
+                                    style={smallActionBtn("white", "#0f172a")}
+                                  >
+                                    - Assist
+                                  </button>
+                                </div>
                               </div>
-
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
-                                <button
-                                  onClick={() => adjustPlayerStat(player.id, "goals", 1)}
-                                  style={smallActionBtn("#0f172a", "white")}
-                                >
-                                  + Goal
-                                </button>
-                                <button
-                                  onClick={() => adjustPlayerStat(player.id, "goals", -1)}
-                                  style={smallActionBtn("white", "#0f172a")}
-                                >
-                                  - Goal
-                                </button>
-                                <button
-                                  onClick={() => adjustPlayerStat(player.id, "assists", 1)}
-                                  style={smallActionBtn("#0f172a", "white")}
-                                >
-                                  + Assist
-                                </button>
-                                <button
-                                  onClick={() => adjustPlayerStat(player.id, "assists", -1)}
-                                  style={smallActionBtn("white", "#0f172a")}
-                                >
-                                  - Assist
-                                </button>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <div style={{ ...cardStyle("#166534"), color: "white" }}>
-                        <div style={sectionTitleStyle()}>Pitch</div>
-
-                        {selectedBenchId ? (
-                          <div style={{ marginBottom: 12, padding: 12, borderRadius: 14, background: "rgba(255,255,255,0.15)" }}>
-                            Selected bench player: <strong>{availablePlayers.find((p) => p.id === selectedBenchId)?.name}</strong>
-                          </div>
-                        ) : null}
-
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns:
-                              pitchSlots.length <= 7 ? "repeat(3, 1fr)" : pitchSlots.length <= 9 ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
-                            gap: 12,
-                          }}
-                        >
-                          {pitchSlots.map((slot, index) => {
-                            const player = pitchPlayers[index]
-                            const slotSelected = selectedPitchSlot === index
-
-                            return (
-                              <DroppablePitchSlot
-                                key={`${slot}-${index}`}
-                                dropId={`slot-${index}`}
-                                slot={slot}
-                                player={player}
-                                selected={slotSelected}
-                                onClick={() => setSelectedPitchSlot(index)}
-                                onBench={() => removeFromPitch(index)}
-                                onInjure={() => {
-                                  if (player) void markPlayerInjured(player.id, index)
-                                }}
-                                timeText={player ? formatSeconds(playerSeconds[player.id] || 0) : ""}
-                              />
                             )
                           })}
                         </div>
                       </div>
 
                       <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Bench</div>
+                        <div style={sectionTitleStyle()}>Starting Lineup Board</div>
                         <div style={{ display: "grid", gap: 10 }}>
-                          {benchPlayers.map((player) => (
-                            <DraggablePlayerCard
-                              key={player.id}
-                              id={player.id}
-                              name={player.name}
-                              subtitle={formatSeconds(playerSeconds[player.id] || 0)}
-                            />
-                          ))}
+                          {["FWD", "MID", "DEF", "GK"].map((position) => {
+                            const rowPlayers = pitchSlots
+                              .map((slot, index) => ({ slot, playerId: pitchIds[index], index }))
+                              .filter((item) => item.slot === position)
+
+                            return (
+                              <div key={position} style={{ padding: 12, borderRadius: 16, background: "#f8fafc" }}>
+                                <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800, marginBottom: 8 }}>{position}</div>
+                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                  {rowPlayers.map((item) => (
+                                    <div
+                                      key={`${position}-${item.index}`}
+                                      style={{
+                                        padding: "8px 12px",
+                                        borderRadius: 999,
+                                        background: item.playerId ? "#e2e8f0" : "#f1f5f9",
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {item.playerId ? getPlayerName(item.playerId) : "Empty"}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
-                    </DndContext>
 
-                    <div style={{ display: "grid", gap: 12 }}>
-                      <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Match Log</div>
-                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-                          <button
-                            onClick={() => clearMatchLog(selectedEvent.id)}
+                      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                        <div
+                          style={{
+                            ...cardStyle("#166534"),
+                            color: "white",
+                            padding: 18,
+                            overflow: "hidden",
+                            position: "relative",
+                          }}
+                        >
+                          <div
                             style={{
-                              padding: "10px 12px",
-                              borderRadius: 12,
-                              border: "1px solid #d1d5db",
-                              background: "white",
-                              fontWeight: 700,
+                              position: "absolute",
+                              inset: 12,
+                              border: "2px solid rgba(255,255,255,0.25)",
+                              borderRadius: 24,
+                              pointerEvents: "none",
                             }}
-                          >
-                            Clear
-                          </button>
+                          />
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              top: 12,
+                              bottom: 12,
+                              width: 2,
+                              background: "rgba(255,255,255,0.22)",
+                              pointerEvents: "none",
+                            }}
+                          />
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: "50%",
+                              top: "50%",
+                              width: 84,
+                              height: 84,
+                              marginLeft: -42,
+                              marginTop: -42,
+                              border: "2px solid rgba(255,255,255,0.22)",
+                              borderRadius: "50%",
+                              pointerEvents: "none",
+                            }}
+                          />
+
+                          <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Pitch View</div>
+                          <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, marginBottom: 14 }}>
+                            Drag bench players onto the pitch. Layout follows your selected formation.
+                          </div>
+
+                          <div style={{ display: "grid", gap: 18 }}>
+                            {pitchRows.map((row, rowIndex) => (
+                              <div
+                                key={rowIndex}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: `repeat(${Math.max(row.length, 1)}, minmax(0, 1fr))`,
+                                  gap: 12,
+                                  alignItems: "center",
+                                }}
+                              >
+                                {row.map((item) => (
+                                  <DroppablePitchSlot
+                                    key={`${item.slot}-${item.index}`}
+                                    dropId={`slot-${item.index}`}
+                                    slot={item.slot}
+                                    player={item.player}
+                                    selected={selectedPitchSlot === item.index}
+                                    onClick={() => setSelectedPitchSlot(item.index)}
+                                    onBench={() => removeFromPitch(item.index)}
+                                    onInjure={() => {
+                                      if (item.player) void markPlayerInjured(item.player.id, item.index)
+                                    }}
+                                    timeText={item.player ? formatSeconds(playerSeconds[item.player.id] || 0) : ""}
+                                  />
+                                ))}
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {getMatchLog(selectedEvent.id).length === 0 ? (
-                            <div style={{ color: "#64748b" }}>No match events yet.</div>
-                          ) : (
-                            [...getMatchLog(selectedEvent.id)]
-                              .sort((a, b) => {
-                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
-                                return a.time - b.time
-                              })
-                              .map((item) => (
-                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
-                                  <div style={{ fontWeight: 800 }}>
-                                    Q{item.quarter} {formatSeconds(item.time)}
-                                  </div>
-                                  {item.type === "GOAL" ? (
-                                    <div style={{ marginTop: 4, color: "#475569" }}>
-                                      {item.team === "home" ? (selectedEvent.home || "Home") : (selectedEvent.away || "Away")} goal —
-                                      {" "}{getPlayerName(item.scorerId)}
-                                      {item.assisterId ? ` (assist ${getPlayerName(item.assisterId)})` : ""}
-                                    </div>
-                                  ) : (
-                                    <div style={{ marginTop: 4, color: "#475569" }}>{item.note}</div>
-                                  )}
-                                </div>
+                        <div style={cardStyle()}>
+                          <div style={sectionTitleStyle()}>Bench</div>
+                          <div style={{ display: "grid", gap: 10 }}>
+                            {benchPlayers.length === 0 ? (
+                              <div style={{ color: "#64748b" }}>No bench players available.</div>
+                            ) : (
+                              benchPlayers.map((player) => (
+                                <DraggablePlayerCard
+                                  key={player.id}
+                                  id={player.id}
+                                  name={player.name}
+                                  subtitle={formatSeconds(playerSeconds[player.id] || 0)}
+                                />
                               ))
+                            )}
+                          </div>
+                        </div>
+                      </DndContext>
+
+                      <div style={cardStyle()}>
+                        <div style={sectionTitleStyle()}>Live Match Timeline</div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {liveTimeline.length === 0 ? (
+                            <div style={{ color: "#64748b" }}>No live events yet.</div>
+                          ) : (
+                            liveTimeline.map((item) => (
+                              <div
+                                key={item.id}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "72px 1fr",
+                                  gap: 12,
+                                  alignItems: "start",
+                                  padding: 12,
+                                  borderRadius: 14,
+                                  background: "#f8fafc",
+                                }}
+                              >
+                                <div style={{ fontWeight: 800, color: "#0f172a" }}>
+                                  Q{item.quarter}
+                                  <div style={{ marginTop: 2, color: "#64748b" }}>{formatSeconds(item.time)}</div>
+                                </div>
+                                <div>
+                                  <div style={{ fontWeight: 800 }}>{item.title}</div>
+                                  <div style={{ color: "#64748b", marginTop: 4 }}>{item.detail}</div>
+                                </div>
+                              </div>
+                            ))
                           )}
                         </div>
                       </div>
@@ -2351,9 +2469,57 @@ export default function Page() {
                           )}
                         </div>
                       </div>
+
+                      <div style={cardStyle()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
+                          <div style={{ fontSize: 22, fontWeight: 800 }}>Detailed Match Log</div>
+                          <button
+                            onClick={() => clearMatchLog(selectedEvent.id)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 12,
+                              border: "1px solid #d1d5db",
+                              background: "white",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Clear
+                          </button>
+                        </div>
+
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {getMatchLog(selectedEvent.id).length === 0 ? (
+                            <div style={{ color: "#64748b" }}>No match events yet.</div>
+                          ) : (
+                            [...getMatchLog(selectedEvent.id)]
+                              .sort((a, b) => {
+                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
+                                return a.time - b.time
+                              })
+                              .map((item) => (
+                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
+                                  <div style={{ fontWeight: 800 }}>
+                                    Q{item.quarter} {formatSeconds(item.time)}
+                                  </div>
+                                  {item.type === "GOAL" ? (
+                                    <div style={{ marginTop: 4, color: "#475569" }}>
+                                      {item.team === "home" ? selectedEvent.home || "Home" : selectedEvent.away || "Away"} goal —{" "}
+                                      {getPlayerName(item.scorerId)}
+                                      {item.assisterId ? ` (assist ${getPlayerName(item.assisterId)})` : ""}
+                                    </div>
+                                  ) : (
+                                    <div style={{ marginTop: 4, color: "#475569" }}>{item.note}</div>
+                                  )}
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </>
-                ) : null}
+                ) : (
+                  <div style={cardStyle()}>This event is not a match.</div>
+                )}
               </>
             )}
           </div>
