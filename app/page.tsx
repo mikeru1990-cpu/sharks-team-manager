@@ -118,6 +118,7 @@ type TimelineItem =
       kind: "GOAL"
       title: string
       detail: string
+      team: "home" | "away"
     }
   | {
       id: string
@@ -126,6 +127,7 @@ type TimelineItem =
       kind: "SUB"
       title: string
       detail: string
+      team: "home" | "away"
     }
 
 const ALL_POSITIONS: Position[] = ["GK", "DEF", "MID", "FWD"]
@@ -146,6 +148,17 @@ const FORMATIONS: Record<MatchFormat, Record<string, Position[]>> = {
     "3-5-2": ["FWD", "FWD", "MID", "MID", "MID", "MID", "MID", "DEF", "DEF", "DEF", "GK"],
   },
 }
+
+const APP_BG = "#0b1020"
+const PANEL_BG = "#ffffff"
+const PANEL_BORDER = "#e2e8f0"
+const TEXT = "#0f172a"
+const MUTED = "#64748b"
+const NAVY = "#091637"
+const GREEN = "#15803d"
+const GREEN_2 = "#166534"
+const GOLD = "#f59e0b"
+const DANGER = "#dc2626"
 
 function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -208,20 +221,30 @@ function playerCanPlaySlot(player: Player, slot: Position) {
   return player.positions.includes(slot)
 }
 
-function cardStyle(background = "#ffffff") {
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("")
+}
+
+function cardStyle(background = PANEL_BG) {
   return {
     background,
-    borderRadius: 22,
-    border: "1px solid #e5e7eb",
+    borderRadius: 24,
+    border: `1px solid ${PANEL_BORDER}`,
     padding: 16,
-    boxShadow: "0 6px 18px rgba(15,23,42,0.06)",
+    boxShadow: "0 10px 30px rgba(2,6,23,0.06)",
   } as const
 }
 
 function sectionTitleStyle() {
   return {
     fontSize: 22,
-    fontWeight: 800,
+    fontWeight: 900,
+    letterSpacing: -0.4,
     marginBottom: 12,
   } as const
 }
@@ -229,32 +252,21 @@ function sectionTitleStyle() {
 function smallActionBtn(background: string, color: string) {
   return {
     padding: "12px 10px",
-    borderRadius: 12,
-    border: background === "white" ? "1px solid #d1d5db" : "none",
+    borderRadius: 14,
+    border: background === "white" ? "1px solid #cbd5e1" : "none",
     background,
     color,
     fontWeight: 800,
+    boxShadow: background === "white" ? "none" : "0 8px 20px rgba(15,23,42,0.12)",
   } as const
 }
 
-function pitchBtnStyle() {
-  return {
-    padding: "8px 10px",
-    borderRadius: 999,
-    border: "none",
-    background: "white",
-    color: "#0f172a",
-    fontWeight: 800,
-    fontSize: 12,
-  } as const
-}
-
-function chipStyle(background: string, color = "#0f172a") {
+function chipStyle(background: string, color = TEXT) {
   return {
     display: "inline-flex",
     alignItems: "center",
     gap: 6,
-    padding: "6px 10px",
+    padding: "7px 11px",
     borderRadius: 999,
     background,
     color,
@@ -263,20 +275,61 @@ function chipStyle(background: string, color = "#0f172a") {
   } as const
 }
 
-function DraggablePlayerCard({
+function statCardStyle() {
+  return {
+    ...cardStyle(),
+    minHeight: 112,
+    display: "flex",
+    flexDirection: "column" as const,
+    justifyContent: "space-between",
+  }
+}
+
+function tabIcon(value: AppTab) {
+  if (value === "home") return "⌂"
+  if (value === "players") return "👥"
+  if (value === "events") return "📅"
+  if (value === "match") return "⚽"
+  return "📊"
+}
+
+function roleTag(player: Player) {
+  if (player.mainGK) return "MAIN GK"
+  if (player.backupGK) return "BACKUP GK"
+  return player.positions[0] || "PLAYER"
+}
+
+function playerMarkerStyle(active = false) {
+  return {
+    width: 62,
+    height: 62,
+    borderRadius: "50%",
+    background: active
+      ? "linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%)"
+      : "linear-gradient(180deg, #ffffff 0%, #dbeafe 100%)",
+    color: active ? "#111827" : "#0f172a",
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 900,
+    boxShadow: active
+      ? "0 10px 24px rgba(245,158,11,0.45)"
+      : "0 8px 18px rgba(15,23,42,0.16)",
+    border: "2px solid rgba(255,255,255,0.85)",
+  } as const
+}
+
+function DraggableBenchPlayer({
   id,
-  name,
+  player,
   subtitle,
-  background = "#fef3c7",
 }: {
   id: string
-  name: string
+  player: Player
   subtitle?: string
-  background?: string
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id })
 
-  const style = {
+  const dragStyle = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     opacity: isDragging ? 0.6 : 1,
     touchAction: "none" as const,
@@ -288,28 +341,30 @@ function DraggablePlayerCard({
       {...listeners}
       {...attributes}
       style={{
-        ...style,
-        width: "100%",
-        boxSizing: "border-box",
-        padding: "16px 14px",
-        borderRadius: 16,
-        border: "1px solid #d1d5db",
-        background,
-        fontSize: 16,
+        ...dragStyle,
+        padding: 12,
+        borderRadius: 18,
+        border: "1px solid #e5e7eb",
+        background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 100%)",
         display: "flex",
-        justifyContent: "space-between",
         alignItems: "center",
-        fontWeight: 700,
+        gap: 12,
         cursor: "grab",
       }}
     >
-      <span>{name}</span>
-      {subtitle ? <span>{subtitle}</span> : null}
+      <div style={playerMarkerStyle(false)}>{initials(player.name)}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>{player.name}</div>
+        <div style={{ color: MUTED, fontSize: 13, marginTop: 2 }}>
+          {roleTag(player)} • {player.positions.join("/")}
+        </div>
+      </div>
+      <div style={{ color: MUTED, fontWeight: 700, fontSize: 13 }}>{subtitle}</div>
     </div>
   )
 }
 
-function DroppablePitchSlot({
+function TacticalPitchSlot({
   dropId,
   slot,
   player,
@@ -335,29 +390,54 @@ function DroppablePitchSlot({
       ref={setNodeRef}
       onClick={onClick}
       style={{
-        minHeight: 112,
-        borderRadius: 18,
-        border: selected ? "3px solid #fde68a" : isOver ? "3px solid #93c5fd" : "2px solid rgba(255,255,255,0.7)",
-        background: isOver ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.14)",
-        padding: 10,
-        textAlign: "center",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        minHeight: 120,
+        display: "grid",
+        placeItems: "center",
+        position: "relative",
       }}
     >
       {player ? (
-        <div style={{ width: "100%" }}>
-          <div style={{ fontWeight: 800, fontSize: 12, opacity: 0.95 }}>{slot}</div>
-          <div style={{ marginTop: 5, fontSize: 17, fontWeight: 800, lineHeight: 1.1 }}>{player.name}</div>
-          <div style={{ marginTop: 5, fontSize: 13 }}>{timeText}</div>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 130,
+            borderRadius: 18,
+            padding: 10,
+            background: selected
+              ? "rgba(251,191,36,0.20)"
+              : isOver
+                ? "rgba(147,197,253,0.22)"
+                : "rgba(255,255,255,0.16)",
+            border: selected
+              ? "2px solid rgba(251,191,36,0.95)"
+              : isOver
+                ? "2px solid rgba(147,197,253,0.95)"
+                : "1px solid rgba(255,255,255,0.22)",
+            textAlign: "center",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div style={{ display: "grid", placeItems: "center" }}>
+            <div style={playerMarkerStyle(selected)}>{initials(player.name)}</div>
+          </div>
+          <div style={{ marginTop: 8, fontWeight: 900, fontSize: 14, lineHeight: 1.1 }}>{player.name}</div>
+          <div style={{ marginTop: 3, fontSize: 11, opacity: 0.9 }}>{slot}</div>
+          <div style={{ marginTop: 3, fontSize: 12, opacity: 0.9 }}>{timeText}</div>
           <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 8, flexWrap: "wrap" }}>
             <button
               onClick={(e) => {
                 e.stopPropagation()
                 onBench()
               }}
-              style={pitchBtnStyle()}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: "none",
+                background: "white",
+                color: TEXT,
+                fontWeight: 800,
+                fontSize: 11,
+              }}
             >
               Bench
             </button>
@@ -366,16 +446,34 @@ function DroppablePitchSlot({
                 e.stopPropagation()
                 onInjure()
               }}
-              style={pitchBtnStyle()}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: "none",
+                background: "#fee2e2",
+                color: "#991b1b",
+                fontWeight: 800,
+                fontSize: 11,
+              }}
             >
               Injured
             </button>
           </div>
         </div>
       ) : (
-        <div>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 118,
+            borderRadius: 18,
+            padding: 14,
+            textAlign: "center",
+            background: isOver ? "rgba(147,197,253,0.22)" : "rgba(255,255,255,0.12)",
+            border: isOver ? "2px solid rgba(147,197,253,0.95)" : "1px dashed rgba(255,255,255,0.38)",
+          }}
+        >
           <div style={{ fontWeight: 800, fontSize: 12 }}>{slot}</div>
-          <div style={{ marginTop: 8, fontSize: 16 }}>Drop Here</div>
+          <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>Drop player</div>
         </div>
       )}
     </div>
@@ -425,7 +523,6 @@ export default function Page() {
   const [formation, setFormation] = useState("2-3-1")
 
   const [pitchIds, setPitchIds] = useState<(string | null)[]>(Array(7).fill(null))
-  const [selectedBenchId, setSelectedBenchId] = useState<string | null>(null)
   const [selectedPitchSlot, setSelectedPitchSlot] = useState<number | null>(null)
 
   const [matchSeconds, setMatchSeconds] = useState(0)
@@ -450,7 +547,6 @@ export default function Page() {
 
   useEffect(() => {
     setPitchIds(Array(pitchSlots.length).fill(null))
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
   }, [pitchSlots.length])
 
@@ -480,7 +576,6 @@ export default function Page() {
     setPlayerSeconds({})
     const saved = quarterPlans[selectedEvent.id]?.[1]
     setPitchIds(saved ? normalizeLineup(saved, pitchSlots.length) : Array(pitchSlots.length).fill(null))
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
   }, [selectedEventId, pitchSlots.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1157,6 +1252,7 @@ export default function Page() {
         kind: "GOAL" as const,
         title: `${item.team === "home" ? selectedEvent.home || "Home" : selectedEvent.away || "Away"} goal`,
         detail: `${getPlayerName(item.scorerId)}${item.assisterId ? ` • assist ${getPlayerName(item.assisterId)}` : ""}`,
+        team: item.team,
       }))
 
     const subItems: TimelineItem[] = getSubHistoryForEvent(selectedEvent.id).map((item) => ({
@@ -1166,6 +1262,7 @@ export default function Page() {
       kind: "SUB" as const,
       title: item.reason,
       detail: `${getPlayerName(item.offPlayerId)} → ${getPlayerName(item.onPlayerId)}`,
+      team: "home" as const,
     }))
 
     return [...goalItems, ...subItems].sort((a, b) => {
@@ -1319,7 +1416,6 @@ export default function Page() {
     localStorage.setItem("sharks_quarter_plans", JSON.stringify(mergedPlans))
     setCurrentQuarter(1)
     setPitchIds(normalizeLineup(nextQuarterPlans[1], pitchSlots.length))
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
     alert("Smart quarter planner generated")
@@ -1330,7 +1426,6 @@ export default function Page() {
     const saved = quarterPlans[selectedEvent.id]?.[quarterNumber]
     setCurrentQuarter(quarterNumber)
     setPitchIds(saved ? normalizeLineup(saved, pitchSlots.length) : Array(pitchSlots.length).fill(null))
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
     setTimerRunning(false)
     setMatchSeconds(0)
@@ -1362,7 +1457,6 @@ export default function Page() {
     })
 
     setPitchIds(next)
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
     if (selectedEvent) void saveQuarterPlan(selectedEvent.id, currentQuarter, next)
@@ -1371,7 +1465,6 @@ export default function Page() {
   function clearPitch() {
     const next = Array(pitchSlots.length).fill(null) as (string | null)[]
     setPitchIds(next)
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
     setTimerRunning(false)
     setMatchSeconds(0)
@@ -1425,7 +1518,6 @@ export default function Page() {
     }
 
     setPitchIds(next)
-    setSelectedBenchId(null)
     setSelectedPitchSlot(null)
 
     if (occupyingId !== activeId) recordSubHistory(occupyingId || null, activeId, "DRAG")
@@ -1467,9 +1559,9 @@ export default function Page() {
     <main
       style={{
         minHeight: "100vh",
-        background: "#f8fafc",
-        color: "#0f172a",
-        paddingBottom: 100,
+        background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+        color: TEXT,
+        paddingBottom: 116,
       }}
     >
       <div
@@ -1477,28 +1569,29 @@ export default function Page() {
           position: "sticky",
           top: 0,
           zIndex: 30,
-          background: "rgba(248,250,252,0.96)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid #e5e7eb",
+          background: "rgba(248,250,252,0.88)",
+          backdropFilter: "blur(14px)",
+          borderBottom: `1px solid ${PANEL_BORDER}`,
         }}
       >
-        <div style={{ maxWidth: 960, margin: "0 auto", padding: "16px 16px 14px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div style={{ maxWidth: 1040, margin: "0 auto", padding: "14px 16px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14 }}>
             <div>
-              <div style={{ fontSize: 14, color: "#64748b", fontWeight: 700 }}>Sharks App</div>
-              <div style={{ fontSize: 28, fontWeight: 800 }}>Team Manager Pro</div>
+              <div style={{ fontSize: 13, color: MUTED, fontWeight: 800, letterSpacing: 1 }}>SHARKS APP</div>
+              <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: -1 }}>Team Manager Pro</div>
             </div>
 
             <div
               style={{
-                width: 46,
-                height: 46,
-                borderRadius: 14,
-                background: "#0f172a",
+                width: 54,
+                height: 54,
+                borderRadius: 18,
+                background: "linear-gradient(180deg, #0f172a 0%, #091637 100%)",
                 color: "white",
                 display: "grid",
                 placeItems: "center",
-                fontWeight: 800,
+                fontSize: 24,
+                boxShadow: "0 12px 24px rgba(15,23,42,0.22)",
               }}
             >
               ⚽
@@ -1507,45 +1600,78 @@ export default function Page() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: 16 }}>
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: 16 }}>
         {errorMessage ? (
           <div style={{ ...cardStyle("#fff1f2"), border: "1px solid #fecdd3", marginBottom: 16 }}>{errorMessage}</div>
         ) : null}
 
         {tab === "home" ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ ...cardStyle("#0f172a"), color: "white" }}>
-              <div style={{ fontSize: 14, opacity: 0.75 }}>Club Dashboard</div>
-              <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>Ready for Matchday</div>
-              <div style={{ marginTop: 10, opacity: 0.85 }}>
-                Players, attendance, scoring, quarter planning and live subs in one place.
+            <div
+              style={{
+                ...cardStyle("linear-gradient(135deg, #07112b 0%, #0b1c47 100%)"),
+                color: "white",
+                overflow: "hidden",
+                position: "relative",
+                minHeight: 190,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  right: -40,
+                  top: -30,
+                  width: 180,
+                  height: 180,
+                  borderRadius: "50%",
+                  background: "rgba(255,255,255,0.05)",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  right: 30,
+                  bottom: -36,
+                  width: 120,
+                  height: 120,
+                  borderRadius: "50%",
+                  border: "2px solid rgba(255,255,255,0.08)",
+                }}
+              />
+
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div style={{ fontSize: 14, opacity: 0.75, fontWeight: 800 }}>Club Dashboard</div>
+                <div style={{ fontSize: 34, fontWeight: 900, marginTop: 10, letterSpacing: -1 }}>Ready for Matchday</div>
+                <div style={{ marginTop: 12, opacity: 0.88, maxWidth: 620, fontSize: 18, lineHeight: 1.4 }}>
+                  Players, attendance, scoring, quarter planning and live subs in one polished football app.
+                </div>
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Players</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{players.length}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Players</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{players.length}</div>
               </div>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Events</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{events.length}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Events</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{events.length}</div>
               </div>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Matches</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalMatches}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Matches</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{totalMatches}</div>
               </div>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Training</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalTraining}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Training</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{totalTraining}</div>
               </div>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>No Game</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalNoGame}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>No Game</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{totalNoGame}</div>
               </div>
-              <div style={cardStyle()}>
-                <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700 }}>Holiday</div>
-                <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{totalHoliday}</div>
+              <div style={statCardStyle()}>
+                <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Holiday</div>
+                <div style={{ fontSize: 38, fontWeight: 900 }}>{totalHoliday}</div>
               </div>
             </div>
 
@@ -1561,15 +1687,17 @@ export default function Page() {
                     }}
                     style={{
                       textAlign: "left",
-                      padding: 14,
-                      borderRadius: 16,
-                      border: "1px solid #e5e7eb",
-                      background: "white",
+                      padding: 16,
+                      borderRadius: 20,
+                      border: "1px solid #e2e8f0",
+                      background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
                     }}
                   >
                     <div style={chipStyle(eventTypeColor(event.type))}>{event.type}</div>
-                    <div style={{ marginTop: 8, fontWeight: 800 }}>{event.title}</div>
-                    <div style={{ marginTop: 4, color: "#64748b" }}>
+                    <div style={{ marginTop: 10, fontWeight: 900, fontSize: 24, color: event.type === "MATCH" ? "#0f172a" : "#1d4ed8" }}>
+                      {event.title}
+                    </div>
+                    <div style={{ marginTop: 6, color: MUTED, fontSize: 16 }}>
                       {event.day} {event.date} • {event.kickOff}
                     </div>
                   </button>
@@ -1579,11 +1707,11 @@ export default function Page() {
 
             {selectedEvent ? (
               <div style={cardStyle("#fff7ed")}>
-                <div style={{ fontSize: 13, color: "#9a3412", fontWeight: 700 }}>Selected Event</div>
-                <div style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{selectedEvent.title}</div>
-                <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 13, color: "#9a3412", fontWeight: 800 }}>Selected Event</div>
+                <div style={{ fontSize: 24, fontWeight: 900, marginTop: 8 }}>{selectedEvent.title}</div>
+                <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <div style={chipStyle("#ffedd5", "#7c2d12")}>Availability {avgAvailability}</div>
-                  <div style={chipStyle("#ecfccb", "#365314")}>Playing {availablePlayers.length}</div>
+                  <div style={chipStyle("#dcfce7", "#166534")}>Playing {availablePlayers.length}</div>
                   <div style={chipStyle("#fef3c7", "#854d0e")}>Reserve {reservePlayers.length}</div>
                 </div>
               </div>
@@ -1593,10 +1721,18 @@ export default function Page() {
 
         {tab === "players" ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ ...cardStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                ...cardStyle(),
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800 }}>Players</div>
-                <div style={{ color: "#64748b", marginTop: 4 }}>Manage squad roles and goalkeeper settings.</div>
+                <div style={{ fontSize: 24, fontWeight: 900 }}>Players</div>
+                <div style={{ color: MUTED, marginTop: 4 }}>Manage squad roles and goalkeeper settings.</div>
               </div>
               <button
                 onClick={() => {
@@ -1607,7 +1743,7 @@ export default function Page() {
                   padding: "12px 16px",
                   borderRadius: 14,
                   border: "none",
-                  background: "#0f172a",
+                  background: NAVY,
                   color: "white",
                   fontWeight: 800,
                 }}
@@ -1618,7 +1754,7 @@ export default function Page() {
 
             {showPlayerForm ? (
               <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
                   {editingPlayerId ? "Edit Player" : "Add Player"}
                 </div>
 
@@ -1639,7 +1775,7 @@ export default function Page() {
 
                 <div style={{ display: "grid", gap: 10, marginBottom: 12 }}>
                   {ALL_POSITIONS.map((pos) => (
-                    <label key={pos} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 18 }}>
+                    <label key={pos} style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 17 }}>
                       <input
                         type="checkbox"
                         checked={playerForm.positions.includes(pos)}
@@ -1650,7 +1786,7 @@ export default function Page() {
                   ))}
                 </div>
 
-                <label style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, fontSize: 18 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, fontSize: 17 }}>
                   <input
                     type="checkbox"
                     checked={playerForm.mainGK}
@@ -1668,7 +1804,7 @@ export default function Page() {
                   Main GK
                 </label>
 
-                <label style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, fontSize: 18 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, fontSize: 17 }}>
                   <input
                     type="checkbox"
                     checked={playerForm.backupGK}
@@ -1685,7 +1821,7 @@ export default function Page() {
                       padding: "14px 16px",
                       borderRadius: 14,
                       border: "none",
-                      background: "#0f172a",
+                      background: NAVY,
                       color: "white",
                       fontWeight: 800,
                     }}
@@ -1711,26 +1847,37 @@ export default function Page() {
 
             <div style={{ display: "grid", gap: 12 }}>
               {players.map((player) => (
-                <div key={player.id} style={cardStyle()}>
-                  <div style={{ fontSize: 20, fontWeight: 800 }}>{player.name}</div>
-                  <div style={{ marginTop: 6, color: "#64748b" }}>
-                    {player.positions.join("/")}
-                    {player.mainGK ? " • Main GK" : ""}
-                    {!player.mainGK && player.backupGK ? " • Backup GK" : ""}
+                <div
+                  key={player.id}
+                  style={{
+                    ...cardStyle(),
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                  }}
+                >
+                  <div style={playerMarkerStyle(player.mainGK)}>{initials(player.name)}</div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 19, fontWeight: 900 }}>{player.name}</div>
+                    <div style={{ marginTop: 6, color: MUTED }}>
+                      {player.positions.join("/")}
+                      {player.mainGK ? " • Main GK" : ""}
+                      {!player.mainGK && player.backupGK ? " • Backup GK" : ""}
+                    </div>
                   </div>
 
                   <button
                     onClick={() => startEditPlayer(player)}
                     style={{
-                      marginTop: 12,
                       padding: "10px 14px",
                       borderRadius: 12,
                       border: "1px solid #d1d5db",
                       background: "white",
-                      fontWeight: 700,
+                      fontWeight: 800,
                     }}
                   >
-                    Edit Player
+                    Edit
                   </button>
                 </div>
               ))}
@@ -1740,10 +1887,18 @@ export default function Page() {
 
         {tab === "events" ? (
           <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ ...cardStyle(), display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                ...cardStyle(),
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
               <div>
-                <div style={{ fontSize: 24, fontWeight: 800 }}>Events</div>
-                <div style={{ color: "#64748b", marginTop: 4 }}>Fixtures, training and weekly schedule.</div>
+                <div style={{ fontSize: 24, fontWeight: 900 }}>Events</div>
+                <div style={{ color: MUTED, marginTop: 4 }}>Fixtures, training and weekly schedule.</div>
               </div>
               <button
                 onClick={() => {
@@ -1754,7 +1909,7 @@ export default function Page() {
                   padding: "12px 16px",
                   borderRadius: 14,
                   border: "none",
-                  background: "#0f172a",
+                  background: NAVY,
                   color: "white",
                   fontWeight: 800,
                 }}
@@ -1765,7 +1920,7 @@ export default function Page() {
 
             {showEventForm ? (
               <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
                   {editingEventId ? "Edit Event" : "Add Event"}
                 </div>
 
@@ -1822,7 +1977,7 @@ export default function Page() {
                       padding: "14px 16px",
                       borderRadius: 14,
                       border: "none",
-                      background: "#0f172a",
+                      background: NAVY,
                       color: "white",
                       fontWeight: 800,
                     }}
@@ -1853,8 +2008,8 @@ export default function Page() {
                   <div
                     key={event.id}
                     style={{
-                      ...cardStyle(),
-                      border: selected ? "2px solid #0f172a" : "1px solid #e5e7eb",
+                      ...cardStyle("linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)"),
+                      border: selected ? `2px solid ${NAVY}` : `1px solid ${PANEL_BORDER}`,
                     }}
                   >
                     <button
@@ -1868,12 +2023,12 @@ export default function Page() {
                       }}
                     >
                       <div style={chipStyle(eventTypeColor(event.type))}>{event.type}</div>
-                      <div style={{ marginTop: 10, fontSize: 20, fontWeight: 800 }}>{event.title}</div>
-                      <div style={{ marginTop: 6, color: "#64748b" }}>
+                      <div style={{ marginTop: 10, fontSize: 22, fontWeight: 900 }}>{event.title}</div>
+                      <div style={{ marginTop: 6, color: MUTED }}>
                         {event.day} {event.date} • {event.kickOff}
                       </div>
                       {event.type === "MATCH" ? (
-                        <div style={{ marginTop: 6, color: "#64748b" }}>
+                        <div style={{ marginTop: 6, color: MUTED }}>
                           {event.home} vs {event.away}
                         </div>
                       ) : null}
@@ -1888,7 +2043,7 @@ export default function Page() {
                           borderRadius: 12,
                           border: "1px solid #d1d5db",
                           background: "white",
-                          fontWeight: 700,
+                          fontWeight: 800,
                         }}
                       >
                         Edit
@@ -1902,7 +2057,7 @@ export default function Page() {
                           border: "1px solid #fecaca",
                           background: "#fff1f2",
                           color: "#b91c1c",
-                          fontWeight: 700,
+                          fontWeight: 800,
                         }}
                       >
                         Delete
@@ -1921,32 +2076,57 @@ export default function Page() {
               <div style={cardStyle()}>Choose an event first.</div>
             ) : (
               <>
-                <div style={{ ...cardStyle("#0f172a"), color: "white" }}>
-                  <div style={{ fontSize: 14, opacity: 0.75 }}>Match Center</div>
-                  <div style={{ fontSize: 28, fontWeight: 800, marginTop: 8 }}>{selectedEvent.title}</div>
-                  <div style={{ marginTop: 6, opacity: 0.85 }}>
-                    {selectedEvent.day} {selectedEvent.date} • {selectedEvent.kickOff}
+                <div
+                  style={{
+                    ...cardStyle("linear-gradient(135deg, #07112b 0%, #0b1c47 100%)"),
+                    color: "white",
+                    overflow: "hidden",
+                    position: "relative",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: -40,
+                      top: -20,
+                      width: 140,
+                      height: 140,
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                  />
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <div style={{ fontSize: 14, opacity: 0.75, fontWeight: 800 }}>Match Center</div>
+                    <div style={{ fontSize: 30, fontWeight: 900, marginTop: 8, letterSpacing: -0.8 }}>{selectedEvent.title}</div>
+                    <div style={{ marginTop: 6, opacity: 0.88 }}>
+                      {selectedEvent.day} {selectedEvent.date} • {selectedEvent.kickOff}
+                    </div>
                   </div>
                 </div>
 
                 {selectedEvent.type === "MATCH" ? (
                   <>
-                    <div style={{ ...cardStyle("#111827"), color: "white" }}>
-                      <div style={{ fontSize: 14, opacity: 0.75 }}>Live Scoreboard</div>
+                    <div
+                      style={{
+                        ...cardStyle("linear-gradient(135deg, #0f172a 0%, #111827 100%)"),
+                        color: "white",
+                      }}
+                    >
+                      <div style={{ fontSize: 13, opacity: 0.75, fontWeight: 800 }}>Live Scoreboard</div>
                       <div
                         style={{
                           display: "grid",
                           gridTemplateColumns: "1fr auto 1fr",
                           gap: 12,
                           alignItems: "center",
-                          marginTop: 14,
+                          marginTop: 12,
                         }}
                       >
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.home || "Home"}</div>
-                          <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.home}</div>
+                          <div style={{ fontSize: 16, opacity: 0.82, fontWeight: 700 }}>{selectedEvent.home || "Home"}</div>
+                          <div style={{ fontSize: 56, fontWeight: 900, marginTop: 4 }}>{liveScore.home}</div>
                           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
-                            <button onClick={() => adjustTeamScore("home", 1)} style={smallActionBtn("white", "#0f172a")}>
+                            <button onClick={() => adjustTeamScore("home", 1)} style={smallActionBtn("white", TEXT)}>
                               +1
                             </button>
                             <button onClick={() => adjustTeamScore("home", -1)} style={smallActionBtn("#1f2937", "white")}>
@@ -1955,13 +2135,13 @@ export default function Page() {
                           </div>
                         </div>
 
-                        <div style={{ fontSize: 24, fontWeight: 900 }}>v</div>
+                        <div style={{ fontSize: 24, fontWeight: 900, opacity: 0.8 }}>v</div>
 
                         <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 16, opacity: 0.8 }}>{selectedEvent.away || "Away"}</div>
-                          <div style={{ fontSize: 52, fontWeight: 900, marginTop: 4 }}>{liveScore.away}</div>
+                          <div style={{ fontSize: 16, opacity: 0.82, fontWeight: 700 }}>{selectedEvent.away || "Away"}</div>
+                          <div style={{ fontSize: 56, fontWeight: 900, marginTop: 4 }}>{liveScore.away}</div>
                           <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10 }}>
-                            <button onClick={() => adjustTeamScore("away", 1)} style={smallActionBtn("white", "#0f172a")}>
+                            <button onClick={() => adjustTeamScore("away", 1)} style={smallActionBtn("white", TEXT)}>
                               +1
                             </button>
                             <button onClick={() => adjustTeamScore("away", -1)} style={smallActionBtn("#1f2937", "white")}>
@@ -1972,44 +2152,44 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div style={cardStyle()}>
-                      <div style={sectionTitleStyle()}>Attendance</div>
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {players.map((player) => {
-                          const status = getAttendanceStatus(selectedEvent.id, player.id)
-                          return (
-                            <div
-                              key={player.id}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                gap: 12,
-                                padding: 12,
-                                borderRadius: 14,
-                                background: "#f8fafc",
-                              }}
-                            >
-                              <div>
-                                <div style={{ fontWeight: 800 }}>{player.name}</div>
-                                <div style={{ color: "#64748b", fontSize: 14 }}>{player.positions.join("/")}</div>
-                              </div>
-                              <button
-                                onClick={() => void cycleAttendance(player.id)}
-                                style={{
-                                  minWidth: 72,
-                                  padding: "10px 12px",
-                                  borderRadius: 999,
-                                  border: "none",
-                                  background: attendanceColor(status),
-                                  fontWeight: 800,
-                                }}
-                              >
-                                {status}
-                              </button>
-                            </div>
-                          )
-                        })}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+                      <div style={statCardStyle()}>
+                        <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Available</div>
+                        <div style={{ fontSize: 32, fontWeight: 900 }}>{availablePlayers.length}</div>
+                      </div>
+                      <div style={statCardStyle()}>
+                        <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Reserve</div>
+                        <div style={{ fontSize: 32, fontWeight: 900 }}>{reservePlayers.length}</div>
+                      </div>
+                      <div style={statCardStyle()}>
+                        <div style={{ color: MUTED, fontWeight: 800, fontSize: 13 }}>Injured</div>
+                        <div style={{ fontSize: 32, fontWeight: 900 }}>{injuredPlayers.length}</div>
+                      </div>
+                    </div>
+
+                    <div style={cardStyle("#ecfccb")}>
+                      <div style={{ fontSize: 13, color: "#3f6212", fontWeight: 800 }}>Quarter {currentQuarter}</div>
+                      <div style={{ fontSize: 42, fontWeight: 900, marginTop: 4 }}>{formatSeconds(matchSeconds)}</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 12 }}>
+                        <button onClick={() => setTimerRunning(true)} style={smallActionBtn(NAVY, "white")}>
+                          Start
+                        </button>
+                        <button onClick={() => setTimerRunning(false)} style={smallActionBtn("white", TEXT)}>
+                          Pause
+                        </button>
+                        <button
+                          onClick={() => {
+                            setTimerRunning(false)
+                            setMatchSeconds(0)
+                            setPlayerSeconds({})
+                          }}
+                          style={smallActionBtn("white", TEXT)}
+                        >
+                          Reset
+                        </button>
+                        <button onClick={() => void saveLiveMinutesToStats()} style={smallActionBtn("white", TEXT)}>
+                          Save
+                        </button>
                       </div>
                     </div>
 
@@ -2051,7 +2231,7 @@ export default function Page() {
                             padding: "14px 16px",
                             borderRadius: 14,
                             border: "none",
-                            background: "#0f172a",
+                            background: NAVY,
                             color: "white",
                             fontWeight: 800,
                           }}
@@ -2094,9 +2274,9 @@ export default function Page() {
                             style={{
                               padding: "10px 14px",
                               borderRadius: 999,
-                              border: currentQuarter === q ? "2px solid #0f172a" : "1px solid #d1d5db",
-                              background: currentQuarter === q ? "#e2e8f0" : "white",
-                              fontWeight: 800,
+                              border: currentQuarter === q ? `2px solid ${NAVY}` : "1px solid #d1d5db",
+                              background: currentQuarter === q ? "#dbeafe" : "white",
+                              fontWeight: 900,
                             }}
                           >
                             Q{q}
@@ -2105,415 +2285,390 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div style={cardStyle("#ecfccb")}>
-                      <div style={{ fontSize: 14, color: "#3f6212", fontWeight: 700 }}>Quarter {currentQuarter}</div>
-                      <div style={{ fontSize: 40, fontWeight: 800, marginTop: 4 }}>{formatSeconds(matchSeconds)}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
-                        <button onClick={() => setTimerRunning(true)} style={smallActionBtn("#0f172a", "white")}>
-                          Start
-                        </button>
-                        <button onClick={() => setTimerRunning(false)} style={smallActionBtn("white", "#0f172a")}>
-                          Pause
-                        </button>
+                    <div style={cardStyle()}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Goal Recorder</div>
                         <button
-                          onClick={() => {
-                            setTimerRunning(false)
-                            setMatchSeconds(0)
-                            setPlayerSeconds({})
-                          }}
-                          style={smallActionBtn("white", "#0f172a")}
-                        >
-                          Reset
-                        </button>
-                        <button onClick={() => void saveLiveMinutesToStats()} style={smallActionBtn("white", "#0f172a")}>
-                          Save
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "grid", gap: 12 }}>
-                      <div style={cardStyle()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                          <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Goal Recorder</div>
-                          <button
-                            onClick={openGoalModal}
-                            style={{
-                              padding: "12px 16px",
-                              borderRadius: 14,
-                              border: "none",
-                              background: "#0f172a",
-                              color: "white",
-                              fontWeight: 800,
-                            }}
-                          >
-                            Record Goal
-                          </button>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {players.map((player) => {
-                            const stat = getPlayerStat(selectedEvent.id, player.id)
-                            return (
-                              <div
-                                key={player.id}
-                                style={{
-                                  padding: 12,
-                                  borderRadius: 14,
-                                  background: "#f8fafc",
-                                }}
-                              >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                                  <div>
-                                    <div style={{ fontWeight: 800 }}>{player.name}</div>
-                                    <div style={{ color: "#64748b", fontSize: 14 }}>
-                                      Goals: {stat.goals} • Assists: {stat.assists}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
-                                  <button
-                                    onClick={() => adjustPlayerStat(player.id, "goals", 1)}
-                                    style={smallActionBtn("#0f172a", "white")}
-                                  >
-                                    + Goal
-                                  </button>
-                                  <button
-                                    onClick={() => adjustPlayerStat(player.id, "goals", -1)}
-                                    style={smallActionBtn("white", "#0f172a")}
-                                  >
-                                    - Goal
-                                  </button>
-                                  <button
-                                    onClick={() => adjustPlayerStat(player.id, "assists", 1)}
-                                    style={smallActionBtn("#0f172a", "white")}
-                                  >
-                                    + Assist
-                                  </button>
-                                  <button
-                                    onClick={() => adjustPlayerStat(player.id, "assists", -1)}
-                                    style={smallActionBtn("white", "#0f172a")}
-                                  >
-                                    - Assist
-                                  </button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Starting Lineup Board</div>
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {["FWD", "MID", "DEF", "GK"].map((position) => {
-                            const rowPlayers = pitchSlots
-                              .map((slot, index) => ({ slot, playerId: pitchIds[index], index }))
-                              .filter((item) => item.slot === position)
-
-                            return (
-                              <div key={position} style={{ padding: 12, borderRadius: 16, background: "#f8fafc" }}>
-                                <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800, marginBottom: 8 }}>{position}</div>
-                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                  {rowPlayers.map((item) => (
-                                    <div
-                                      key={`${position}-${item.index}`}
-                                      style={{
-                                        padding: "8px 12px",
-                                        borderRadius: 999,
-                                        background: item.playerId ? "#e2e8f0" : "#f1f5f9",
-                                        fontWeight: 700,
-                                      }}
-                                    >
-                                      {item.playerId ? getPlayerName(item.playerId) : "Empty"}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-
-                      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                        <div
+                          onClick={openGoalModal}
                           style={{
-                            ...cardStyle("#166534"),
+                            padding: "12px 16px",
+                            borderRadius: 14,
+                            border: "none",
+                            background: NAVY,
                             color: "white",
-                            padding: 18,
-                            overflow: "hidden",
-                            position: "relative",
+                            fontWeight: 800,
                           }}
                         >
-                          <div
-                            style={{
-                              position: "absolute",
-                              inset: 12,
-                              border: "2px solid rgba(255,255,255,0.25)",
-                              borderRadius: 24,
-                              pointerEvents: "none",
-                            }}
-                          />
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              top: 12,
-                              bottom: 12,
-                              width: 2,
-                              background: "rgba(255,255,255,0.22)",
-                              pointerEvents: "none",
-                            }}
-                          />
-                          <div
-                            style={{
-                              position: "absolute",
-                              left: "50%",
-                              top: "50%",
-                              width: 84,
-                              height: 84,
-                              marginLeft: -42,
-                              marginTop: -42,
-                              border: "2px solid rgba(255,255,255,0.22)",
-                              borderRadius: "50%",
-                              pointerEvents: "none",
-                            }}
-                          />
-
-                          <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Pitch View</div>
-                          <div style={{ fontSize: 13, opacity: 0.82, marginTop: 4, marginBottom: 14 }}>
-                            Drag bench players onto the pitch. Layout follows your selected formation.
-                          </div>
-
-                          <div style={{ display: "grid", gap: 18 }}>
-                            {pitchRows.map((row, rowIndex) => (
-                              <div
-                                key={rowIndex}
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: `repeat(${Math.max(row.length, 1)}, minmax(0, 1fr))`,
-                                  gap: 12,
-                                  alignItems: "center",
-                                }}
-                              >
-                                {row.map((item) => (
-                                  <DroppablePitchSlot
-                                    key={`${item.slot}-${item.index}`}
-                                    dropId={`slot-${item.index}`}
-                                    slot={item.slot}
-                                    player={item.player}
-                                    selected={selectedPitchSlot === item.index}
-                                    onClick={() => setSelectedPitchSlot(item.index)}
-                                    onBench={() => removeFromPitch(item.index)}
-                                    onInjure={() => {
-                                      if (item.player) void markPlayerInjured(item.player.id, item.index)
-                                    }}
-                                    timeText={item.player ? formatSeconds(playerSeconds[item.player.id] || 0) : ""}
-                                  />
-                                ))}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div style={cardStyle()}>
-                          <div style={sectionTitleStyle()}>Bench</div>
-                          <div style={{ display: "grid", gap: 10 }}>
-                            {benchPlayers.length === 0 ? (
-                              <div style={{ color: "#64748b" }}>No bench players available.</div>
-                            ) : (
-                              benchPlayers.map((player) => (
-                                <DraggablePlayerCard
-                                  key={player.id}
-                                  id={player.id}
-                                  name={player.name}
-                                  subtitle={formatSeconds(playerSeconds[player.id] || 0)}
-                                />
-                              ))
-                            )}
-                          </div>
-                        </div>
-                      </DndContext>
-
-                      <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Live Match Timeline</div>
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {liveTimeline.length === 0 ? (
-                            <div style={{ color: "#64748b" }}>No live events yet.</div>
-                          ) : (
-                            liveTimeline.map((item) => (
-                              <div
-                                key={item.id}
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "72px 1fr",
-                                  gap: 12,
-                                  alignItems: "start",
-                                  padding: 12,
-                                  borderRadius: 14,
-                                  background: "#f8fafc",
-                                }}
-                              >
-                                <div style={{ fontWeight: 800, color: "#0f172a" }}>
-                                  Q{item.quarter}
-                                  <div style={{ marginTop: 2, color: "#64748b" }}>{formatSeconds(item.time)}</div>
-                                </div>
-                                <div>
-                                  <div style={{ fontWeight: 800 }}>{item.title}</div>
-                                  <div style={{ color: "#64748b", marginTop: 4 }}>{item.detail}</div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                          Record Goal
+                        </button>
                       </div>
 
-                      <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Injured</div>
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {injuredPlayers.length === 0 ? (
-                            <div style={{ color: "#64748b" }}>No injured players.</div>
-                          ) : (
-                            injuredPlayers.map((player) => (
-                              <div
-                                key={player.id}
-                                style={{
-                                  padding: 14,
-                                  borderRadius: 14,
-                                  background: "#fff7ed",
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  gap: 12,
-                                }}
-                              >
-                                <span style={{ fontWeight: 700 }}>{player.name}</span>
-                                <button
-                                  onClick={() => void returnFromInjury(player.id)}
-                                  style={{
-                                    padding: "10px 12px",
-                                    borderRadius: 12,
-                                    border: "1px solid #d1d5db",
-                                    background: "white",
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  Return
-                                </button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={cardStyle()}>
-                        <div style={sectionTitleStyle()}>Projected Minutes</div>
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {players.map((player) => (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {players.map((player) => {
+                          const stat = getPlayerStat(selectedEvent.id, player.id)
+                          return (
                             <div
                               key={player.id}
                               style={{
+                                padding: 14,
+                                borderRadius: 18,
+                                background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                                border: "1px solid #e2e8f0",
                                 display: "flex",
-                                justifyContent: "space-between",
                                 alignItems: "center",
-                                padding: 12,
-                                borderRadius: 14,
-                                background: "#f8fafc",
+                                gap: 12,
                               }}
                             >
-                              <span style={{ fontWeight: 700 }}>{player.name}</span>
-                              <span>{projectedSummaryMinutes[player.id] || 0} mins</span>
+                              <div style={playerMarkerStyle(player.mainGK)}>{initials(player.name)}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 900 }}>{player.name}</div>
+                                <div style={{ color: MUTED, fontSize: 14 }}>
+                                  Goals: {stat.goals} • Assists: {stat.assists}
+                                </div>
+                              </div>
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, width: "100%" }}>
+                                <button onClick={() => adjustPlayerStat(player.id, "goals", 1)} style={smallActionBtn(NAVY, "white")}>
+                                  + Goal
+                                </button>
+                                <button onClick={() => adjustPlayerStat(player.id, "goals", -1)} style={smallActionBtn("white", TEXT)}>
+                                  - Goal
+                                </button>
+                                <button onClick={() => adjustPlayerStat(player.id, "assists", 1)} style={smallActionBtn(NAVY, "white")}>
+                                  + Assist
+                                </button>
+                                <button onClick={() => adjustPlayerStat(player.id, "assists", -1)} style={smallActionBtn("white", TEXT)}>
+                                  - Assist
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Lineup Board</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {["FWD", "MID", "DEF", "GK"].map((position) => {
+                          const rowPlayers = pitchSlots
+                            .map((slot, index) => ({ slot, playerId: pitchIds[index], index }))
+                            .filter((item) => item.slot === position)
+
+                          return (
+                            <div key={position} style={{ padding: 12, borderRadius: 18, background: "#f8fafc" }}>
+                              <div style={{ fontSize: 12, color: MUTED, fontWeight: 900, marginBottom: 8 }}>{position}</div>
+                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                {rowPlayers.map((item) => (
+                                  <div
+                                    key={`${position}-${item.index}`}
+                                    style={{
+                                      padding: "8px 12px",
+                                      borderRadius: 999,
+                                      background: item.playerId ? "#dbeafe" : "#f1f5f9",
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    {item.playerId ? getPlayerName(item.playerId) : "Empty"}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                      <div
+                        style={{
+                          ...cardStyle("linear-gradient(180deg, #1b7a39 0%, #166534 100%)"),
+                          color: "white",
+                          padding: 18,
+                          overflow: "hidden",
+                          position: "relative",
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 12,
+                            border: "2px solid rgba(255,255,255,0.30)",
+                            borderRadius: 28,
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            top: 12,
+                            bottom: 12,
+                            width: 2,
+                            background: "rgba(255,255,255,0.26)",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: "50%",
+                            width: 96,
+                            height: 96,
+                            marginLeft: -48,
+                            marginTop: -48,
+                            border: "2px solid rgba(255,255,255,0.24)",
+                            borderRadius: "50%",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: "50%",
+                            width: 8,
+                            height: 8,
+                            marginLeft: -4,
+                            marginTop: -4,
+                            background: "rgba(255,255,255,0.75)",
+                            borderRadius: "50%",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            right: 12,
+                            top: 34,
+                            height: 92,
+                            border: "2px solid rgba(255,255,255,0.18)",
+                            borderBottom: "none",
+                            borderRadius: "22px 22px 0 0",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 12,
+                            right: 12,
+                            bottom: 34,
+                            height: 92,
+                            border: "2px solid rgba(255,255,255,0.18)",
+                            borderTop: "none",
+                            borderRadius: "0 0 22px 22px",
+                            pointerEvents: "none",
+                          }}
+                        />
+
+                        <div style={{ ...sectionTitleStyle(), marginBottom: 0 }}>Tactics Board</div>
+                        <div style={{ fontSize: 13, opacity: 0.84, marginTop: 4, marginBottom: 14 }}>
+                          Drag bench players onto the pitch. Formation updates live.
+                        </div>
+
+                        <div style={{ display: "grid", gap: 18, position: "relative", zIndex: 1 }}>
+                          {pitchRows.map((row, rowIndex) => (
+                            <div
+                              key={rowIndex}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: `repeat(${Math.max(row.length, 1)}, minmax(0, 1fr))`,
+                                gap: 12,
+                                alignItems: "center",
+                              }}
+                            >
+                              {row.map((item) => (
+                                <TacticalPitchSlot
+                                  key={`${item.slot}-${item.index}`}
+                                  dropId={`slot-${item.index}`}
+                                  slot={item.slot}
+                                  player={item.player}
+                                  selected={selectedPitchSlot === item.index}
+                                  onClick={() => setSelectedPitchSlot(item.index)}
+                                  onBench={() => removeFromPitch(item.index)}
+                                  onInjure={() => {
+                                    if (item.player) void markPlayerInjured(item.player.id, item.index)
+                                  }}
+                                  timeText={item.player ? formatSeconds(playerSeconds[item.player.id] || 0) : ""}
+                                />
+                              ))}
                             </div>
                           ))}
                         </div>
                       </div>
 
                       <div style={cardStyle()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
-                          <div style={{ fontSize: 22, fontWeight: 800 }}>Substitution History</div>
-                          <button
-                            onClick={() => clearSubHistoryForEvent(selectedEvent.id)}
-                            style={{
-                              padding: "10px 12px",
-                              borderRadius: 12,
-                              border: "1px solid #d1d5db",
-                              background: "white",
-                              fontWeight: 700,
-                            }}
-                          >
-                            Clear
-                          </button>
-                        </div>
-
+                        <div style={sectionTitleStyle()}>Bench</div>
                         <div style={{ display: "grid", gap: 10 }}>
-                          {getSubHistoryForEvent(selectedEvent.id).length === 0 ? (
-                            <div style={{ color: "#64748b" }}>No substitutions yet.</div>
+                          {benchPlayers.length === 0 ? (
+                            <div style={{ color: MUTED }}>No bench players available.</div>
                           ) : (
-                            [...getSubHistoryForEvent(selectedEvent.id)]
-                              .sort((a, b) => {
-                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
-                                return a.time - b.time
-                              })
-                              .map((item) => (
-                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
-                                  <div style={{ fontWeight: 800 }}>
-                                    Q{item.quarter} {formatSeconds(item.time)}
-                                  </div>
-                                  <div style={{ marginTop: 4, color: "#475569" }}>
-                                    {getPlayerName(item.offPlayerId)} → {getPlayerName(item.onPlayerId)}
-                                  </div>
-                                  <div style={{ marginTop: 4, fontSize: 13, color: "#64748b" }}>{item.reason}</div>
-                                </div>
-                              ))
+                            benchPlayers.map((player) => (
+                              <DraggableBenchPlayer
+                                key={player.id}
+                                id={player.id}
+                                player={player}
+                                subtitle={formatSeconds(playerSeconds[player.id] || 0)}
+                              />
+                            ))
                           )}
                         </div>
                       </div>
+                    </DndContext>
 
-                      <div style={cardStyle()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
-                          <div style={{ fontSize: 22, fontWeight: 800 }}>Detailed Match Log</div>
-                          <button
-                            onClick={() => clearMatchLog(selectedEvent.id)}
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Live Match Timeline</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {liveTimeline.length === 0 ? (
+                          <div style={{ color: MUTED }}>No live events yet.</div>
+                        ) : (
+                          liveTimeline.map((item) => (
+                            <div
+                              key={item.id}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "74px 1fr",
+                                gap: 12,
+                                alignItems: "start",
+                                padding: 14,
+                                borderRadius: 18,
+                                background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                                border: "1px solid #e2e8f0",
+                              }}
+                            >
+                              <div style={{ fontWeight: 900 }}>
+                                Q{item.quarter}
+                                <div style={{ marginTop: 2, color: MUTED, fontWeight: 700 }}>{formatSeconds(item.time)}</div>
+                              </div>
+                              <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span
+                                    style={chipStyle(
+                                      item.kind === "GOAL"
+                                        ? item.team === "home"
+                                          ? "#dbeafe"
+                                          : "#fee2e2"
+                                        : "#f3f4f6",
+                                      item.kind === "GOAL"
+                                        ? item.team === "home"
+                                          ? "#1d4ed8"
+                                          : "#991b1b"
+                                        : "#334155"
+                                    )}
+                                  >
+                                    {item.kind}
+                                  </span>
+                                  <span style={{ fontWeight: 900 }}>{item.title}</span>
+                                </div>
+                                <div style={{ color: MUTED, marginTop: 6 }}>{item.detail}</div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Injured</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {injuredPlayers.length === 0 ? (
+                          <div style={{ color: MUTED }}>No injured players.</div>
+                        ) : (
+                          injuredPlayers.map((player) => (
+                            <div
+                              key={player.id}
+                              style={{
+                                padding: 14,
+                                borderRadius: 18,
+                                background: "#fff7ed",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: 12,
+                              }}
+                            >
+                              <span style={{ fontWeight: 800 }}>{player.name}</span>
+                              <button
+                                onClick={() => void returnFromInjury(player.id)}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: 12,
+                                  border: "1px solid #d1d5db",
+                                  background: "white",
+                                  fontWeight: 800,
+                                }}
+                              >
+                                Return
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={cardStyle()}>
+                      <div style={sectionTitleStyle()}>Projected Minutes</div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {players.map((player) => (
+                          <div
+                            key={player.id}
                             style={{
-                              padding: "10px 12px",
-                              borderRadius: 12,
-                              border: "1px solid #d1d5db",
-                              background: "white",
-                              fontWeight: 700,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: 12,
+                              borderRadius: 16,
+                              background: "#f8fafc",
                             }}
                           >
-                            Clear
-                          </button>
-                        </div>
+                            <span style={{ fontWeight: 800 }}>{player.name}</span>
+                            <span style={{ color: MUTED, fontWeight: 800 }}>{projectedSummaryMinutes[player.id] || 0} mins</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                        <div style={{ display: "grid", gap: 10 }}>
-                          {getMatchLog(selectedEvent.id).length === 0 ? (
-                            <div style={{ color: "#64748b" }}>No match events yet.</div>
-                          ) : (
-                            [...getMatchLog(selectedEvent.id)]
-                              .sort((a, b) => {
-                                if (a.quarter !== b.quarter) return a.quarter - b.quarter
-                                return a.time - b.time
-                              })
-                              .map((item) => (
-                                <div key={item.id} style={{ padding: 12, borderRadius: 14, background: "#f8fafc" }}>
-                                  <div style={{ fontWeight: 800 }}>
-                                    Q{item.quarter} {formatSeconds(item.time)}
-                                  </div>
-                                  {item.type === "GOAL" ? (
-                                    <div style={{ marginTop: 4, color: "#475569" }}>
-                                      {item.team === "home" ? selectedEvent.home || "Home" : selectedEvent.away || "Away"} goal —{" "}
-                                      {getPlayerName(item.scorerId)}
-                                      {item.assisterId ? ` (assist ${getPlayerName(item.assisterId)})` : ""}
-                                    </div>
-                                  ) : (
-                                    <div style={{ marginTop: 4, color: "#475569" }}>{item.note}</div>
-                                  )}
+                    <div style={cardStyle()}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
+                        <div style={{ fontSize: 22, fontWeight: 900 }}>Substitution History</div>
+                        <button
+                          onClick={() => clearSubHistoryForEvent(selectedEvent.id)}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: 12,
+                            border: "1px solid #d1d5db",
+                            background: "white",
+                            fontWeight: 800,
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {getSubHistoryForEvent(selectedEvent.id).length === 0 ? (
+                          <div style={{ color: MUTED }}>No substitutions yet.</div>
+                        ) : (
+                          [...getSubHistoryForEvent(selectedEvent.id)]
+                            .sort((a, b) => {
+                              if (a.quarter !== b.quarter) return a.quarter - b.quarter
+                              return a.time - b.time
+                            })
+                            .map((item) => (
+                              <div key={item.id} style={{ padding: 14, borderRadius: 18, background: "#f8fafc" }}>
+                                <div style={{ fontWeight: 900 }}>
+                                  Q{item.quarter} {formatSeconds(item.time)}
                                 </div>
-                              ))
-                          )}
-                        </div>
+                                <div style={{ marginTop: 4, color: "#475569" }}>
+                                  {getPlayerName(item.offPlayerId)} → {getPlayerName(item.onPlayerId)}
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 13, color: MUTED }}>{item.reason}</div>
+                              </div>
+                            ))
+                        )}
                       </div>
                     </div>
                   </>
@@ -2531,9 +2686,17 @@ export default function Page() {
               <div style={sectionTitleStyle()}>Season Stats</div>
               <div style={{ display: "grid", gap: 12 }}>
                 {seasonStats.map((row) => (
-                  <div key={row.player.id} style={{ padding: 14, borderRadius: 16, background: "#f8fafc" }}>
-                    <div style={{ fontSize: 18, fontWeight: 800 }}>{row.player.name}</div>
-                    <div style={{ marginTop: 4, color: "#64748b" }}>{row.player.positions.join("/")}</div>
+                  <div
+                    key={row.player.id}
+                    style={{
+                      padding: 14,
+                      borderRadius: 18,
+                      background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ fontSize: 18, fontWeight: 900 }}>{row.player.name}</div>
+                    <div style={{ marginTop: 4, color: MUTED }}>{row.player.positions.join("/")}</div>
                     <div style={{ marginTop: 8 }}>
                       P: {row.attendanceP} • R: {row.attendanceR} • NO: {row.attendanceNo} • OFF: {row.attendanceOff} • INJ: {row.attendanceInj}
                     </div>
@@ -2554,18 +2717,20 @@ export default function Page() {
       <div
         style={{
           position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
+          left: 12,
+          right: 12,
+          bottom: 12,
           zIndex: 40,
-          background: "rgba(255,255,255,0.94)",
-          backdropFilter: "blur(12px)",
-          borderTop: "1px solid #e5e7eb",
+          background: "rgba(255,255,255,0.88)",
+          backdropFilter: "blur(18px)",
+          border: "1px solid rgba(226,232,240,0.95)",
+          borderRadius: 24,
+          boxShadow: "0 14px 30px rgba(15,23,42,0.12)",
         }}
       >
         <div
           style={{
-            maxWidth: 960,
+            maxWidth: 1040,
             margin: "0 auto",
             padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
             display: "grid",
@@ -2584,16 +2749,20 @@ export default function Page() {
               key={value}
               onClick={() => setTab(value as AppTab)}
               style={{
-                padding: "12px 8px",
-                borderRadius: 14,
+                padding: "10px 8px",
+                borderRadius: 16,
                 border: "none",
-                background: tab === value ? "#0f172a" : "transparent",
+                background: tab === value ? NAVY : "transparent",
                 color: tab === value ? "white" : "#475569",
-                fontWeight: 800,
-                fontSize: 14,
+                fontWeight: 900,
+                fontSize: 13,
+                display: "grid",
+                placeItems: "center",
+                gap: 2,
               }}
             >
-              {label}
+              <span style={{ fontSize: 16 }}>{tabIcon(value as AppTab)}</span>
+              <span>{label}</span>
             </button>
           ))}
         </div>
@@ -2604,7 +2773,7 @@ export default function Page() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15,23,42,0.45)",
+            background: "rgba(15,23,42,0.52)",
             display: "grid",
             placeItems: "center",
             zIndex: 100,
@@ -2612,7 +2781,7 @@ export default function Page() {
           }}
         >
           <div style={{ ...cardStyle(), width: "100%", maxWidth: 520 }}>
-            <div style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Record Goal</div>
+            <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 12 }}>Record Goal</div>
 
             <div style={{ display: "grid", gap: 12 }}>
               <select
@@ -2661,7 +2830,7 @@ export default function Page() {
                   padding: "14px 16px",
                   borderRadius: 14,
                   border: "none",
-                  background: "#0f172a",
+                  background: NAVY,
                   color: "white",
                   fontWeight: 800,
                 }}
