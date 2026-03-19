@@ -100,8 +100,11 @@ export default function RollingCalendar({
 
       <div style={{ marginTop: 16 }}>
         <div style={{ fontSize: 22, fontWeight: 900 }}>
-          Events on {new Date(selectedDate).toLocaleDateString("en-GB", { weekday: "short" })}{" "}
-          {String(new Date(selectedDate).getMonth() + 1).padStart(2, "0")}-{String(new Date(selectedDate).getDate()).padStart(2, "0")}
+          Events on{" "}
+          {new Date(selectedDate).toLocaleDateString("en-GB", { weekday: "short" })}{" "}
+          {String(new Date(selectedDate).getMonth() + 1).padStart(2, "0")}-{String(
+            new Date(selectedDate).getDate()
+          ).padStart(2, "0")}
         </div>
 
         <div style={{ color: "#64748b", marginTop: 12 }}>
