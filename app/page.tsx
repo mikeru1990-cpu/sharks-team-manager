@@ -28,6 +28,8 @@ type Player = {
   id: string
   name: string
   positions: PitchPosition[]
+  mainGK: boolean
+  backupGK: boolean
 }
 
 type TimelineItem = {
@@ -65,6 +67,17 @@ type QuarterPlan = {
   bench: string[]
 }
 
+type SavedLineup = {
+  id: string
+  name: string
+  format: MatchFormat
+  formation: string
+  lineup: Record<string, string | null>
+  bench: string[]
+}
+
+const STORAGE_KEY = "sharks-team-manager-upgrade-10-fixed-gk"
+
 const ALL_POSITIONS: PitchPosition[] = ["GK", "DEF", "MID", "FWD"]
 
 const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = {
@@ -79,20 +92,21 @@ const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = {
   "11v11": {
     "4-3-3": ["FWD", "FWD", "FWD", "MID", "MID", "MID", "DEF", "DEF", "DEF", "DEF", "GK"],
     "4-4-2": ["FWD", "FWD", "MID", "MID", "MID", "MID", "DEF", "DEF", "DEF", "DEF", "GK"],
+    "3-5-2": ["FWD", "FWD", "MID", "MID", "MID", "MID", "MID", "DEF", "DEF", "DEF", "GK"],
   },
 }
 
 const initialPlayers: Player[] = [
-  { id: "1", name: "Lyra Twinning", positions: ["FWD"] },
-  { id: "2", name: "Bella Bainbridge", positions: ["MID"] },
-  { id: "3", name: "Betsy Rowland", positions: ["MID"] },
-  { id: "4", name: "Ella Wilson", positions: ["MID", "DEF"] },
-  { id: "5", name: "Bailee Dowler-Rowles", positions: ["DEF"] },
-  { id: "6", name: "Evelyn Evans", positions: ["DEF"] },
-  { id: "7", name: "Darcy-Rae Russell", positions: ["GK"] },
-  { id: "8", name: "Isabella Ogden", positions: ["MID", "FWD"] },
-  { id: "9", name: "Martha Scrivens", positions: ["MID"] },
-  { id: "10", name: "Poppy Bennett", positions: ["GK"] },
+  { id: "1", name: "Lyra Twinning", positions: ["FWD"], mainGK: false, backupGK: false },
+  { id: "2", name: "Bella Bainbridge", positions: ["MID"], mainGK: false, backupGK: false },
+  { id: "3", name: "Betsy Rowland", positions: ["MID"], mainGK: false, backupGK: false },
+  { id: "4", name: "Ella Wilson", positions: ["MID", "DEF"], mainGK: false, backupGK: false },
+  { id: "5", name: "Bailee Dowler-Rowles", positions: ["DEF"], mainGK: false, backupGK: false },
+  { id: "6", name: "Evelyn Evans", positions: ["DEF"], mainGK: false, backupGK: false },
+  { id: "7", name: "Darcy-Rae Russell", positions: ["GK"], mainGK: true, backupGK: false },
+  { id: "8", name: "Isabella Ogden", positions: ["MID", "FWD"], mainGK: false, backupGK: false },
+  { id: "9", name: "Martha Scrivens", positions: ["MID"], mainGK: false, backupGK: false },
+  { id: "10", name: "Poppy Bennett", positions: ["GK"], mainGK: false, backupGK: true },
 ]
 
 const initialEvents: EventItem[] = [
@@ -152,7 +166,7 @@ function formatShortDate(date: string) {
 }
 
 function makeId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 function initials(name: string) {
@@ -210,10 +224,6 @@ function chipStyle(active: boolean) {
   } as const
 }
 
-function canPlaySlot(player: Player, slotPosition: PitchPosition) {
-  return player.positions.includes(slotPosition)
-}
-
 function makeSlotId(position: PitchPosition, count: number) {
   return `slot-${position.toLowerCase()}-${count}`
 }
@@ -256,6 +266,50 @@ function parseDragId(value: string) {
   }
 }
 
+function isGoalkeeper(player: Player) {
+  return player.mainGK || player.backupGK || player.positions.includes("GK")
+}
+
+function goalkeeperPriority(player: Player) {
+  if (player.mainGK) return 0
+  if (player.backupGK) return 1
+  if (player.positions.includes("GK")) return 2
+  return 99
+}
+
+function canPlaySlot(player: Player, slotPosition: PitchPosition) {
+  if (slotPosition === "GK") return isGoalkeeper(player)
+  return player.positions.includes(slotPosition)
+}
+
+function buildAutoLineup(players: Player[], slots: PitchSlot[]) {
+  const used = new Set<string>()
+  const lineup: Record<string, string | null> = {}
+
+  slots.forEach((slot) => {
+    const candidates = players.filter((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+
+    let chosen: Player | undefined
+
+    if (slot.position === "GK") {
+      chosen = [...candidates].sort((a, b) => {
+        const aRank = goalkeeperPriority(a)
+        const bRank = goalkeeperPriority(b)
+        if (aRank !== bRank) return aRank - bRank
+        return a.name.localeCompare(b.name)
+      })[0]
+    } else {
+      chosen = [...candidates].sort((a, b) => a.name.localeCompare(b.name))[0]
+    }
+
+    lineup[slot.id] = chosen ? chosen.id : null
+    if (chosen) used.add(chosen.id)
+  })
+
+  const bench = players.filter((p) => !used.has(p.id)).map((p) => p.id)
+  return { lineup, bench }
+}
+
 function TrainingCard({ title, desc }: { title: string; desc: string }) {
   return (
     <div
@@ -294,6 +348,14 @@ function DraggablePlayerCard({
     cursor: "grab",
   }
 
+  const roleText = [
+    player.mainGK ? "Main GK" : null,
+    !player.mainGK && player.backupGK ? "Backup GK" : null,
+    player.positions.join("/"),
+  ]
+    .filter(Boolean)
+    .join(" • ")
+
   if (compact) {
     return (
       <div
@@ -303,7 +365,7 @@ function DraggablePlayerCard({
         style={{
           ...dragStyle,
           width: "100%",
-          maxWidth: 140,
+          maxWidth: 145,
           borderRadius: 18,
           background: "rgba(255,255,255,0.18)",
           padding: 10,
@@ -328,7 +390,7 @@ function DraggablePlayerCard({
           {initials(player.name)}
         </div>
         <div style={{ marginTop: 8, fontWeight: 900, fontSize: 14, lineHeight: 1.1 }}>{player.name}</div>
-        <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>{player.positions.join("/")}</div>
+        <div style={{ marginTop: 4, fontSize: 11, opacity: 0.9 }}>{roleText}</div>
         {subtitle ? <div style={{ marginTop: 4, fontSize: 11 }}>{subtitle}</div> : null}
       </div>
     )
@@ -369,7 +431,7 @@ function DraggablePlayerCard({
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 900, fontSize: 18 }}>{player.name}</div>
-        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+        <div style={{ color: "#64748b", marginTop: 4 }}>{roleText}</div>
         {subtitle ? <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div> : null}
       </div>
     </div>
@@ -430,11 +492,7 @@ function PitchDropSlot({
   )
 }
 
-function BenchDropZone({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function BenchDropZone({ children }: { children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({ id: "bench" })
 
   return (
@@ -475,9 +533,7 @@ export default function Page() {
   const [lineupMap, setLineupMap] = useState<Record<string, string | null>>({})
   const [benchIds, setBenchIds] = useState<string[]>([])
 
-  const [savedLineups, setSavedLineups] = useState<
-    { id: string; name: string; format: MatchFormat; formation: string; lineup: Record<string, string | null>; bench: string[] }[]
-  >([])
+  const [savedLineups, setSavedLineups] = useState<SavedLineup[]>([])
   const [lineupName, setLineupName] = useState("")
 
   const [timeline, setTimeline] = useState<TimelineItem[]>([
@@ -514,25 +570,118 @@ export default function Page() {
 
   const [showPlayerForm, setShowPlayerForm] = useState(false)
   const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null)
-  const [playerForm, setPlayerForm] = useState<{ name: string; positions: PitchPosition[] }>({
+  const [playerForm, setPlayerForm] = useState<{
+    name: string
+    positions: PitchPosition[]
+    mainGK: boolean
+    backupGK: boolean
+  }>({
     name: "",
     positions: ["MID"],
+    mainGK: false,
+    backupGK: false,
   })
 
+  const [hydrated, setHydrated] = useState(false)
+
   useEffect(() => {
-    const firstLineup: Record<string, string | null> = {}
-    const used = new Set<string>()
-
-    currentSlots.forEach((slot) => {
-      const player = players.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
-      firstLineup[slot.id] = player ? player.id : null
-      if (player) used.add(player.id)
-    })
-
-    setLineupMap(firstLineup)
-    setBenchIds(players.filter((p) => !used.has(p.id)).map((p) => p.id))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw)
+        setTab(saved.tab ?? "home")
+        setMatchTab(saved.matchTab ?? "overview")
+        setPlayers(saved.players ?? initialPlayers)
+        setSelectedDate(saved.selectedDate ?? getToday())
+        setHomeScore(saved.homeScore ?? 1)
+        setAwayScore(saved.awayScore ?? 4)
+        setSeconds(saved.seconds ?? 0)
+        setMatchFormat(saved.matchFormat ?? "7v7")
+        setFormation(saved.formation ?? "2-3-1")
+        setLineupMap(saved.lineupMap ?? {})
+        setBenchIds(saved.benchIds ?? [])
+        setSavedLineups(saved.savedLineups ?? [])
+        setLineupName(saved.lineupName ?? "")
+        setTimeline(saved.timeline ?? [])
+        setSelectedTemplateId(saved.selectedTemplateId ?? initialTrainingTemplates[0].id)
+        setTrainingPlan(saved.trainingPlan ?? {
+          title: "Weekly Training Session",
+          warmUp: initialTrainingTemplates[0].warmUp,
+          drill1: initialTrainingTemplates[0].drill1,
+          drill2: initialTrainingTemplates[0].drill2,
+          game: initialTrainingTemplates[0].game,
+          notes: initialTrainingTemplates[0].notes,
+        })
+        setLiveSecondsMap(saved.liveSecondsMap ?? {})
+        setSeasonSecondsMap(saved.seasonSecondsMap ?? {})
+        setCurrentQuarter(saved.currentQuarter ?? 1)
+        setQuarterPlans(saved.quarterPlans ?? {})
+        setQuarterWarnings(saved.quarterWarnings ?? [])
+      } else {
+        const auto = buildAutoLineup(initialPlayers, buildPitchSlots("7v7", "2-3-1"))
+        setLineupMap(auto.lineup)
+        setBenchIds(auto.bench)
+      }
+    } catch {
+      const auto = buildAutoLineup(initialPlayers, buildPitchSlots("7v7", "2-3-1"))
+      setLineupMap(auto.lineup)
+      setBenchIds(auto.bench)
+    }
+    setHydrated(true)
   }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        tab,
+        matchTab,
+        players,
+        selectedDate,
+        homeScore,
+        awayScore,
+        seconds,
+        matchFormat,
+        formation,
+        lineupMap,
+        benchIds,
+        savedLineups,
+        lineupName,
+        timeline,
+        selectedTemplateId,
+        trainingPlan,
+        liveSecondsMap,
+        seasonSecondsMap,
+        currentQuarter,
+        quarterPlans,
+        quarterWarnings,
+      })
+    )
+  }, [
+    hydrated,
+    tab,
+    matchTab,
+    players,
+    selectedDate,
+    homeScore,
+    awayScore,
+    seconds,
+    matchFormat,
+    formation,
+    lineupMap,
+    benchIds,
+    savedLineups,
+    lineupName,
+    timeline,
+    selectedTemplateId,
+    trainingPlan,
+    liveSecondsMap,
+    seasonSecondsMap,
+    currentQuarter,
+    quarterPlans,
+    quarterWarnings,
+  ])
 
   useEffect(() => {
     if (!running) return
@@ -592,7 +741,6 @@ export default function Page() {
   function loadTrainingTemplate(templateId: string) {
     const template = trainingTemplates.find((t) => t.id === templateId)
     if (!template) return
-
     setSelectedTemplateId(templateId)
     setTrainingPlan({
       title: template.name,
@@ -605,53 +753,18 @@ export default function Page() {
   }
 
   function rebuildLineupForCurrentShape(nextPlayers: Player[]) {
-    const freshLineup: Record<string, string | null> = {}
-    const used = new Set<string>()
-
-    currentSlots.forEach((slot) => {
-      const existingId = lineupMap[slot.id]
-      const existingPlayer = nextPlayers.find((p) => p.id === existingId)
-      if (existingPlayer && canPlaySlot(existingPlayer, slot.position) && !used.has(existingPlayer.id)) {
-        freshLineup[slot.id] = existingPlayer.id
-        used.add(existingPlayer.id)
-        return
-      }
-
-      const fallback = nextPlayers.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
-      freshLineup[slot.id] = fallback ? fallback.id : null
-      if (fallback) used.add(fallback.id)
-    })
-
-    setLineupMap(freshLineup)
-    setBenchIds(nextPlayers.filter((p) => !used.has(p.id)).map((p) => p.id))
+    const auto = buildAutoLineup(nextPlayers, currentSlots)
+    setLineupMap(auto.lineup)
+    setBenchIds(auto.bench)
   }
 
   function onChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
-    const slots = buildPitchSlots(nextFormat, nextFormation)
-    const used = new Set<string>()
-    const nextLineup: Record<string, string | null> = {}
-
-    slots.forEach((slot) => {
-      const currentPlayer = players.find(
-        (p) =>
-          !used.has(p.id) &&
-          lineupPlayerIds.includes(p.id) &&
-          canPlaySlot(p, slot.position)
-      )
-      if (currentPlayer) {
-        nextLineup[slot.id] = currentPlayer.id
-        used.add(currentPlayer.id)
-      } else {
-        const fallback = players.find((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
-        nextLineup[slot.id] = fallback ? fallback.id : null
-        if (fallback) used.add(fallback.id)
-      }
-    })
-
+    const nextSlots = buildPitchSlots(nextFormat, nextFormation)
+    const auto = buildAutoLineup(players, nextSlots)
     setMatchFormat(nextFormat)
     setFormation(nextFormation)
-    setLineupMap(nextLineup)
-    setBenchIds(players.filter((p) => !used.has(p.id)).map((p) => p.id))
+    setLineupMap(auto.lineup)
+    setBenchIds(auto.bench)
     addTimeline("note", `Formation changed to ${nextFormation}`)
   }
 
@@ -712,7 +825,6 @@ export default function Page() {
 
     if (overId === "bench") {
       if (fromId === "bench") return
-
       setLineupMap((prev) => ({ ...prev, [fromId]: null }))
       setBenchIds((prev) => (prev.includes(playerId) ? prev : [...prev, playerId]))
       addTimeline("sub", `${player.name} moved to bench`)
@@ -748,6 +860,7 @@ export default function Page() {
 
       const swappedPlayer = targetPlayerId ? players.find((p) => p.id === targetPlayerId) : null
       const previousSlot = currentSlots.find((s) => s.id === fromId)
+
       if (swappedPlayer && previousSlot && !canPlaySlot(swappedPlayer, previousSlot.position)) {
         addTimeline("note", `Swap blocked because ${swappedPlayer.name} cannot play ${previousSlot.position}`)
         return
@@ -842,13 +955,12 @@ export default function Page() {
   function generateQuarterPlans() {
     const quarterCount = 4
     const plans: Record<number, QuarterPlan> = {}
-    const playerIds = players.map((p) => p.id)
     const benchHistory: Record<string, number[]> = {}
     const projectedSeconds: Record<string, number> = {}
 
-    playerIds.forEach((id) => {
-      benchHistory[id] = []
-      projectedSeconds[id] = (seasonSecondsMap[id] || 0) + (liveSecondsMap[id] || 0)
+    players.forEach((p) => {
+      benchHistory[p.id] = []
+      projectedSeconds[p.id] = (seasonSecondsMap[p.id] || 0) + (liveSecondsMap[p.id] || 0)
     })
 
     for (let quarter = 1; quarter <= quarterCount; quarter++) {
@@ -856,22 +968,37 @@ export default function Page() {
       const used = new Set<string>()
 
       currentSlots.forEach((slot) => {
-        const eligible = players
-          .filter((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
-          .sort((a, b) => {
+        let eligible = players.filter((p) => !used.has(p.id) && canPlaySlot(p, slot.position))
+
+        if (slot.position === "GK") {
+          eligible = eligible.sort((a, b) => {
+            const aRank = goalkeeperPriority(a)
+            const bRank = goalkeeperPriority(b)
+            if (aRank !== bRank) return aRank - bRank
+
+            const aSecs = projectedSeconds[a.id] || 0
+            const bSecs = projectedSeconds[b.id] || 0
+            if (aSecs !== bSecs) return aSecs - bSecs
+
+            return a.name.localeCompare(b.name)
+          })
+        } else {
+          eligible = eligible.sort((a, b) => {
             const aConsecutiveBench = benchHistory[a.id].slice(-1)[0] === quarter - 1 ? 1 : 0
             const bConsecutiveBench = benchHistory[b.id].slice(-1)[0] === quarter - 1 ? 1 : 0
             if (aConsecutiveBench !== bConsecutiveBench) return aConsecutiveBench - bConsecutiveBench
 
-            const aSeconds = projectedSeconds[a.id] || 0
-            const bSeconds = projectedSeconds[b.id] || 0
-            if (aSeconds !== bSeconds) return aSeconds - bSeconds
+            const aSecs = projectedSeconds[a.id] || 0
+            const bSecs = projectedSeconds[b.id] || 0
+            if (aSecs !== bSecs) return aSecs - bSecs
 
             return a.name.localeCompare(b.name)
           })
+        }
 
         const chosen = eligible[0]
         lineup[slot.id] = chosen ? chosen.id : null
+
         if (chosen) {
           used.add(chosen.id)
           projectedSeconds[chosen.id] = (projectedSeconds[chosen.id] || 0) + 15 * 60
@@ -880,7 +1007,6 @@ export default function Page() {
 
       const bench = players.filter((p) => !used.has(p.id)).map((p) => p.id)
       bench.forEach((id) => benchHistory[id].push(quarter))
-
       plans[quarter] = { lineup, bench }
     }
 
@@ -903,7 +1029,12 @@ export default function Page() {
   }
 
   function resetPlayerForm() {
-    setPlayerForm({ name: "", positions: ["MID"] })
+    setPlayerForm({
+      name: "",
+      positions: ["MID"],
+      mainGK: false,
+      backupGK: false,
+    })
     setEditingPlayerId(null)
     setShowPlayerForm(false)
   }
@@ -918,7 +1049,12 @@ export default function Page() {
   }
 
   function startEditPlayer(player: Player) {
-    setPlayerForm({ name: player.name, positions: player.positions })
+    setPlayerForm({
+      name: player.name,
+      positions: player.positions,
+      mainGK: player.mainGK,
+      backupGK: player.backupGK,
+    })
     setEditingPlayerId(player.id)
     setShowPlayerForm(true)
   }
@@ -930,23 +1066,41 @@ export default function Page() {
       return
     }
 
-    if (editingPlayerId) {
-      const nextPlayers = players.map((p) =>
-        p.id === editingPlayerId ? { ...p, name: trimmed, positions: playerForm.positions } : p
+    const targetId = editingPlayerId ?? makeId()
+
+    let nextPlayers = players.map((p) => {
+      if (p.id !== targetId) return p
+      return {
+        ...p,
+        name: trimmed,
+        positions: playerForm.positions,
+        mainGK: playerForm.mainGK,
+        backupGK: playerForm.backupGK,
+      }
+    })
+
+    if (!editingPlayerId) {
+      nextPlayers.push({
+        id: targetId,
+        name: trimmed,
+        positions: playerForm.positions,
+        mainGK: playerForm.mainGK,
+        backupGK: playerForm.backupGK,
+      })
+    }
+
+    if (playerForm.mainGK) {
+      nextPlayers = nextPlayers.map((p) =>
+        p.id === targetId ? p : { ...p, mainGK: false }
       )
-      setPlayers(nextPlayers)
-      rebuildLineupForCurrentShape(nextPlayers)
-      resetPlayerForm()
-      return
     }
 
-    const newPlayer: Player = {
-      id: makeId(),
-      name: trimmed,
-      positions: playerForm.positions,
+    if (playerForm.backupGK) {
+      nextPlayers = nextPlayers.map((p) =>
+        p.id === targetId ? p : { ...p, backupGK: false }
+      )
     }
 
-    const nextPlayers = [...players, newPlayer]
     setPlayers(nextPlayers)
     rebuildLineupForCurrentShape(nextPlayers)
     resetPlayerForm()
@@ -955,6 +1109,7 @@ export default function Page() {
   function deletePlayer(playerId: string) {
     const name = players.find((p) => p.id === playerId)?.name || "Player"
     const nextPlayers = players.filter((p) => p.id !== playerId)
+
     setPlayers(nextPlayers)
     setBenchIds((prev) => prev.filter((id) => id !== playerId))
     setLineupMap((prev) => {
@@ -974,7 +1129,16 @@ export default function Page() {
       delete next[playerId]
       return next
     })
+
     addTimeline("note", `${name} removed from squad`)
+  }
+
+  if (!hydrated) {
+    return (
+      <main style={{ minHeight: "100vh", padding: 24, background: "#f8fafc" }}>
+        <div style={{ ...cardStyle(), maxWidth: 720, margin: "0 auto" }}>Loading...</div>
+      </main>
+    )
   }
 
   return (
@@ -1048,7 +1212,7 @@ export default function Page() {
             <div style={{ fontSize: 14, opacity: 0.8, fontWeight: 800 }}>Club Dashboard</div>
             <div style={{ fontSize: 34, fontWeight: 900, marginTop: 8 }}>Ready for Matchday</div>
             <div style={{ marginTop: 10, opacity: 0.9, fontSize: 18 }}>
-              Live minutes, quarter planning, team editing and drag-and-drop lineups.
+              Persistent saving, goalkeeper rules, live minutes, quarter planning, team editing.
             </div>
           </div>
 
@@ -1125,6 +1289,44 @@ export default function Page() {
                 ))}
               </div>
 
+              <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={playerForm.mainGK}
+                  onChange={(e) =>
+                    setPlayerForm((prev) => ({
+                      ...prev,
+                      mainGK: e.target.checked,
+                      backupGK: e.target.checked ? false : prev.backupGK,
+                      positions:
+                        e.target.checked && !prev.positions.includes("GK")
+                          ? [...prev.positions, "GK"]
+                          : prev.positions,
+                    }))
+                  }
+                />
+                <span style={{ fontWeight: 700 }}>Main GK</span>
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <input
+                  type="checkbox"
+                  checked={playerForm.backupGK}
+                  onChange={(e) =>
+                    setPlayerForm((prev) => ({
+                      ...prev,
+                      backupGK: e.target.checked,
+                      mainGK: e.target.checked ? false : prev.mainGK,
+                      positions:
+                        e.target.checked && !prev.positions.includes("GK")
+                          ? [...prev.positions, "GK"]
+                          : prev.positions,
+                    }))
+                  }
+                />
+                <span style={{ fontWeight: 700 }}>Backup GK</span>
+              </label>
+
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={savePlayer} style={{ ...buttonPrimary(), flex: 1 }}>
                   Save
@@ -1165,7 +1367,11 @@ export default function Page() {
 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 900, fontSize: 18 }}>{player.name}</div>
-                  <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                  <div style={{ color: "#64748b", marginTop: 4 }}>
+                    {player.positions.join("/")}
+                    {player.mainGK ? " • Main GK" : ""}
+                    {!player.mainGK && player.backupGK ? " • Backup GK" : ""}
+                  </div>
                 </div>
 
                 <button onClick={() => startEditPlayer(player)} style={buttonSecondary()}>
@@ -1422,6 +1628,13 @@ export default function Page() {
                 </div>
               </div>
 
+              <div style={cardStyle("#eff6ff")}>
+                <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Goalkeeper Rules</div>
+                <div style={{ color: "#334155" }}>
+                  The GK slot only accepts a goalkeeper. The app always prefers <strong>Main GK</strong>, then <strong>Backup GK</strong>, then any other GK-capable player.
+                </div>
+              </div>
+
               <div style={cardStyle()}>
                 <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Lineups</div>
                 {savedLineups.length === 0 ? (
@@ -1461,10 +1674,7 @@ export default function Page() {
               </div>
 
               <div style={cardStyle()}>
-                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Real Drag-and-Drop Tactics Board</div>
-                <div style={{ color: "#64748b", marginBottom: 12 }}>
-                  Drag from bench to pitch, swap players, and live minutes update while the clock runs.
-                </div>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Drag-and-Drop Tactics Board</div>
 
                 <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                   <div
@@ -1618,7 +1828,11 @@ export default function Page() {
                     >
                       <div>
                         <div style={{ fontWeight: 900 }}>{player.name}</div>
-                        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>
+                          {player.positions.join("/")}
+                          {player.mainGK ? " • Main GK" : ""}
+                          {!player.mainGK && player.backupGK ? " • Backup GK" : ""}
+                        </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontWeight: 900 }}>{formatMinutes(liveSecondsMap[player.id] || 0)} min</div>
@@ -1663,6 +1877,13 @@ export default function Page() {
                   <button onClick={generateQuarterPlans} style={buttonSecondary()}>
                     Auto Generate Q1-Q4
                   </button>
+                </div>
+              </div>
+
+              <div style={cardStyle("#eff6ff")}>
+                <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Goalkeeper Rules</div>
+                <div style={{ color: "#334155" }}>
+                  Quarter generation always tries <strong>Main GK first</strong>, then <strong>Backup GK</strong>, then any other GK-capable player.
                 </div>
               </div>
 
