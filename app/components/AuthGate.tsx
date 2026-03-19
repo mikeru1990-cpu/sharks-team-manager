@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabase"
 import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
 
 const ADMIN_EMAILS = [
-  "your-admin-email@example.com",
+  "mikeru1990@hotmail.com",
 ]
 
 type AuthGateProps = {
