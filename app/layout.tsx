@@ -1,34 +1,31 @@
 import type { Metadata, Viewport } from "next"
-import ServiceWorkerRegister from "./components/ServiceWorkerRegister"
 import "../globals.css"
 
 export const metadata: Metadata = {
-  title: "Sharks Team Manager",
-  description: "Team manager app for players, events, attendance and match planning.",
-  applicationName: "Sharks Team Manager",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Sharks",
-  },
-  formatDetection: {
-    telephone: false,
-  },
+  title: "Sharks Team Manager Pro",
+  description: "Professional football team manager app",
+  applicationName: "Sharks Team Manager Pro",
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0f172a",
+  themeColor: "#06245c",
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
     <html lang="en">
-      <body>
-        <ServiceWorkerRegister />
+      <body
+        style={{
+          margin: 0,
+          background: "#f4f7fb",
+          color: "#0f172a",
+          overflowX: "hidden",
+        }}
+      >
         {children}
       </body>
     </html>
