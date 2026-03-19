@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic"
+
 import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
@@ -13,7 +15,6 @@ import {
   buttonPrimary,
   buttonSecondary,
   cardStyle,
-  chipStyle,
   formatMinutes,
   initialEvents,
   initialPlayers,
@@ -24,7 +25,6 @@ import {
   type MatchTab,
   type MatchEventDraft,
   type MatchFormat,
-  type PitchSlot,
   type Player,
   type QuarterPlan,
   type SavedLineup,
@@ -91,11 +91,17 @@ function Dashboard({
   })
 
   const [loading, setLoading] = useState(true)
-
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
   async function loadAll() {
     setLoading(true)
+
+    if (!supabase) {
+      console.error("Supabase env vars are missing")
+      setPlayers(initialPlayers)
+      setLoading(false)
+      return
+    }
 
     const [playersRes, settingsRes, timelineRes, quarterRes, lineupsRes] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
@@ -198,16 +204,20 @@ function Dashboard({
     return () => window.clearInterval(interval)
   }, [running, lineupMap])
 
-  async function persistSettings(patch?: Partial<{
-    homeTeam: string
-    awayTeam: string
-    matchFormat: MatchFormat
-    formation: string
-    currentQuarter: number
-    homeScore: number
-    awayScore: number
-    selectedDate: string
-  }>) {
+  async function persistSettings(
+    patch?: Partial<{
+      homeTeam: string
+      awayTeam: string
+      matchFormat: MatchFormat
+      formation: string
+      currentQuarter: number
+      homeScore: number
+      awayScore: number
+      selectedDate: string
+    }>
+  ) {
+    if (!supabase) return
+
     const next = {
       homeTeam: patch?.homeTeam ?? homeTeam,
       awayTeam: patch?.awayTeam ?? awayTeam,
@@ -233,6 +243,8 @@ function Dashboard({
   }
 
   async function savePlayers(nextPlayers: Player[]) {
+    if (!supabase) return
+
     const removedIds = players.filter((p) => !nextPlayers.some((n) => n.id === p.id)).map((p) => p.id)
     if (removedIds.length > 0) {
       await supabase.from("players").delete().in("id", removedIds)
@@ -262,6 +274,8 @@ function Dashboard({
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
+    if (!supabase) return
+
     await supabase.from("saved_lineups").delete().neq("id", "")
     if (nextLineups.length > 0) {
       await supabase.from("saved_lineups").insert(
@@ -279,6 +293,8 @@ function Dashboard({
   }
 
   async function saveQuarterPlans(nextPlans: Record<number, QuarterPlan>) {
+    if (!supabase) return
+
     await supabase.from("quarter_plans").delete().gte("quarter_number", 1)
     const entries = Object.entries(nextPlans)
     if (entries.length > 0) {
@@ -295,6 +311,8 @@ function Dashboard({
   }
 
   async function saveTimeline(nextTimeline: TimelineItem[]) {
+    if (!supabase) return
+
     const removedIds = timeline.filter((t) => !nextTimeline.some((n) => n.id === t.id)).map((t) => t.id)
     if (removedIds.length > 0) {
       await supabase.from("timeline_events").delete().in("id", removedIds)
@@ -424,6 +442,11 @@ function Dashboard({
   }
 
   function openCreateEvent() {
+    if (!isAdmin) {
+      alert("Only admins can add events")
+      return
+    }
+
     setEditingTimelineId(null)
     setEventDraft({
       type: "goal",
@@ -435,6 +458,11 @@ function Dashboard({
   }
 
   function openEditEvent(item: TimelineItem) {
+    if (!isAdmin) {
+      alert("Only admins can edit events")
+      return
+    }
+
     setEditingTimelineId(item.id)
     setEventDraft({
       type: item.type,
@@ -446,10 +474,19 @@ function Dashboard({
   }
 
   async function handleDeleteTimelineItem(id: string) {
+    if (!isAdmin) {
+      alert("Only admins can delete events")
+      return
+    }
     await saveTimeline(timeline.filter((item) => item.id !== id))
   }
 
   async function saveMatchEvent() {
+    if (!isAdmin) {
+      alert("Only admins can save events")
+      return
+    }
+
     const player = players.find((p) => p.id === eventDraft.playerId)
     const secondPlayer = players.find((p) => p.id === eventDraft.secondPlayerId)
 
@@ -474,23 +511,20 @@ function Dashboard({
       text = eventDraft.note.trim()
     }
 
-    const nextTimeline =
-      editingTimelineId
-        ? timeline.map((item) =>
-            item.id === editingTimelineId
-              ? { ...item, type: eventDraft.type, text }
-              : item
-          )
-        : [
-            ...timeline,
-            {
-              id: makeId(),
-              minute: Math.floor(seconds / 60),
-              type: eventDraft.type,
-              text,
-              sortOrder: timeline.length,
-            },
-          ]
+    const nextTimeline = editingTimelineId
+      ? timeline.map((item) =>
+          item.id === editingTimelineId ? { ...item, type: eventDraft.type, text } : item
+        )
+      : [
+          ...timeline,
+          {
+            id: makeId(),
+            minute: Math.floor(seconds / 60),
+            type: eventDraft.type,
+            text,
+            sortOrder: timeline.length,
+          },
+        ]
 
     await saveTimeline(nextTimeline)
     setShowEventModal(false)
@@ -580,8 +614,16 @@ function Dashboard({
             color: "white",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-            <div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ flex: "1 1 260px", minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>CLUB HUB</div>
               <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8 }}>{TEAM.name}</div>
               <div style={{ marginTop: 6, opacity: 0.9 }}>
@@ -589,7 +631,13 @@ function Dashboard({
               </div>
             </div>
 
-            <div style={{ textAlign: "right" }}>
+            <div
+              style={{
+                textAlign: "right",
+                flex: "0 0 auto",
+                alignSelf: "flex-start",
+              }}
+            >
               <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
               <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
                 Sign Out
@@ -604,18 +652,20 @@ function Dashboard({
             left: 16,
             right: 16,
             bottom: 16,
+            width: "calc(100% - 32px)",
             background: "rgba(255,255,255,0.94)",
             backdropFilter: "blur(12px)",
             border: "1px solid #dbe3ef",
             borderRadius: 28,
             padding: 10,
             display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
             gap: 8,
             boxShadow: "0 10px 30px rgba(15,23,42,0.12)",
             zIndex: 50,
             maxWidth: 980,
             margin: "0 auto",
+            boxSizing: "border-box",
           }}
         >
           {[
@@ -636,6 +686,7 @@ function Dashboard({
                 color: tab === value ? "white" : "#475569",
                 fontWeight: 800,
                 fontSize: 13,
+                minWidth: 0,
               }}
             >
               <div style={{ fontSize: 18 }}>{icon}</div>
@@ -705,10 +756,15 @@ function Dashboard({
                       borderRadius: 16,
                       border: selectedTemplateId === template.id ? `2px solid ${TEAM.primary}` : "1px solid #dbe3ef",
                       background: selectedTemplateId === template.id ? "#dbeafe" : "#f8fafc",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      overflow: "hidden",
                     }}
                   >
                     <div style={{ fontWeight: 900 }}>{template.name}</div>
-                    <div style={{ color: "#64748b", marginTop: 4 }}>{template.notes}</div>
+                    <div style={{ color: "#64748b", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {template.notes}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -730,10 +786,11 @@ function Dashboard({
                       borderRadius: 16,
                       background: "#f8fafc",
                       border: "1px solid #e2e8f0",
+                      minWidth: 0,
                     }}
                   >
                     <div style={{ fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                    <div style={{ color: "#475569" }}>{value}</div>
+                    <div style={{ color: "#475569", overflowWrap: "anywhere" }}>{value}</div>
                   </div>
                 ))}
               </div>
@@ -880,7 +937,7 @@ function Dashboard({
                 value={eventDraft.type}
                 onChange={(e) =>
                   setEventDraft({
-                    type: e.target.value as any,
+                    type: e.target.value as "goal" | "assist" | "sub" | "injury" | "note",
                     playerId: "",
                     secondPlayerId: "",
                     note: "",
