@@ -16,22 +16,26 @@ import {
   buttonSecondary,
   cardStyle,
   formatMinutes,
-  initialEvents,
   initialPlayers,
   initialTrainingTemplates,
   makeId,
   type EventItem,
   type MainTab,
-  type MatchTab,
   type MatchEventDraft,
   type MatchFormat,
+  type MatchTab,
   type Player,
   type QuarterPlan,
   type SavedLineup,
   type TimelineItem,
   type TrainingTemplate,
 } from "./lib/types"
-import { buildAutoLineup, buildPitchSlots, canPlaySlot, generateQuarterPlans } from "./lib/rotation"
+import {
+  buildAutoLineup,
+  buildPitchSlots,
+  canPlaySlot,
+  generateQuarterPlans,
+} from "./lib/rotation"
 
 function Dashboard({
   isAdmin,
@@ -45,10 +49,12 @@ function Dashboard({
 
   const [players, setPlayers] = useState<Player[]>([])
   const [events, setEvents] = useState<EventItem[]>([])
-const [showEventForm, setShowEventForm] = useState(false)
-const [eventTitle, setEventTitle] = useState("")
-const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
+
+  const [showEventForm, setShowEventForm] = useState(false)
+  const [editingCalendarEventId, setEditingCalendarEventId] = useState<string | null>(null)
+  const [eventTitle, setEventTitle] = useState("")
+  const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
   const [awayTeam, setAwayTeamState] = useState("Leonard Stanley U10 Lioness")
@@ -70,7 +76,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
 
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [editingTimelineId, setEditingTimelineId] = useState<string | null>(null)
-  const [showEventModal, setShowEventModal] = useState(false)
+  const [showMatchEventModal, setShowMatchEventModal] = useState(false)
   const [eventDraft, setEventDraft] = useState<MatchEventDraft>({
     type: "goal",
     playerId: "",
@@ -94,6 +100,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
   })
 
   const [loading, setLoading] = useState(true)
+
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
   async function loadAll() {
@@ -106,13 +113,15 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
       return
     }
 
-    const [playersRes, settingsRes, timelineRes, quarterRes, lineupsRes] = await Promise.all([
-      supabase.from("players").select("*").order("sort_order", { ascending: true }),
-      supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
-      supabase.from("timeline_events").select("*").order("sort_order", { ascending: true }),
-      supabase.from("quarter_plans").select("*").order("quarter_number", { ascending: true }),
-      supabase.from("saved_lineups").select("*").order("updated_at", { ascending: false }),
-    ])
+    const [playersRes, settingsRes, timelineRes, quarterRes, lineupsRes, eventsRes] =
+      await Promise.all([
+        supabase.from("players").select("*").order("sort_order", { ascending: true }),
+        supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
+        supabase.from("timeline_events").select("*").order("sort_order", { ascending: true }),
+        supabase.from("quarter_plans").select("*").order("quarter_number", { ascending: true }),
+        supabase.from("saved_lineups").select("*").order("updated_at", { ascending: false }),
+        supabase.from("events").select("*").order("date", { ascending: true }),
+      ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
       const nextPlayers: Player[] = playersRes.data.map((row: any) => ({
@@ -173,6 +182,17 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
         bench: JSON.parse(row.bench_json || "[]"),
       }))
       setSavedLineups(nextLineups)
+    }
+
+    if (!eventsRes.error && eventsRes.data) {
+      setEvents(
+        eventsRes.data.map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          title: row.title,
+          type: row.type,
+        }))
+      )
     }
 
     setLoading(false)
@@ -336,6 +356,94 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
     setTimeline(nextTimeline)
   }
 
+  async function addEvent() {
+    if (!supabase) return
+
+    if (!isAdmin) {
+      alert("Only admins can add events")
+      return
+    }
+
+    if (!eventTitle.trim()) {
+      alert("Enter event title")
+      return
+    }
+
+    const newEvent: EventItem = {
+      id: editingCalendarEventId || makeId(),
+      date: selectedDate,
+      title: eventTitle.trim(),
+      type: eventType,
+    }
+
+    const { error } = await supabase.from("events").upsert({
+      id: newEvent.id,
+      date: newEvent.date,
+      title: newEvent.title,
+      type: newEvent.type,
+      notes: "",
+    })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setEvents((prev) => {
+      const withoutOld = prev.filter((e) => e.id !== newEvent.id)
+      return [...withoutOld, newEvent].sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date)
+        if (dateCompare !== 0) return dateCompare
+        return a.title.localeCompare(b.title)
+      })
+    })
+
+    setEventTitle("")
+    setEventType("training")
+    setEditingCalendarEventId(null)
+    setShowEventForm(false)
+  }
+
+  function openAddCalendarEvent() {
+    if (!isAdmin) {
+      alert("Only admins can add events")
+      return
+    }
+    setEditingCalendarEventId(null)
+    setEventTitle("")
+    setEventType("training")
+    setShowEventForm(true)
+  }
+
+  function openEditCalendarEvent(event: EventItem) {
+    if (!isAdmin) {
+      alert("Only admins can edit events")
+      return
+    }
+    setEditingCalendarEventId(event.id)
+    setEventTitle(event.title)
+    setEventType(event.type)
+    setSelectedDate(event.date)
+    setShowEventForm(true)
+  }
+
+  async function deleteCalendarEvent(id: string) {
+    if (!supabase) return
+
+    if (!isAdmin) {
+      alert("Only admins can delete events")
+      return
+    }
+
+    const { error } = await supabase.from("events").delete().eq("id", id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setEvents((prev) => prev.filter((event) => event.id !== id))
+  }
+
   async function handleChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
     const nextSlots = buildPitchSlots(nextFormat, nextFormation)
     const auto = buildAutoLineup(players, nextSlots)
@@ -446,7 +554,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
 
   function openCreateEvent() {
     if (!isAdmin) {
-      alert("Only admins can add events")
+      alert("Only admins can add match events")
       return
     }
 
@@ -457,12 +565,12 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
       secondPlayerId: "",
       note: "",
     })
-    setShowEventModal(true)
+    setShowMatchEventModal(true)
   }
 
   function openEditEvent(item: TimelineItem) {
     if (!isAdmin) {
-      alert("Only admins can edit events")
+      alert("Only admins can edit match events")
       return
     }
 
@@ -473,12 +581,12 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
       secondPlayerId: "",
       note: item.text,
     })
-    setShowEventModal(true)
+    setShowMatchEventModal(true)
   }
 
   async function handleDeleteTimelineItem(id: string) {
     if (!isAdmin) {
-      alert("Only admins can delete events")
+      alert("Only admins can delete match events")
       return
     }
     await saveTimeline(timeline.filter((item) => item.id !== id))
@@ -486,7 +594,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
 
   async function saveMatchEvent() {
     if (!isAdmin) {
-      alert("Only admins can save events")
+      alert("Only admins can save match events")
       return
     }
 
@@ -530,7 +638,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
         ]
 
     await saveTimeline(nextTimeline)
-    setShowEventModal(false)
+    setShowMatchEventModal(false)
     setEditingTimelineId(null)
   }
 
@@ -580,6 +688,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
   const totalAssists = timeline.filter((t) => t.type === "assist").length
   const mainGk = players.find((p) => p.mainGK)
   const backupGk = players.find((p) => p.backupGK)
+  const selectedDateEvents = events.filter((e) => e.date === selectedDate)
 
   if (loading) {
     return (
@@ -601,72 +710,72 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
         boxSizing: "border-box",
       }}
     >
-     <div
-  style={{
-    width: "100%",
-    maxWidth: 980,
-    margin: "0 auto",
-    display: "grid",
-    gap: 16,
-    boxSizing: "border-box",
-    minWidth: 0,
-    overflowX: "clip",
-  }}
->
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 980,
+          margin: "0 auto",
+          display: "grid",
+          gap: 16,
+          boxSizing: "border-box",
+          minWidth: 0,
+          overflowX: "clip",
+        }}
+      >
         <div
-  style={{
-    ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
-    color: "white",
-    minWidth: 0,
-    overflow: "hidden",
-  }}
->
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "minmax(0, 1fr) auto",
-      gap: 12,
-      alignItems: "start",
-    }}
-  >
-    <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-      <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>CLUB HUB</div>
-      <div
-        style={{
-          fontSize: 28,
-          fontWeight: 900,
-          marginTop: 8,
-          lineHeight: 1.1,
-          overflowWrap: "anywhere",
-        }}
-      >
-        {TEAM.name}
-      </div>
-      <div
-        style={{
-          marginTop: 6,
-          opacity: 0.9,
-          overflowWrap: "anywhere",
-          wordBreak: "break-word",
-        }}
-      >
-        Supabase sync, login, admin mode, weekday calendar and better screen fit.
-      </div>
-    </div>
+          style={{
+            ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
+            color: "white",
+            minWidth: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              gap: 12,
+              alignItems: "start",
+            }}
+          >
+            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+              <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>CLUB HUB</div>
+              <div
+                style={{
+                  fontSize: 28,
+                  fontWeight: 900,
+                  marginTop: 8,
+                  lineHeight: 1.1,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {TEAM.name}
+              </div>
+              <div
+                style={{
+                  marginTop: 6,
+                  opacity: 0.9,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                Supabase sync, login, admin mode, weekday calendar and better screen fit.
+              </div>
+            </div>
 
-    <div
-      style={{
-        textAlign: "right",
-        minWidth: 96,
-      }}
-    >
-      <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
-      <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
-        Sign Out
-      </button>
-    </div>
-  </div>
-</div>
+            <div
+              style={{
+                textAlign: "right",
+                minWidth: 96,
+              }}
+            >
+              <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
+              <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
 
         <div
           style={{
@@ -754,39 +863,58 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
               }}
               events={events}
             />
+
             <div style={cardStyle()}>
-  <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
-    Calendar Events
-  </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginBottom: 12,
+                }}
+              >
+                <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar Events</div>
+                {isAdmin ? (
+                  <button onClick={openAddCalendarEvent} style={buttonPrimary()}>
+                    Add Event
+                  </button>
+                ) : null}
+              </div>
 
-  {isAdmin && (
-    <button
-      onClick={() => setShowEventForm(true)}
-      style={{ ...buttonPrimary(), marginBottom: 12 }}
-    >
-      Add Event
-    </button>
-  )}
+              {selectedDateEvents.length === 0 ? (
+                <div style={{ color: "#64748b" }}>No calendar events on this day.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  {selectedDateEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 16,
+                        border: "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{event.title}</div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>{event.type}</div>
 
-  {events
-    .filter((e) => e.date === selectedDate)
-    .map((event) => (
-      <div
-        key={event.id}
-        style={{
-          padding: 12,
-          borderRadius: 12,
-          border: "1px solid #e2e8f0",
-          marginBottom: 8,
-        }}
-      >
-        <div style={{ fontWeight: 900 }}>{event.title}</div>
-        <div style={{ color: "#64748b", fontSize: 12 }}>
-          {event.type}
-        </div>
-      </div>
-    ))}
-</div>
+                      {isAdmin ? (
+                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                          <button onClick={() => openEditCalendarEvent(event)} style={buttonSecondary()}>
+                            Edit
+                          </button>
+                          <button onClick={() => void deleteCalendarEvent(event.id)} style={buttonSecondary()}>
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
@@ -817,7 +945,14 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
                     }}
                   >
                     <div style={{ fontWeight: 900 }}>{template.name}</div>
-                    <div style={{ color: "#64748b", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div
+                      style={{
+                        color: "#64748b",
+                        marginTop: 4,
+                        overflowWrap: "anywhere",
+                        wordBreak: "break-word",
+                      }}
+                    >
                       {template.notes}
                     </div>
                   </button>
@@ -940,7 +1075,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Club Stats</div>
               <div style={{ display: "grid", gap: 10 }}>
                 <div style={{ fontWeight: 800 }}>Total goals: {totalGoals}</div>
-                <div style={{ fontWeight: 800 }}>Total assists: {timeline.filter((t) => t.type === "assist").length}</div>
+                <div style={{ fontWeight: 800 }}>Total assists: {totalAssists}</div>
                 <div style={{ fontWeight: 800 }}>Players: {players.length}</div>
                 <div style={{ fontWeight: 800 }}>Main GK: {mainGk?.name || "Not set"}</div>
                 <div style={{ fontWeight: 800 }}>Backup GK: {backupGk?.name || "Not set"}</div>
@@ -969,65 +1104,86 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
           </div>
         ) : null}
       </div>
-{showEventForm && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.4)",
-      display: "grid",
-      placeItems: "center",
-      zIndex: 100,
-    }}
-  >
-    <div style={{ ...cardStyle(), width: "90%", maxWidth: 400 }}>
-      <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>
-        Add Event
-      </div>
 
-      <input
-        value={eventTitle}
-        onChange={(e) => setEventTitle(e.target.value)}
-        placeholder="Event title"
-        style={{
-          width: "100%",
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 10,
-          border: "1px solid #ccc",
-        }}
-      />
-
-      <select
-        value={eventType}
-        onChange={(e) => setEventType(e.target.value as any)}
-        style={{
-          width: "100%",
-          padding: 10,
-          marginBottom: 10,
-          borderRadius: 10,
-        }}
-      >
-        <option value="training">Training</option>
-        <option value="match">Match</option>
-        <option value="other">Other</option>
-      </select>
-
-      <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={addEvent} style={{ ...buttonPrimary(), flex: 1 }}>
-          Save
-        </button>
-        <button
-          onClick={() => setShowEventForm(false)}
-          style={{ ...buttonSecondary(), flex: 1 }}
+      {showEventForm ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.45)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 100,
+            padding: 16,
+          }}
         >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-      {showEventModal ? (
+          <div style={{ ...cardStyle(), width: "100%", maxWidth: 420 }}>
+            <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 12 }}>
+              {editingCalendarEventId ? "Edit Calendar Event" : "Add Calendar Event"}
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              <input
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                placeholder="Event title"
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 16,
+                }}
+              />
+
+              <select
+                value={eventType}
+                onChange={(e) => setEventType(e.target.value as "training" | "match" | "other")}
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 16,
+                }}
+              >
+                <option value="training">Training</option>
+                <option value="match">Match</option>
+                <option value="other">Other</option>
+              </select>
+
+              <div
+                style={{
+                  padding: 12,
+                  borderRadius: 12,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  color: "#475569",
+                }}
+              >
+                Date: <strong>{selectedDate}</strong>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={() => void addEvent()} style={{ ...buttonPrimary(), flex: 1 }}>
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowEventForm(false)
+                  setEditingCalendarEventId(null)
+                  setEventTitle("")
+                  setEventType("training")
+                }}
+                style={{ ...buttonSecondary(), flex: 1 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {showMatchEventModal ? (
         <div
           style={{
             position: "fixed",
@@ -1119,7 +1275,7 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
               </button>
               <button
                 onClick={() => {
-                  setShowEventModal(false)
+                  setShowMatchEventModal(false)
                   setEditingTimelineId(null)
                 }}
                 style={{ ...buttonSecondary(), flex: 1 }}
