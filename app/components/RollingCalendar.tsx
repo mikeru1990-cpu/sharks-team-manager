@@ -1,74 +1,112 @@
 "use client"
 
-import type { EventItem } from "../lib/types"
-import { cardStyle, chipStyle, formatShortDate, getNext7Days, getWeekdayLabel } from "../lib/types"
+import { cardStyle, TEAM, type EventItem } from "../lib/types"
 
-type Props = {
+function formatLabel(dateStr: string) {
+  const d = new Date(dateStr)
+  const weekday = d.toLocaleDateString("en-GB", { weekday: "short" })
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${weekday}\n${month}-${day}`
+}
+
+function getRollingDates(centerDate: string, days = 7) {
+  const start = new Date(centerDate)
+  const items: string[] = []
+
+  for (let i = 0; i < days; i++) {
+    const next = new Date(start)
+    next.setDate(start.getDate() + i)
+    items.push(next.toISOString().split("T")[0])
+  }
+
+  return items
+}
+
+export default function RollingCalendar({
+  selectedDate,
+  onSelectDate,
+  events,
+}: {
   selectedDate: string
   onSelectDate: (date: string) => void
   events: EventItem[]
-}
-
-export default function RollingCalendar({ selectedDate, onSelectDate, events }: Props) {
-  const days = getNext7Days()
-  const visibleEvents = events.filter((e) => e.date === selectedDate)
+}) {
+  const dates = getRollingDates(selectedDate, 7)
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Rolling Calendar</div>
-        <div
-          style={{
-            display: "flex",
-            overflowX: "auto",
-            gap: 10,
-            paddingBottom: 6,
-            width: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          {days.map((date) => (
+    <div style={{ ...cardStyle(), minWidth: 0, overflow: "hidden" }}>
+      <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Rolling Calendar</div>
+
+      <div
+        style={{
+          display: "grid",
+          gridAutoFlow: "column",
+          gridAutoColumns: "140px",
+          gap: 10,
+          overflowX: "auto",
+          overflowY: "hidden",
+          width: "100%",
+          paddingBottom: 4,
+          boxSizing: "border-box",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {dates.map((date) => {
+          const dayEvents = events.filter((e) => e.date === date)
+          const active = date === selectedDate
+
+          return (
             <button
               key={date}
               onClick={() => onSelectDate(date)}
               style={{
-                ...chipStyle(date === selectedDate),
-                minWidth: 90,
-                whiteSpace: "nowrap",
+                width: "140px",
+                minWidth: 0,
+                flexShrink: 0,
+                border: active ? `2px solid ${TEAM.primary}` : "1px solid #dbe3ef",
+                background: active ? "#dbeafe" : "#fff",
+                borderRadius: 16,
+                padding: 12,
+                textAlign: "center",
+                boxSizing: "border-box",
               }}
             >
-              <div>{getWeekdayLabel(date)}</div>
-              <div>{formatShortDate(date)}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
-          Events on {getWeekdayLabel(selectedDate)} {formatShortDate(selectedDate)}
-        </div>
-
-        {visibleEvents.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No events on this day.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {visibleEvents.map((event) => (
               <div
-                key={event.id}
                 style={{
-                  padding: 14,
-                  borderRadius: 16,
-                  border: "1px solid #dbe3ef",
-                  background: event.type === "match" ? "#dcfce7" : "#dbeafe",
+                  fontWeight: 900,
+                  fontSize: 13,
+                  whiteSpace: "pre-line",
+                  lineHeight: 1.35,
                 }}
               >
-                <div style={{ fontWeight: 900 }}>{event.title}</div>
-                <div style={{ marginTop: 4, color: "#475569", textTransform: "capitalize" }}>{event.type}</div>
+                {formatLabel(date)}
               </div>
-            ))}
-          </div>
-        )}
+
+              <div
+                style={{
+                  marginTop: 8,
+                  color: "#64748b",
+                  fontSize: 12,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {dayEvents.length ? `${dayEvents.length} event${dayEvents.length > 1 ? "s" : ""}` : "No events"}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>
+          Events on {new Date(selectedDate).toLocaleDateString("en-GB", { weekday: "short" })}{" "}
+          {String(new Date(selectedDate).getMonth() + 1).padStart(2, "0")}-{String(new Date(selectedDate).getDate()).padStart(2, "0")}
+        </div>
+
+        <div style={{ color: "#64748b", marginTop: 12 }}>
+          {events.some((e) => e.date === selectedDate) ? "Events available." : "No events on this day."}
+        </div>
       </div>
     </div>
   )
