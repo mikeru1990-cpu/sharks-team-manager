@@ -44,7 +44,10 @@ function Dashboard({
   const [matchTab, setMatchTab] = useState<MatchTab>("overview")
 
   const [players, setPlayers] = useState<Player[]>([])
-  const [events] = useState<EventItem[]>(initialEvents)
+  const [events, setEvents] = useState<EventItem[]>([])
+const [showEventForm, setShowEventForm] = useState(false)
+const [eventTitle, setEventTitle] = useState("")
+const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
