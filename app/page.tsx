@@ -754,6 +754,39 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
               }}
               events={events}
             />
+            <div style={cardStyle()}>
+  <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+    Calendar Events
+  </div>
+
+  {isAdmin && (
+    <button
+      onClick={() => setShowEventForm(true)}
+      style={{ ...buttonPrimary(), marginBottom: 12 }}
+    >
+      Add Event
+    </button>
+  )}
+
+  {events
+    .filter((e) => e.date === selectedDate)
+    .map((event) => (
+      <div
+        key={event.id}
+        style={{
+          padding: 12,
+          borderRadius: 12,
+          border: "1px solid #e2e8f0",
+          marginBottom: 8,
+        }}
+      >
+        <div style={{ fontWeight: 900 }}>{event.title}</div>
+        <div style={{ color: "#64748b", fontSize: 12 }}>
+          {event.type}
+        </div>
+      </div>
+    ))}
+</div>
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
@@ -936,7 +969,64 @@ const [eventType, setEventType] = useState<"training" | "match" | "other">("trai
           </div>
         ) : null}
       </div>
+{showEventForm && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.4)",
+      display: "grid",
+      placeItems: "center",
+      zIndex: 100,
+    }}
+  >
+    <div style={{ ...cardStyle(), width: "90%", maxWidth: 400 }}>
+      <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>
+        Add Event
+      </div>
 
+      <input
+        value={eventTitle}
+        onChange={(e) => setEventTitle(e.target.value)}
+        placeholder="Event title"
+        style={{
+          width: "100%",
+          padding: 10,
+          marginBottom: 10,
+          borderRadius: 10,
+          border: "1px solid #ccc",
+        }}
+      />
+
+      <select
+        value={eventType}
+        onChange={(e) => setEventType(e.target.value as any)}
+        style={{
+          width: "100%",
+          padding: 10,
+          marginBottom: 10,
+          borderRadius: 10,
+        }}
+      >
+        <option value="training">Training</option>
+        <option value="match">Match</option>
+        <option value="other">Other</option>
+      </select>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={addEvent} style={{ ...buttonPrimary(), flex: 1 }}>
+          Save
+        </button>
+        <button
+          onClick={() => setShowEventForm(false)}
+          style={{ ...buttonSecondary(), flex: 1 }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {showEventModal ? (
         <div
           style={{
