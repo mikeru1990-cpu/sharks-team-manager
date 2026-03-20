@@ -1,6 +1,6 @@
 export type MainTab = "home" | "players" | "events" | "match" | "stats"
 export type MatchTab = "overview" | "lineup" | "live" | "quarters" | "stats"
-export type EventType = "match" | "training" | "none"
+export type EventType = "match" | "training" | "other"
 export type MatchFormat = "7v7" | "9v9" | "11v11"
 export type PitchPosition = "GK" | "DEF" | "MID" | "FWD"
 export type TimelineEventType = "goal" | "assist" | "sub" | "injury" | "note"
