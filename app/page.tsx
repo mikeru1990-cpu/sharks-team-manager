@@ -19,6 +19,8 @@ import {
   initialPlayers,
   initialTrainingTemplates,
   makeId,
+  type AttendanceStatus,
+  type EventAttendance,
   type EventItem,
   type MainTab,
   type MatchEventDraft,
@@ -37,6 +39,28 @@ import {
   generateQuarterPlans,
 } from "./lib/rotation"
 
+function statusStyle(status: AttendanceStatus) {
+  if (status === "available") {
+    return {
+      border: "1px solid #16a34a",
+      background: "#dcfce7",
+      color: "#166534",
+    }
+  }
+  if (status === "maybe") {
+    return {
+      border: "1px solid #d97706",
+      background: "#fef3c7",
+      color: "#92400e",
+    }
+  }
+  return {
+    border: "1px solid #dc2626",
+    background: "#fee2e2",
+    color: "#991b1b",
+  }
+}
+
 function Dashboard({
   isAdmin,
   signOut,
@@ -49,12 +73,19 @@ function Dashboard({
 
   const [players, setPlayers] = useState<Player[]>([])
   const [events, setEvents] = useState<EventItem[]>([])
+  const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
 
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingCalendarEventId, setEditingCalendarEventId] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+
   const [eventTitle, setEventTitle] = useState("")
   const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
+  const [eventStartTime, setEventStartTime] = useState("")
+  const [eventLocation, setEventLocation] = useState("")
+  const [eventOpponent, setEventOpponent] = useState("")
+  const [eventNotes, setEventNotes] = useState("")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
   const [awayTeam, setAwayTeamState] = useState("Leonard Stanley U10 Lioness")
@@ -103,6 +134,21 @@ function Dashboard({
 
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
+  const selectedDateEvents = events.filter((e) => e.date === selectedDate)
+  const selectedEvent = events.find((e) => e.id === selectedEventId) || null
+
+  function attendanceForEvent(eventId: string) {
+    return attendance.filter((a) => a.eventId === eventId)
+  }
+
+  function countAttendance(eventId: string, status: AttendanceStatus) {
+    return attendance.filter((a) => a.eventId === eventId && a.status === status).length
+  }
+
+  function getPlayerStatus(eventId: string, playerId: string): AttendanceStatus | null {
+    return attendance.find((a) => a.eventId === eventId && a.playerId === playerId)?.status || null
+  }
+
   async function loadAll() {
     setLoading(true)
 
@@ -113,7 +159,7 @@ function Dashboard({
       return
     }
 
-    const [playersRes, settingsRes, timelineRes, quarterRes, lineupsRes, eventsRes] =
+    const [playersRes, settingsRes, timelineRes, quarterRes, lineupsRes, eventsRes, attendanceRes] =
       await Promise.all([
         supabase.from("players").select("*").order("sort_order", { ascending: true }),
         supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
@@ -121,6 +167,7 @@ function Dashboard({
         supabase.from("quarter_plans").select("*").order("quarter_number", { ascending: true }),
         supabase.from("saved_lineups").select("*").order("updated_at", { ascending: false }),
         supabase.from("events").select("*").order("date", { ascending: true }),
+        supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
       ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -191,6 +238,21 @@ function Dashboard({
           date: row.date,
           title: row.title,
           type: row.type,
+          startTime: row.start_time || "",
+          location: row.location || "",
+          opponent: row.opponent || "",
+          notes: row.notes || "",
+        }))
+      )
+    }
+
+    if (!attendanceRes.error && attendanceRes.data) {
+      setAttendance(
+        attendanceRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          playerId: row.player_id,
+          status: row.status,
         }))
       )
     }
@@ -356,14 +418,40 @@ function Dashboard({
     setTimeline(nextTimeline)
   }
 
+  async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
+    if (!supabase) return
+    if (!isAdmin) {
+      alert("Only admins can update attendance")
+      return
+    }
+
+    const existing = attendance.find((a) => a.eventId === eventId && a.playerId === playerId)
+    const recordId = existing?.id || makeId()
+
+    const { error } = await supabase.from("event_attendance").upsert({
+      id: recordId,
+      event_id: eventId,
+      player_id: playerId,
+      status,
+    })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setAttendance((prev) => {
+      const filtered = prev.filter((a) => !(a.eventId === eventId && a.playerId === playerId))
+      return [...filtered, { id: recordId, eventId, playerId, status }]
+    })
+  }
+
   async function addEvent() {
     if (!supabase) return
-
     if (!isAdmin) {
       alert("Only admins can add events")
       return
     }
-
     if (!eventTitle.trim()) {
       alert("Enter event title")
       return
@@ -374,6 +462,10 @@ function Dashboard({
       date: selectedDate,
       title: eventTitle.trim(),
       type: eventType,
+      startTime: eventStartTime,
+      location: eventLocation,
+      opponent: eventOpponent,
+      notes: eventNotes,
     }
 
     const { error } = await supabase.from("events").upsert({
@@ -381,7 +473,10 @@ function Dashboard({
       date: newEvent.date,
       title: newEvent.title,
       type: newEvent.type,
-      notes: "",
+      start_time: newEvent.startTime || "",
+      location: newEvent.location || "",
+      opponent: newEvent.opponent || "",
+      notes: newEvent.notes || "",
     })
 
     if (error) {
@@ -400,6 +495,10 @@ function Dashboard({
 
     setEventTitle("")
     setEventType("training")
+    setEventStartTime("")
+    setEventLocation("")
+    setEventOpponent("")
+    setEventNotes("")
     setEditingCalendarEventId(null)
     setShowEventForm(false)
   }
@@ -412,6 +511,10 @@ function Dashboard({
     setEditingCalendarEventId(null)
     setEventTitle("")
     setEventType("training")
+    setEventStartTime("")
+    setEventLocation("")
+    setEventOpponent("")
+    setEventNotes("")
     setShowEventForm(true)
   }
 
@@ -423,13 +526,16 @@ function Dashboard({
     setEditingCalendarEventId(event.id)
     setEventTitle(event.title)
     setEventType(event.type)
+    setEventStartTime(event.startTime || "")
+    setEventLocation(event.location || "")
+    setEventOpponent(event.opponent || "")
+    setEventNotes(event.notes || "")
     setSelectedDate(event.date)
     setShowEventForm(true)
   }
 
   async function deleteCalendarEvent(id: string) {
     if (!supabase) return
-
     if (!isAdmin) {
       alert("Only admins can delete events")
       return
@@ -442,6 +548,8 @@ function Dashboard({
     }
 
     setEvents((prev) => prev.filter((event) => event.id !== id))
+    setAttendance((prev) => prev.filter((item) => item.eventId !== id))
+    if (selectedEventId === id) setSelectedEventId(null)
   }
 
   async function handleChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
@@ -688,7 +796,9 @@ function Dashboard({
   const totalAssists = timeline.filter((t) => t.type === "assist").length
   const mainGk = players.find((p) => p.mainGK)
   const backupGk = players.find((p) => p.backupGK)
-  const selectedDateEvents = events.filter((e) => e.date === selectedDate)
+  const availableCount = selectedEvent ? countAttendance(selectedEvent.id, "available") : 0
+  const maybeCount = selectedEvent ? countAttendance(selectedEvent.id, "maybe") : 0
+  const unavailableCount = selectedEvent ? countAttendance(selectedEvent.id, "unavailable") : 0
 
   if (loading) {
     return (
@@ -888,33 +998,128 @@ function Dashboard({
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   {selectedDateEvents.map((event) => (
-                    <div
+                    <button
                       key={event.id}
+                      onClick={() => setSelectedEventId(event.id)}
                       style={{
                         padding: 12,
                         borderRadius: 16,
-                        border: "1px solid #e2e8f0",
+                        border: selectedEventId === event.id ? `2px solid ${TEAM.primary}` : "1px solid #e2e8f0",
                         background: "#f8fafc",
+                        textAlign: "left",
                       }}
                     >
                       <div style={{ fontWeight: 900 }}>{event.title}</div>
-                      <div style={{ color: "#64748b", marginTop: 4 }}>{event.type}</div>
-
-                      {isAdmin ? (
-                        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                          <button onClick={() => openEditCalendarEvent(event)} style={buttonSecondary()}>
-                            Edit
-                          </button>
-                          <button onClick={() => void deleteCalendarEvent(event.id)} style={buttonSecondary()}>
-                            Delete
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>
+                        {event.type}
+                        {event.startTime ? ` • ${event.startTime}` : ""}
+                        {event.location ? ` • ${event.location}` : ""}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
+                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
+                      </div>
+                    </button>
                   ))}
                 </div>
               )}
             </div>
+
+            {selectedEvent ? (
+              <div style={cardStyle()}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    marginBottom: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedEvent.title}</div>
+                    <div style={{ color: "#64748b", marginTop: 6 }}>
+                      {selectedEvent.date}
+                      {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
+                      {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
+                    </div>
+                    {selectedEvent.opponent ? (
+                      <div style={{ color: "#64748b", marginTop: 6 }}>Opponent: {selectedEvent.opponent}</div>
+                    ) : null}
+                    {selectedEvent.notes ? (
+                      <div style={{ color: "#475569", marginTop: 8 }}>{selectedEvent.notes}</div>
+                    ) : null}
+                  </div>
+
+                  {isAdmin ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => openEditCalendarEvent(selectedEvent)} style={buttonSecondary()}>
+                        Edit
+                      </button>
+                      <button onClick={() => void deleteCalendarEvent(selectedEvent.id)} style={buttonSecondary()}>
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                  <div style={{ ...statusStyle("available"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
+                    Available {availableCount}
+                  </div>
+                  <div style={{ ...statusStyle("maybe"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
+                    Maybe {maybeCount}
+                  </div>
+                  <div style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
+                    Unavailable {unavailableCount}
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: 10 }}>
+                  {players.map((player) => {
+                    const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
+                    return (
+                      <div
+                        key={player.id}
+                        style={{
+                          padding: 12,
+                          borderRadius: 16,
+                          border: "1px solid #e2e8f0",
+                          background: "#f8fafc",
+                        }}
+                      >
+                        <div style={{ fontWeight: 900, marginBottom: 8 }}>{player.name}</div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {(["available", "maybe", "unavailable"] as AttendanceStatus[]).map((status) => {
+                            const active = currentStatus === status
+                            return (
+                              <button
+                                key={status}
+                                onClick={() => void saveAttendance(selectedEvent.id, player.id, status)}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: 999,
+                                  fontWeight: 800,
+                                  ...(active
+                                    ? statusStyle(status)
+                                    : {
+                                        border: "1px solid #cbd5e1",
+                                        background: "white",
+                                        color: "#334155",
+                                      }),
+                                }}
+                              >
+                                {status}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
@@ -1117,7 +1322,7 @@ function Dashboard({
             padding: 16,
           }}
         >
-          <div style={{ ...cardStyle(), width: "100%", maxWidth: 420 }}>
+          <div style={{ ...cardStyle(), width: "100%", maxWidth: 460 }}>
             <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 12 }}>
               {editingCalendarEventId ? "Edit Calendar Event" : "Add Calendar Event"}
             </div>
@@ -1127,28 +1332,53 @@ function Dashboard({
                 value={eventTitle}
                 onChange={(e) => setEventTitle(e.target.value)}
                 placeholder="Event title"
-                style={{
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 16,
-                }}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
               />
 
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value as "training" | "match" | "other")}
-                style={{
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 16,
-                }}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
               >
                 <option value="training">Training</option>
                 <option value="match">Match</option>
                 <option value="other">Other</option>
               </select>
+
+              <input
+                value={eventStartTime}
+                onChange={(e) => setEventStartTime(e.target.value)}
+                placeholder="Start time e.g. 18:00"
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              />
+
+              <input
+                value={eventLocation}
+                onChange={(e) => setEventLocation(e.target.value)}
+                placeholder="Location"
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              />
+
+              <input
+                value={eventOpponent}
+                onChange={(e) => setEventOpponent(e.target.value)}
+                placeholder="Opponent"
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              />
+
+              <textarea
+                value={eventNotes}
+                onChange={(e) => setEventNotes(e.target.value)}
+                placeholder="Notes"
+                style={{
+                  minHeight: 90,
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #cbd5e1",
+                  fontSize: 16,
+                  resize: "vertical",
+                }}
+              />
 
               <div
                 style={{
@@ -1173,6 +1403,10 @@ function Dashboard({
                   setEditingCalendarEventId(null)
                   setEventTitle("")
                   setEventType("training")
+                  setEventStartTime("")
+                  setEventLocation("")
+                  setEventOpponent("")
+                  setEventNotes("")
                 }}
                 style={{ ...buttonSecondary(), flex: 1 }}
               >
