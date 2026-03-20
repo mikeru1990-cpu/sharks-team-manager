@@ -4,12 +4,24 @@ export type EventType = "match" | "training" | "other"
 export type MatchFormat = "7v7" | "9v9" | "11v11"
 export type PitchPosition = "GK" | "DEF" | "MID" | "FWD"
 export type TimelineEventType = "goal" | "assist" | "sub" | "injury" | "note"
+export type AttendanceStatus = "available" | "maybe" | "unavailable"
 
 export type EventItem = {
   id: string
   title: string
   date: string
   type: EventType
+  startTime?: string
+  location?: string
+  opponent?: string
+  notes?: string
+}
+
+export type EventAttendance = {
+  id: string
+  eventId: string
+  playerId: string
+  status: AttendanceStatus
 }
 
 export type Player = {
@@ -107,9 +119,9 @@ export const initialPlayers: Player[] = [
 ]
 
 export const initialEvents: EventItem[] = [
-  { id: "1", title: "League Game vs Leonard Stanley", date: "2026-03-15", type: "match" },
-  { id: "2", title: "Technical Training", date: "2026-03-13", type: "training" },
-  { id: "3", title: "Recovery Session", date: "2026-03-16", type: "training" },
+  { id: "1", title: "League Game vs Leonard Stanley", date: "2026-03-15", type: "match", startTime: "10:00", location: "", opponent: "Leonard Stanley", notes: "" },
+  { id: "2", title: "Technical Training", date: "2026-03-13", type: "training", startTime: "18:00", location: "", opponent: "", notes: "" },
+  { id: "3", title: "Recovery Session", date: "2026-03-16", type: "training", startTime: "18:00", location: "", opponent: "", notes: "" },
 ]
 
 export const initialTrainingTemplates: TrainingTemplate[] = [
