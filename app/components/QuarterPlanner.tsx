@@ -18,7 +18,6 @@ type Props = {
   onSaveCurrentQuarter: () => Promise<void>
   onLoadQuarter: (quarter: number) => void
   onAutoGenerate: () => Promise<void>
-
   periodMode: PeriodMode
   periodLength: number
 }
@@ -52,7 +51,7 @@ export default function QuarterPlanner({
 
         <div style={{ color: "#475569", marginBottom: 12 }}>
           {periodCount} {periodName.toLowerCase()}
-          {periodCount === 1 ? "" : "s"} • {periodLength} minutes each
+          {periodCount > 1 ? "s" : ""} • {periodLength} minutes each
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
