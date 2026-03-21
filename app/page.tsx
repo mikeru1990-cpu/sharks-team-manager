@@ -1284,41 +1284,6 @@ function Dashboard({
         {tab === "match" ? (
           <>
             <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Settings</div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
-                <select
-                  value={periodMode}
-                  disabled={!isAdmin}
-                  onChange={(e) => {
-                    const value = e.target.value as PeriodMode
-                    setPeriodModeState(value)
-                    setCurrentQuarterState(1)
-                    void persistSettings({ periodMode: value, currentQuarter: 1 })
-                  }}
-                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
-                >
-                  <option value="quarters">4 Quarters</option>
-                  <option value="halves">2 Halves</option>
-                </select>
-
-                <input
-                  type="number"
-                  min={1}
-                  value={periodLength}
-                  disabled={!isAdmin}
-                  onChange={(e) => {
-                    const value = Math.max(1, Number(e.target.value) || 1)
-                    setPeriodLengthState(value)
-                    void persistSettings({ periodLength: value })
-                  }}
-                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
-                  placeholder="Minutes per period"
-                />
-              </div>
-            </div>
-
-            <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
 
               {activeMatchEvent ? (
@@ -1424,6 +1389,28 @@ function Dashboard({
               onOpenCreateEvent={openCreateEvent}
               onOpenEditEvent={openEditEvent}
               onDeleteTimelineItem={handleDeleteTimelineItem}
+              periodMode={periodMode}
+              periodLength={periodLength}
+              currentPeriod={currentQuarter}
+              setCurrentPeriod={(value) => {
+                setCurrentQuarterState(value)
+                void persistSettings({ currentQuarter: value })
+              }}
+              setPeriodMode={async (value) => {
+                setPeriodModeState(value)
+                setCurrentQuarterState(1)
+                await persistSettings({
+                  periodMode: value,
+                  currentQuarter: 1,
+                })
+              }}
+              setPeriodLength={async (value) => {
+                const nextValue = Math.max(1, value)
+                setPeriodLengthState(nextValue)
+                await persistSettings({
+                  periodLength: nextValue,
+                })
+              }}
             />
 
             {matchTab === "quarters" ? (
