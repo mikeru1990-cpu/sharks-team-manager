@@ -8,7 +8,14 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core"
-import type { MatchTab, MatchFormat, MatchEventDraft, PitchSlot, Player, SavedLineup, TimelineItem } from "../lib/types"
+import type {
+  MatchTab,
+  MatchFormat,
+  PitchSlot,
+  Player,
+  SavedLineup,
+  TimelineItem,
+} from "../lib/types"
 import {
   TEAM,
   buttonPrimary,
@@ -20,6 +27,8 @@ import {
   initials,
 } from "../lib/types"
 import { canPlaySlot } from "../lib/rotation"
+
+type PeriodMode = "quarters" | "halves"
 
 type Props = {
   isAdmin: boolean
@@ -60,6 +69,13 @@ type Props = {
   onOpenCreateEvent: () => void
   onOpenEditEvent: (item: TimelineItem) => void
   onDeleteTimelineItem: (id: string) => Promise<void>
+
+  periodMode: PeriodMode
+  periodLength: number
+  currentPeriod: number
+  setCurrentPeriod: (value: number) => void
+  setPeriodMode: (value: PeriodMode) => Promise<void>
+  setPeriodLength: (value: number) => Promise<void>
 }
 
 function ShirtMarker({ player, compact = false }: { player: Player; compact?: boolean }) {
@@ -77,7 +93,8 @@ function ShirtMarker({ player, compact = false }: { player: Player; compact?: bo
         style={{
           position: "absolute",
           inset: 0,
-          clipPath: "polygon(18% 6%, 32% 6%, 39% 18%, 61% 18%, 68% 6%, 82% 6%, 94% 30%, 79% 38%, 79% 100%, 21% 100%, 21% 38%, 6% 30%)",
+          clipPath:
+            "polygon(18% 6%, 32% 6%, 39% 18%, 61% 18%, 68% 6%, 82% 6%, 94% 30%, 79% 38%, 79% 100%, 21% 100%, 21% 38%, 6% 30%)",
           background: `linear-gradient(180deg, ${TEAM.secondary} 0%, ${TEAM.primary} 100%)`,
           border: "2px solid rgba(255,255,255,0.75)",
           boxShadow: "0 8px 16px rgba(2,6,23,0.18)",
@@ -306,6 +323,12 @@ export default function MatchCenter(props: Props) {
     onOpenCreateEvent,
     onOpenEditEvent,
     onDeleteTimelineItem,
+    periodMode,
+    periodLength,
+    currentPeriod,
+    setCurrentPeriod,
+    setPeriodMode,
+    setPeriodLength,
   } = props
 
   const lineupPlayers = Object.values(lineupMap)
@@ -325,6 +348,11 @@ export default function MatchCenter(props: Props) {
     currentSlots.filter((s) => s.position === "DEF"),
     currentSlots.filter((s) => s.position === "GK"),
   ]
+
+  const periodCount = periodMode === "quarters" ? 4 : 2
+  const periodLabel = periodMode === "quarters" ? `Q${currentPeriod}` : `H${currentPeriod}`
+  const periodName = periodMode === "quarters" ? "Quarter" : "Half"
+  const periodsTabLabel = periodMode === "quarters" ? "Quarters" : "Halves"
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -406,7 +434,13 @@ export default function MatchCenter(props: Props) {
             ) : null}
           </div>
 
-          <div style={{ fontSize: 34, fontWeight: 900, opacity: 0.85 }}>{formatClock(seconds)}</div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 16, fontWeight: 900, opacity: 0.9 }}>{periodLabel}</div>
+            <div style={{ fontSize: 34, fontWeight: 900, opacity: 0.85 }}>{formatClock(seconds)}</div>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>
+              {periodLength} min {periodName.toLowerCase()}
+            </div>
+          </div>
 
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 64, fontWeight: 900 }}>{awayScore}</div>
@@ -429,7 +463,7 @@ export default function MatchCenter(props: Props) {
           ["overview", "Overview"],
           ["lineup", "Lineup"],
           ["live", "Live"],
-          ["quarters", "Quarters"],
+          ["quarters", periodsTabLabel],
           ["stats", "Stats"],
         ].map(([value, label]) => (
           <button
@@ -447,9 +481,61 @@ export default function MatchCenter(props: Props) {
 
       {matchTab === "overview" ? (
         <div style={{ display: "grid", gap: 16 }}>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Settings</div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Game Type</div>
+                <select
+                  value={periodMode}
+                  disabled={!isAdmin}
+                  onChange={(e) => void setPeriodMode(e.target.value as PeriodMode)}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16, width: "100%" }}
+                >
+                  <option value="quarters">4 Quarters</option>
+                  <option value="halves">2 Halves</option>
+                </select>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                  {periodMode === "quarters" ? "Quarter Length" : "Half Length"}
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={periodLength}
+                  disabled={!isAdmin}
+                  onChange={(e) => void setPeriodLength(Math.max(1, Number(e.target.value) || 1))}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16, width: "100%" }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Current {periodName}</div>
+                <select
+                  value={currentPeriod}
+                  disabled={!isAdmin}
+                  onChange={(e) => setCurrentPeriod(Number(e.target.value))}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16, width: "100%" }}
+                >
+                  {Array.from({ length: periodCount }, (_, i) => i + 1).map((period) => (
+                    <option key={period} value={period}>
+                      {periodMode === "quarters" ? `Quarter ${period}` : `Half ${period}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div style={cardStyle("#ecfccb")}>
             <div style={{ color: "#4d7c0f", fontWeight: 900, fontSize: 16 }}>Match Clock</div>
             <div style={{ fontSize: 52, fontWeight: 900, marginTop: 8 }}>{formatClock(seconds)}</div>
+            <div style={{ marginTop: 6, fontWeight: 800 }}>
+              {periodLabel} • {periodLength} min
+            </div>
             {isAdmin ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10, marginTop: 14 }}>
                 <button onClick={() => setRunning(true)} style={buttonPrimary()}>
