@@ -105,6 +105,8 @@ function Dashboard({
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("7v7")
   const [formation, setFormation] = useState("2-3-1")
   const [currentQuarter, setCurrentQuarterState] = useState(1)
+  const [periodMode, setPeriodModeState] = useState<"quarters" | "halves">("quarters")
+  const [periodLength, setPeriodLengthState] = useState(10)
 
   const [seconds, setSeconds] = useState(0)
   const [running, setRunning] = useState(false)
@@ -129,9 +131,6 @@ function Dashboard({
   const [quarterWarnings, setQuarterWarnings] = useState<string[]>([])
   const [activeDragPlayerId, setActiveDragPlayerId] = useState<string | null>(null)
 
-  const [periodMode, setPeriodModeState] = useState<"quarters" | "halves">("quarters")
-const [periodLength, setPeriodLengthState] = useState(10)
-  
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
   const [trainingTemplates] = useState<TrainingTemplate[]>(initialTrainingTemplates)
   const [trainingPlan, setTrainingPlan] = useState({
@@ -243,8 +242,8 @@ const [periodLength, setPeriodLengthState] = useState(10)
       setCurrentQuarterState(settingsRes.data.current_quarter || 1)
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
       setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
-  setPeriodModeState(settingsRes.data.period_mode || "quarters")
-setPeriodLengthState(settingsRes.data.period_length || 10)
+      setPeriodModeState(settingsRes.data.period_mode || "quarters")
+      setPeriodLengthState(settingsRes.data.period_length || 10)
     }
 
     if (!timelineRes.error && timelineRes.data) {
@@ -350,6 +349,8 @@ setPeriodLengthState(settingsRes.data.period_length || 10)
       awayScore: number
       selectedDate: string
       activeMatchEventId: string | null
+      periodMode: "quarters" | "halves"
+      periodLength: number
     }>
   ) {
     if (!supabase) return
@@ -364,6 +365,8 @@ setPeriodLengthState(settingsRes.data.period_length || 10)
       awayScore: patch?.awayScore ?? awayScore,
       selectedDate: patch?.selectedDate ?? selectedDate,
       activeMatchEventId: patch?.activeMatchEventId ?? activeMatchEventId,
+      periodMode: patch?.periodMode ?? periodMode,
+      periodLength: patch?.periodLength ?? periodLength,
     }
 
     await supabase.from("app_settings").upsert({
@@ -377,6 +380,8 @@ setPeriodLengthState(settingsRes.data.period_length || 10)
       away_score: next.awayScore,
       selected_date: next.selectedDate,
       active_match_event_id: next.activeMatchEventId,
+      period_mode: next.periodMode,
+      period_length: next.periodLength,
     })
   }
 
@@ -1334,6 +1339,22 @@ setPeriodLengthState(settingsRes.data.period_length || 10)
               seconds={seconds}
               running={running}
               liveSecondsMap={liveSecondsMap}
+              periodMode={periodMode}
+              periodLength={periodLength}
+              currentPeriod={currentQuarter}
+              setCurrentPeriod={(q) => {
+                setCurrentQuarterState(q)
+                void persistSettings({ currentQuarter: q })
+              }}
+              setPeriodMode={async (value) => {
+                setPeriodModeState(value)
+                setCurrentQuarterState(1)
+                await persistSettings({ periodMode: value, currentQuarter: 1 })
+              }}
+              setPeriodLength={async (value) => {
+                setPeriodLengthState(value)
+                await persistSettings({ periodLength: value })
+              }}
               timeline={timeline}
               savedLineups={savedLineups}
               lineupName={lineupName}
@@ -1391,6 +1412,8 @@ setPeriodLengthState(settingsRes.data.period_length || 10)
                 onSaveCurrentQuarter={handleSaveCurrentQuarter}
                 onLoadQuarter={handleLoadQuarter}
                 onAutoGenerate={handleAutoGenerate}
+                periodMode={periodMode}
+                periodLength={periodLength}
               />
             ) : null}
           </>
