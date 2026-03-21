@@ -39,6 +39,8 @@ import {
   generateQuarterPlans,
 } from "./lib/rotation"
 
+type PeriodMode = "quarters" | "halves"
+
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
@@ -56,6 +58,7 @@ function statusStyle(status: AttendanceStatus) {
       color: "#166534",
     }
   }
+
   if (status === "maybe") {
     return {
       border: "1px solid #d97706",
@@ -63,6 +66,7 @@ function statusStyle(status: AttendanceStatus) {
       color: "#92400e",
     }
   }
+
   return {
     border: "1px solid #dc2626",
     background: "#fee2e2",
@@ -105,7 +109,8 @@ function Dashboard({
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("7v7")
   const [formation, setFormation] = useState("2-3-1")
   const [currentQuarter, setCurrentQuarterState] = useState(1)
-  const [periodMode, setPeriodModeState] = useState<"quarters" | "halves">("quarters")
+
+  const [periodMode, setPeriodModeState] = useState<PeriodMode>("quarters")
   const [periodLength, setPeriodLengthState] = useState(10)
 
   const [seconds, setSeconds] = useState(0)
@@ -192,7 +197,7 @@ function Dashboard({
 
   const noAvailableKeeper =
     activeMatchEvent && matchPlayers.length > 0
-      ? !matchPlayers.some((p) => p.mainGK || p.backupGK || p.positions.includes("GK" as any))
+      ? !matchPlayers.some((p) => p.mainGK || p.backupGK || p.positions.includes("GK"))
       : false
 
   async function loadAll() {
@@ -242,7 +247,7 @@ function Dashboard({
       setCurrentQuarterState(settingsRes.data.current_quarter || 1)
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
       setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
-      setPeriodModeState(settingsRes.data.period_mode || "quarters")
+      setPeriodModeState((settingsRes.data.period_mode as PeriodMode) || "quarters")
       setPeriodLengthState(settingsRes.data.period_length || 10)
     }
 
@@ -287,7 +292,7 @@ function Dashboard({
           date: row.date,
           title: row.title,
           type: row.type,
-          startTime: row.start_time || "",
+          startTime: row.start_time || row.kick_off || "",
           location: row.location || "",
           opponent: row.opponent || "",
           notes: row.notes || "",
@@ -349,7 +354,7 @@ function Dashboard({
       awayScore: number
       selectedDate: string
       activeMatchEventId: string | null
-      periodMode: "quarters" | "halves"
+      periodMode: PeriodMode
       periodLength: number
     }>
   ) {
@@ -515,15 +520,17 @@ function Dashboard({
       return
     }
 
+    const safeTime = eventStartTime.trim() || "00:00"
+
     const newEvent: EventItem = {
       id: editingCalendarEventId || makeId(),
       date: selectedDate,
       title: eventTitle.trim(),
       type: eventType,
-      startTime: eventStartTime,
-      location: eventLocation,
-      opponent: eventOpponent,
-      notes: eventNotes,
+      startTime: safeTime,
+      location: eventLocation.trim(),
+      opponent: eventOpponent.trim(),
+      notes: eventNotes.trim(),
     }
 
     const { error } = await supabase.from("events").upsert({
@@ -532,7 +539,8 @@ function Dashboard({
       day: newEvent.date,
       title: newEvent.title,
       type: newEvent.type,
-      start_time: newEvent.startTime || "",
+      kick_off: safeTime,
+      start_time: safeTime,
       location: newEvent.location || "",
       opponent: newEvent.opponent || "",
       notes: newEvent.notes || "",
@@ -827,7 +835,8 @@ function Dashboard({
   function handleLoadQuarter(quarter: number) {
     const plan = quarterPlans[quarter]
     if (!plan) {
-      alert(`No saved plan for Q${quarter}`)
+      const shortLabel = periodMode === "quarters" ? "Q" : "H"
+      alert(`No saved plan for ${shortLabel}${quarter}`)
       return
     }
     setCurrentQuarterState(quarter)
@@ -1154,6 +1163,7 @@ function Dashboard({
                 <div style={{ display: "grid", gap: 10 }}>
                   {players.map((player) => {
                     const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
+
                     return (
                       <div
                         key={player.id}
@@ -1165,9 +1175,11 @@ function Dashboard({
                         }}
                       >
                         <div style={{ fontWeight: 900, marginBottom: 8 }}>{player.name}</div>
+
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {(["available", "maybe", "unavailable"] as AttendanceStatus[]).map((status) => {
                             const active = currentStatus === status
+
                             return (
                               <button
                                 key={status}
@@ -1272,6 +1284,41 @@ function Dashboard({
         {tab === "match" ? (
           <>
             <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Settings</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
+                <select
+                  value={periodMode}
+                  disabled={!isAdmin}
+                  onChange={(e) => {
+                    const value = e.target.value as PeriodMode
+                    setPeriodModeState(value)
+                    setCurrentQuarterState(1)
+                    void persistSettings({ periodMode: value, currentQuarter: 1 })
+                  }}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+                >
+                  <option value="quarters">4 Quarters</option>
+                  <option value="halves">2 Halves</option>
+                </select>
+
+                <input
+                  type="number"
+                  min={1}
+                  value={periodLength}
+                  disabled={!isAdmin}
+                  onChange={(e) => {
+                    const value = Math.max(1, Number(e.target.value) || 1)
+                    setPeriodLengthState(value)
+                    void persistSettings({ periodLength: value })
+                  }}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+                  placeholder="Minutes per period"
+                />
+              </div>
+            </div>
+
+            <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
 
               {activeMatchEvent ? (
@@ -1339,22 +1386,6 @@ function Dashboard({
               seconds={seconds}
               running={running}
               liveSecondsMap={liveSecondsMap}
-              periodMode={periodMode}
-              periodLength={periodLength}
-              currentPeriod={currentQuarter}
-              setCurrentPeriod={(q) => {
-                setCurrentQuarterState(q)
-                void persistSettings({ currentQuarter: q })
-              }}
-              setPeriodMode={async (value) => {
-                setPeriodModeState(value)
-                setCurrentQuarterState(1)
-                await persistSettings({ periodMode: value, currentQuarter: 1 })
-              }}
-              setPeriodLength={async (value) => {
-                setPeriodLengthState(value)
-                await persistSettings({ periodLength: value })
-              }}
               timeline={timeline}
               savedLineups={savedLineups}
               lineupName={lineupName}
