@@ -129,6 +129,9 @@ function Dashboard({
   const [quarterWarnings, setQuarterWarnings] = useState<string[]>([])
   const [activeDragPlayerId, setActiveDragPlayerId] = useState<string | null>(null)
 
+  const [periodMode, setPeriodModeState] = useState<"quarters" | "halves">("quarters")
+const [periodLength, setPeriodLengthState] = useState(10)
+  
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
   const [trainingTemplates] = useState<TrainingTemplate[]>(initialTrainingTemplates)
   const [trainingPlan, setTrainingPlan] = useState({
@@ -240,6 +243,8 @@ function Dashboard({
       setCurrentQuarterState(settingsRes.data.current_quarter || 1)
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
       setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
+  setPeriodModeState(settingsRes.data.period_mode || "quarters")
+setPeriodLengthState(settingsRes.data.period_length || 10)
     }
 
     if (!timelineRes.error && timelineRes.data) {
