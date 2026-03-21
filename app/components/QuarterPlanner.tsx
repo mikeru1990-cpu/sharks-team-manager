@@ -3,6 +3,8 @@
 import type { PitchSlot, Player, QuarterPlan } from "../lib/types"
 import { buttonPrimary, buttonSecondary, cardStyle, chipStyle } from "../lib/types"
 
+type PeriodMode = "quarters" | "halves"
+
 type Props = {
   isAdmin: boolean
   currentQuarter: number
@@ -16,6 +18,9 @@ type Props = {
   onSaveCurrentQuarter: () => Promise<void>
   onLoadQuarter: (quarter: number) => void
   onAutoGenerate: () => Promise<void>
+
+  periodMode: PeriodMode
+  periodLength: number
 }
 
 export default function QuarterPlanner({
@@ -31,14 +36,27 @@ export default function QuarterPlanner({
   onSaveCurrentQuarter,
   onLoadQuarter,
   onAutoGenerate,
+  periodMode,
+  periodLength,
 }: Props) {
+  const periodCount = periodMode === "quarters" ? 4 : 2
+  const periodName = periodMode === "quarters" ? "Quarter" : "Half"
+  const shortLabel = periodMode === "quarters" ? "Q" : "H"
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Quarter Planner Engine</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+          {periodName} Planner Engine
+        </div>
+
+        <div style={{ color: "#475569", marginBottom: 12 }}>
+          {periodCount} {periodName.toLowerCase()}
+          {periodCount === 1 ? "" : "s"} • {periodLength} minutes each
+        </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-          {[1, 2, 3, 4].map((q) => (
+          {Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => (
             <button
               key={q}
               onClick={() => setCurrentQuarter(q)}
@@ -47,7 +65,8 @@ export default function QuarterPlanner({
                 minWidth: 56,
               }}
             >
-              Q{q}
+              {shortLabel}
+              {q}
             </button>
           ))}
         </div>
@@ -56,10 +75,12 @@ export default function QuarterPlanner({
           {isAdmin ? (
             <>
               <button onClick={onSaveCurrentQuarter} style={buttonPrimary()}>
-                Save Q{currentQuarter}
+                Save {shortLabel}
+                {currentQuarter}
               </button>
               <button onClick={() => onLoadQuarter(currentQuarter)} style={buttonSecondary()}>
-                Load Q{currentQuarter}
+                Load {shortLabel}
+                {currentQuarter}
               </button>
               <button onClick={onAutoGenerate} style={buttonSecondary()}>
                 Auto Generate
@@ -74,13 +95,15 @@ export default function QuarterPlanner({
       <div style={cardStyle("#eff6ff")}>
         <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Goalkeeper Rules</div>
         <div style={{ color: "#334155" }}>
-          Quarter generation always tries <strong>Main GK</strong> first, then <strong>Backup GK</strong>, then any other GK-capable player.
+          {periodName} generation always tries <strong>Main GK</strong> first, then <strong>Backup GK</strong>, then any other GK-capable player.
         </div>
       </div>
 
       {quarterWarnings.length > 0 ? (
         <div style={{ ...cardStyle("#fff7ed"), border: "1px solid #fed7aa" }}>
-          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>Quarter Warnings</div>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 10 }}>
+            {periodName} Warnings
+          </div>
           <div style={{ display: "grid", gap: 8 }}>
             {quarterWarnings.map((warning, index) => (
               <div key={index} style={{ color: "#9a3412", fontWeight: 700 }}>
@@ -92,7 +115,9 @@ export default function QuarterPlanner({
       ) : null}
 
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Current Quarter Snapshot</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+          Current {periodName} Snapshot
+        </div>
         <div style={{ display: "grid", gap: 6 }}>
           {currentSlots.map((slot) => (
             <div key={slot.id}>
@@ -106,9 +131,11 @@ export default function QuarterPlanner({
       </div>
 
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Quarter Plans</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+          Saved {periodName} Plans
+        </div>
         <div style={{ display: "grid", gap: 12 }}>
-          {[1, 2, 3, 4].map((q) => {
+          {Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => {
             const plan = quarterPlans[q]
             return (
               <div
@@ -121,7 +148,9 @@ export default function QuarterPlanner({
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontWeight: 900, fontSize: 18 }}>Quarter {q}</div>
+                  <div style={{ fontWeight: 900, fontSize: 18 }}>
+                    {periodName} {q}
+                  </div>
                   <button onClick={() => onLoadQuarter(q)} style={buttonSecondary()}>
                     Load
                   </button>
