@@ -102,7 +102,7 @@ function Dashboard({
   const [eventNotes, setEventNotes] = useState("")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
-  const [awayTeam, setAwayTeamState] = useState("Opposition")
+  const [awayTeam, setAwayTeamState] = useState("Leonard Stanley U10 Lioness")
   const [homeScore, setHomeScoreState] = useState(0)
   const [awayScore, setAwayScoreState] = useState(0)
 
@@ -239,7 +239,7 @@ function Dashboard({
 
     if (!settingsRes.error && settingsRes.data) {
       setHomeTeamState(settingsRes.data.home_team || TEAM.name)
-      setAwayTeamState(settingsRes.data.away_team || "Opposition")
+      setAwayTeamState(settingsRes.data.away_team || "Leonard Stanley U10 Lioness")
       setHomeScoreState(settingsRes.data.home_score || 0)
       setAwayScoreState(settingsRes.data.away_score || 0)
       setMatchFormat((settingsRes.data.match_format as MatchFormat) || "7v7")
@@ -483,6 +483,7 @@ function Dashboard({
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
     if (!supabase) return
+
     if (!isAdmin) {
       alert("Only admins can update attendance")
       return
@@ -1402,8 +1403,9 @@ function Dashboard({
                 await persistSettings({ periodMode: value, currentQuarter: 1 })
               }}
               setPeriodLength={async (value) => {
-                setPeriodLengthState(value)
-                await persistSettings({ periodLength: value })
+                const nextValue = Math.max(1, value || 1)
+                setPeriodLengthState(nextValue)
+                await persistSettings({ periodLength: nextValue })
               }}
             />
 
