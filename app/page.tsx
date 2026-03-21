@@ -39,6 +39,15 @@ import {
   generateQuarterPlans,
 } from "./lib/rotation"
 
+function formatFullDate(date: string) {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })
+}
+
 function statusStyle(status: AttendanceStatus) {
   if (status === "available") {
     return {
@@ -79,6 +88,7 @@ function Dashboard({
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingCalendarEventId, setEditingCalendarEventId] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const [activeMatchEventId, setActiveMatchEventId] = useState<string | null>(null)
 
   const [eventTitle, setEventTitle] = useState("")
   const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
@@ -136,10 +146,7 @@ function Dashboard({
 
   const selectedDateEvents = events.filter((e) => e.date === selectedDate)
   const selectedEvent = events.find((e) => e.id === selectedEventId) || null
-
-  function attendanceForEvent(eventId: string) {
-    return attendance.filter((a) => a.eventId === eventId)
-  }
+  const activeMatchEvent = events.find((e) => e.id === activeMatchEventId) || null
 
   function countAttendance(eventId: string, status: AttendanceStatus) {
     return attendance.filter((a) => a.eventId === eventId && a.status === status).length
@@ -148,6 +155,43 @@ function Dashboard({
   function getPlayerStatus(eventId: string, playerId: string): AttendanceStatus | null {
     return attendance.find((a) => a.eventId === eventId && a.playerId === playerId)?.status || null
   }
+
+  const activeMatchAvailableIds = activeMatchEvent
+    ? attendance
+        .filter((a) => a.eventId === activeMatchEvent.id && a.status === "available")
+        .map((a) => a.playerId)
+    : []
+
+  const activeMatchMaybeIds = activeMatchEvent
+    ? attendance
+        .filter((a) => a.eventId === activeMatchEvent.id && a.status === "maybe")
+        .map((a) => a.playerId)
+    : []
+
+  const matchPlayers =
+    activeMatchEvent && activeMatchAvailableIds.length > 0
+      ? players.filter((p) => activeMatchAvailableIds.includes(p.id))
+      : players
+
+  const maybePlayers =
+    activeMatchEvent && activeMatchMaybeIds.length > 0
+      ? players.filter((p) => activeMatchMaybeIds.includes(p.id))
+      : []
+
+  const unavailablePlayers =
+    activeMatchEvent
+      ? players.filter((p) => {
+          const status = attendance.find(
+            (a) => a.eventId === activeMatchEvent.id && a.playerId === p.id
+          )?.status
+          return status === "unavailable"
+        })
+      : []
+
+  const noAvailableKeeper =
+    activeMatchEvent && matchPlayers.length > 0
+      ? !matchPlayers.some((p) => p.mainGK || p.backupGK || p.positions.includes("GK" as any))
+      : false
 
   async function loadAll() {
     setLoading(true)
@@ -195,6 +239,7 @@ function Dashboard({
       setFormation(settingsRes.data.formation || "2-3-1")
       setCurrentQuarterState(settingsRes.data.current_quarter || 1)
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
+      setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
     }
 
     if (!timelineRes.error && timelineRes.data) {
@@ -266,10 +311,10 @@ function Dashboard({
 
   useEffect(() => {
     if (players.length === 0) return
-    const auto = buildAutoLineup(players, currentSlots)
+    const auto = buildAutoLineup(matchPlayers, currentSlots)
     setLineupMap((prev) => (Object.keys(prev).length === 0 ? auto.lineup : prev))
     setBenchIds((prev) => (prev.length === 0 ? auto.bench : prev))
-  }, [players, currentSlots])
+  }, [players, currentSlots, activeMatchEventId, attendance.length])
 
   useEffect(() => {
     if (!running) return
@@ -299,6 +344,7 @@ function Dashboard({
       homeScore: number
       awayScore: number
       selectedDate: string
+      activeMatchEventId: string | null
     }>
   ) {
     if (!supabase) return
@@ -312,6 +358,7 @@ function Dashboard({
       homeScore: patch?.homeScore ?? homeScore,
       awayScore: patch?.awayScore ?? awayScore,
       selectedDate: patch?.selectedDate ?? selectedDate,
+      activeMatchEventId: patch?.activeMatchEventId ?? activeMatchEventId,
     }
 
     await supabase.from("app_settings").upsert({
@@ -324,6 +371,7 @@ function Dashboard({
       home_score: next.homeScore,
       away_score: next.awayScore,
       selected_date: next.selectedDate,
+      active_match_event_id: next.activeMatchEventId,
     })
   }
 
@@ -471,6 +519,7 @@ function Dashboard({
     const { error } = await supabase.from("events").upsert({
       id: newEvent.id,
       date: newEvent.date,
+      day: newEvent.date,
       title: newEvent.title,
       type: newEvent.type,
       start_time: newEvent.startTime || "",
@@ -550,11 +599,15 @@ function Dashboard({
     setEvents((prev) => prev.filter((event) => event.id !== id))
     setAttendance((prev) => prev.filter((item) => item.eventId !== id))
     if (selectedEventId === id) setSelectedEventId(null)
+    if (activeMatchEventId === id) {
+      setActiveMatchEventId(null)
+      void persistSettings({ activeMatchEventId: null })
+    }
   }
 
   async function handleChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
     const nextSlots = buildPitchSlots(nextFormat, nextFormation)
-    const auto = buildAutoLineup(players, nextSlots)
+    const auto = buildAutoLineup(matchPlayers, nextSlots)
     setMatchFormat(nextFormat)
     setFormation(nextFormation)
     setLineupMap(auto.lineup)
@@ -625,7 +678,7 @@ function Dashboard({
     const fromId = parts[3]
     const overId = String(over.id)
 
-    const player = players.find((p) => p.id === playerId)
+    const player = matchPlayers.find((p) => p.id === playerId)
     if (!player) return
 
     if (overId === "bench") {
@@ -706,8 +759,8 @@ function Dashboard({
       return
     }
 
-    const player = players.find((p) => p.id === eventDraft.playerId)
-    const secondPlayer = players.find((p) => p.id === eventDraft.secondPlayerId)
+    const player = matchPlayers.find((p) => p.id === eventDraft.playerId)
+    const secondPlayer = matchPlayers.find((p) => p.id === eventDraft.secondPlayerId)
 
     let text = ""
     if (eventDraft.type === "goal") {
@@ -774,7 +827,7 @@ function Dashboard({
   }
 
   async function handleAutoGenerate() {
-    const { plans, warnings } = generateQuarterPlans(players, currentSlots)
+    const { plans, warnings } = generateQuarterPlans(matchPlayers, currentSlots)
     await saveQuarterPlans(plans)
     setQuarterWarnings(warnings)
     setCurrentQuarterState(1)
@@ -1037,9 +1090,10 @@ function Dashboard({
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedEvent.title}</div>
+                    <div style={{ fontSize: 22, fontWeight: 900 }}>{formatFullDate(selectedEvent.date)}</div>
+                    <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6 }}>{selectedEvent.title}</div>
                     <div style={{ color: "#64748b", marginTop: 6 }}>
-                      {selectedEvent.date}
+                      {selectedEvent.type}
                       {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
                       {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
                     </div>
@@ -1052,7 +1106,19 @@ function Dashboard({
                   </div>
 
                   {isAdmin ? (
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {selectedEvent.type === "match" ? (
+                        <button
+                          onClick={() => {
+                            setActiveMatchEventId(selectedEvent.id)
+                            void persistSettings({ activeMatchEventId: selectedEvent.id })
+                          }}
+                          style={activeMatchEventId === selectedEvent.id ? buttonPrimary() : buttonSecondary()}
+                        >
+                          {activeMatchEventId === selectedEvent.id ? "Active Match Day" : "Use for Match Day"}
+                        </button>
+                      ) : null}
+
                       <button onClick={() => openEditCalendarEvent(selectedEvent)} style={buttonSecondary()}>
                         Edit
                       </button>
@@ -1195,6 +1261,57 @@ function Dashboard({
 
         {tab === "match" ? (
           <>
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
+
+              {activeMatchEvent ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontWeight: 800 }}>
+                    Active event: {activeMatchEvent.title} ({activeMatchEvent.date})
+                  </div>
+
+                  <div style={{ color: "#475569" }}>
+                    Available: {matchPlayers.length}
+                    {maybePlayers.length ? ` • Maybe: ${maybePlayers.length}` : ""}
+                    {unavailablePlayers.length ? ` • Unavailable: ${unavailablePlayers.length}` : ""}
+                  </div>
+
+                  {noAvailableKeeper ? (
+                    <div
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        background: "#fee2e2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Warning: no available goalkeeper is marked for this match.
+                    </div>
+                  ) : null}
+
+                  {unavailablePlayers.length > 0 ? (
+                    <div
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        color: "#475569",
+                      }}
+                    >
+                      Unavailable: {unavailablePlayers.map((p) => p.name).join(", ")}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div style={{ color: "#64748b" }}>
+                  No active match event selected. Go to Events, open a match, and tap "Use for Match Day".
+                </div>
+              )}
+            </div>
+
             <MatchCenter
               isAdmin={isAdmin}
               matchTab={matchTab}
@@ -1202,7 +1319,7 @@ function Dashboard({
               matchFormat={matchFormat}
               formation={formation}
               currentSlots={currentSlots}
-              players={players}
+              players={matchPlayers}
               lineupMap={lineupMap}
               benchIds={benchIds}
               homeTeam={homeTeam}
@@ -1263,7 +1380,7 @@ function Dashboard({
                 quarterPlans={quarterPlans}
                 quarterWarnings={quarterWarnings}
                 currentSlots={currentSlots}
-                players={players}
+                players={matchPlayers}
                 lineupMap={lineupMap}
                 benchIds={benchIds}
                 onSaveCurrentQuarter={handleSaveCurrentQuarter}
@@ -1461,7 +1578,7 @@ function Dashboard({
                   style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
                 >
                   <option value="">Choose player</option>
-                  {players.map((player) => (
+                  {matchPlayers.map((player) => (
                     <option key={player.id} value={player.id}>
                       {player.name}
                     </option>
@@ -1476,7 +1593,7 @@ function Dashboard({
                   style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
                 >
                   <option value="">{eventDraft.type === "goal" ? "Optional assist" : "Choose second player"}</option>
-                  {players
+                  {matchPlayers
                     .filter((player) => player.id !== eventDraft.playerId)
                     .map((player) => (
                       <option key={player.id} value={player.id}>
