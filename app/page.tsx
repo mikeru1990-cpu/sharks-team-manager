@@ -102,7 +102,7 @@ function Dashboard({
   const [eventNotes, setEventNotes] = useState("")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
-  const [awayTeam, setAwayTeamState] = useState("Leonard Stanley U10 Lioness")
+  const [awayTeam, setAwayTeamState] = useState("Opposition")
   const [homeScore, setHomeScoreState] = useState(0)
   const [awayScore, setAwayScoreState] = useState(0)
 
@@ -239,7 +239,7 @@ function Dashboard({
 
     if (!settingsRes.error && settingsRes.data) {
       setHomeTeamState(settingsRes.data.home_team || TEAM.name)
-      setAwayTeamState(settingsRes.data.away_team || "Leonard Stanley U10 Lioness")
+      setAwayTeamState(settingsRes.data.away_team || "Opposition")
       setHomeScoreState(settingsRes.data.home_score || 0)
       setAwayScoreState(settingsRes.data.away_score || 0)
       setMatchFormat((settingsRes.data.match_format as MatchFormat) || "7v7")
@@ -489,7 +489,7 @@ function Dashboard({
     }
 
     const existing = attendance.find((a) => a.eventId === eventId && a.playerId === playerId)
-    const recordId = existing?.id || makeId()
+    const recordId = existing?.id || crypto.randomUUID()
 
     const { error } = await supabase.from("event_attendance").upsert({
       id: recordId,
@@ -1399,17 +1399,11 @@ function Dashboard({
               setPeriodMode={async (value) => {
                 setPeriodModeState(value)
                 setCurrentQuarterState(1)
-                await persistSettings({
-                  periodMode: value,
-                  currentQuarter: 1,
-                })
+                await persistSettings({ periodMode: value, currentQuarter: 1 })
               }}
               setPeriodLength={async (value) => {
-                const nextValue = Math.max(1, value)
-                setPeriodLengthState(nextValue)
-                await persistSettings({
-                  periodLength: nextValue,
-                })
+                setPeriodLengthState(value)
+                await persistSettings({ periodLength: value })
               }}
             />
 
