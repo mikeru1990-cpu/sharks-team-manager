@@ -54,15 +54,23 @@ export default function RollingCalendar({
 
   const eventMap = useMemo(() => {
     const map = new Map<string, EventItem[]>()
+
     for (const event of events) {
       const existing = map.get(event.date) || []
       existing.push(event)
       map.set(event.date, existing)
     }
+
     return map
   }, [events])
 
-  const selectedDayEvents = eventMap.get(selectedDate) || []
+  const selectedDayEvents = (eventMap.get(selectedDate) || []).slice().sort((a, b) => {
+    const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+    if (timeCompare !== 0) return timeCompare
+    return a.title.localeCompare(b.title)
+  })
+
+  const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
   const monthGrid = useMemo(() => {
     const firstOfMonth = new Date(
@@ -73,6 +81,7 @@ export default function RollingCalendar({
       0,
       0
     )
+
     const startWeekday = (firstOfMonth.getDay() + 6) % 7
     const gridStart = new Date(firstOfMonth)
     gridStart.setDate(firstOfMonth.getDate() - startWeekday)
@@ -111,8 +120,13 @@ export default function RollingCalendar({
   }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div style={cardStyle()}>
+    <div style={{ display: "grid", gap: 14 }}>
+      <div
+        style={{
+          ...cardStyle(),
+          padding: 14,
+        }}
+      >
         <div
           style={{
             display: "flex",
@@ -120,54 +134,50 @@ export default function RollingCalendar({
             alignItems: "center",
             gap: 10,
             flexWrap: "wrap",
-            marginBottom: 12,
+            marginBottom: 10,
           }}
         >
           <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar</div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button onClick={goPrevMonth} style={buttonSecondary()}>
+            <button
+              onClick={goPrevMonth}
+              style={{ ...buttonSecondary(), padding: "10px 14px" }}
+            >
               ← Prev
             </button>
-            <button onClick={goNextMonth} style={buttonSecondary()}>
+            <button
+              onClick={goNextMonth}
+              style={{ ...buttonSecondary(), padding: "10px 14px" }}
+            >
               Next →
             </button>
-            <button onClick={goToToday} style={buttonSecondary()}>
+            <button
+              onClick={goToToday}
+              style={{ ...buttonSecondary(), padding: "10px 14px" }}
+            >
               Today
             </button>
           </div>
         </div>
 
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 900,
-            marginBottom: 12,
-          }}
-        >
+        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>
           {monthLabel(viewMonth)}
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            marginBottom: 14,
-          }}
-        >
-          <label style={{ fontWeight: 800, color: "#475569" }}>
-            Jump to date
-          </label>
+        <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+          <label style={{ fontWeight: 800, color: "#475569" }}>Jump to date</label>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => handleManualDateChange(e.target.value)}
             style={{
-              padding: 14,
-              borderRadius: 14,
-              border: "1px solid #cbd5e1",
-              fontSize: 16,
               width: "100%",
+              padding: "12px 14px",
+              borderRadius: 16,
+              border: "1px solid #dbe3ef",
+              fontSize: 16,
+              background: "white",
               boxSizing: "border-box",
             }}
           />
@@ -181,18 +191,18 @@ export default function RollingCalendar({
             marginBottom: 8,
           }}
         >
-          {monthGrid.slice(0, 7).map((date, index) => (
+          {weekdayLabels.map((label) => (
             <div
-              key={`weekday-${index}`}
+              key={label}
               style={{
                 textAlign: "center",
                 fontWeight: 900,
                 color: "#64748b",
                 padding: "6px 0",
-                minWidth: 0,
+                fontSize: 14,
               }}
             >
-              {weekdayShort(date)}
+              {label}
             </div>
           ))}
         </div>
@@ -208,7 +218,9 @@ export default function RollingCalendar({
             const dateKey = toDateOnly(date)
             const inCurrentMonth = date.getMonth() === viewMonth.getMonth()
             const isSelected = dateKey === selectedDate
-            const hasEvents = (eventMap.get(dateKey) || []).length > 0
+            const dayEvents = eventMap.get(dateKey) || []
+            const hasEvents = dayEvents.length > 0
+            const isToday = dateKey === toDateOnly(new Date())
 
             return (
               <button
@@ -216,21 +228,26 @@ export default function RollingCalendar({
                 onClick={() => onSelectDate(dateKey)}
                 style={{
                   minWidth: 0,
-                  borderRadius: 16,
-                  padding: "12px 6px",
+                  minHeight: 82,
+                  borderRadius: 18,
+                  padding: "8px 6px",
                   border: isSelected
                     ? `2px solid ${TEAM.primary}`
-                    : "1px solid #cbd5e1",
+                    : isToday
+                    ? "2px solid #cbd5e1"
+                    : "1px solid #dbe3ef",
                   background: isSelected ? "#dbeafe" : "white",
                   color: inCurrentMonth ? "#0f172a" : "#94a3b8",
                   fontWeight: 800,
-                  display: "grid",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
                   gap: 4,
-                  justifyItems: "center",
                   boxSizing: "border-box",
                 }}
               >
-                <div style={{ fontSize: 16 }}>{date.getDate()}</div>
+                <div style={{ fontSize: 16, lineHeight: 1 }}>{date.getDate()}</div>
 
                 {hasEvents ? (
                   <div
@@ -242,19 +259,17 @@ export default function RollingCalendar({
                       lineHeight: 1.1,
                     }}
                   >
-                    {(eventMap.get(dateKey) || []).length} event
-                    {(eventMap.get(dateKey) || []).length === 1 ? "" : "s"}
+                    {dayEvents.length} event{dayEvents.length === 1 ? "" : "s"}
                   </div>
                 ) : (
                   <div
                     style={{
                       fontSize: 11,
-                      color: "#94a3b8",
-                      textAlign: "center",
+                      color: "transparent",
                       lineHeight: 1.1,
                     }}
                   >
-                    &nbsp;
+                    empty
                   </div>
                 )}
               </button>
@@ -263,7 +278,12 @@ export default function RollingCalendar({
         </div>
       </div>
 
-      <div style={cardStyle()}>
+      <div
+        style={{
+          ...cardStyle(),
+          padding: 14,
+        }}
+      >
         <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
           Events on {weekdayShort(selected)} {shortDateLabel(selected)}
         </div>
