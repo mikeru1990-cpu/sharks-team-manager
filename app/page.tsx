@@ -1103,31 +1103,41 @@ function Dashboard({
         >
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
               gap: 12,
-              alignItems: "start",
+              flexWrap: "wrap",
             }}
           >
-            <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+            <div
+              style={{
+                flex: "1 1 260px",
+                minWidth: 0,
+              }}
+            >
               <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>CLUB HUB</div>
+
               <div
                 style={{
                   fontSize: 28,
                   fontWeight: 900,
                   marginTop: 8,
                   lineHeight: 1.1,
-                  overflowWrap: "anywhere",
+                  whiteSpace: "normal",
+                  wordBreak: "normal",
                 }}
               >
                 {TEAM.name}
               </div>
+
               <div
                 style={{
                   marginTop: 6,
                   opacity: 0.9,
-                  overflowWrap: "anywhere",
-                  wordBreak: "break-word",
+                  whiteSpace: "normal",
+                  wordBreak: "normal",
+                  lineHeight: 1.35,
                 }}
               >
                 Supabase sync, login, admin mode, weekday calendar and better screen fit.
@@ -1136,12 +1146,16 @@ function Dashboard({
 
             <div
               style={{
-                textAlign: "right",
-                minWidth: 96,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 10,
+                flexShrink: 0,
               }}
             >
               <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
-              <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
+
+              <button onClick={() => void signOut()} style={buttonSecondary()}>
                 Sign Out
               </button>
             </div>
