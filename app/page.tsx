@@ -482,18 +482,55 @@ function Dashboard({
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase) return
+  if (!supabase) return
 
-    if (!isAdmin) {
-      alert("Only admins can update attendance")
+  if (!isAdmin) {
+    alert("Only admins can update attendance")
+    return
+  }
+
+  try {
+    // 🔍 First: check if record already exists in DB (NOT just local state)
+    const { data: existingRow, error: fetchError } = await supabase
+      .from("event_attendance")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("player_id", playerId)
+      .maybeSingle()
+
+    if (fetchError) {
+      alert(fetchError.message)
       return
     }
 
-    const existing = attendance.find((a) => a.eventId === eventId && a.playerId === playerId)
-    const recordId = existing?.id || crypto.randomUUID()
+    // ✏️ If exists → UPDATE
+    if (existingRow) {
+      const { error } = await supabase
+        .from("event_attendance")
+        .update({ status })
+        .eq("id", existingRow.id)
 
-    const { error } = await supabase.from("event_attendance").upsert({
-      id: recordId,
+      if (error) {
+        alert(error.message)
+        return
+      }
+
+      setAttendance((prev) =>
+        prev.map((item) =>
+          item.eventId === eventId && item.playerId === playerId
+            ? { ...item, status }
+            : item
+        )
+      )
+
+      return
+    }
+
+    // ➕ If NOT exists → INSERT
+    const newId = crypto.randomUUID()
+
+    const { error } = await supabase.from("event_attendance").insert({
+      id: newId,
       event_id: eventId,
       player_id: playerId,
       status,
@@ -504,11 +541,20 @@ function Dashboard({
       return
     }
 
-    setAttendance((prev) => {
-      const filtered = prev.filter((a) => !(a.eventId === eventId && a.playerId === playerId))
-      return [...filtered, { id: recordId, eventId, playerId, status }]
-    })
+    setAttendance((prev) => [
+      ...prev,
+      {
+        id: newId,
+        eventId,
+        playerId,
+        status,
+      },
+    ])
+  } catch (err) {
+    console.error(err)
+    alert("Something went wrong saving attendance")
   }
+}
 
   async function addEvent() {
     if (!supabase) return
