@@ -1104,7 +1104,7 @@ function Dashboard({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) auto",
+              gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
               gap: 12,
               alignItems: "start",
             }}
