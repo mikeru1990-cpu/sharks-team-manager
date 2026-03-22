@@ -6,6 +6,8 @@ export type PitchPosition = "GK" | "DEF" | "MID" | "FWD"
 export type TimelineEventType = "goal" | "assist" | "sub" | "injury" | "note"
 export type AttendanceStatus = "available" | "maybe" | "unavailable"
 
+export type CoachAvailabilityStatus = "available" | "unavailable" | "holiday"
+
 export type EventItem = {
   id: string
   title: string
@@ -33,6 +35,21 @@ export type Player = {
   captain: boolean
   viceCaptain: boolean
   seasonSeconds: number
+}
+
+export type Coach = {
+  id: string
+  name: string
+  role: string
+  active: boolean
+}
+
+export type CoachAvailability = {
+  id: string
+  coachId: string
+  day: string
+  status: CoachAvailabilityStatus
+  notes: string
 }
 
 export type TimelineItem = {
@@ -80,25 +97,6 @@ export type SavedLineup = {
   bench: string[]
 }
 
-export type CoachItem = {
-  id: string
-  name: string
-  role: string
-  phone?: string
-  email?: string
-  notes?: string
-  active?: boolean
-}
-
-export type CoachUnavailableItem = {
-  id: string
-  coach_id: string
-  start_date: string
-  end_date: string
-  status: string
-  reason?: string
-}
-
 export const TEAM = {
   name: "Sharks Lioness",
   primary: "#06245c",
@@ -125,179 +123,20 @@ export const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = 
 }
 
 export const initialPlayers: Player[] = [
-  {
-    id: "1",
-    name: "Bailee Dowler-Rowles",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "2",
-    name: "Bella Bainbridge",
-    positions: ["MID"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: true,
-    seasonSeconds: 0,
-  },
-  {
-    id: "3",
-    name: "Betsy Rowland",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "4",
-    name: "Connie Luff",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "5",
-    name: "Darcy-Rae Russell",
-    positions: ["GK"],
-    mainGK: true,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "6",
-    name: "Ella Wilson",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "7",
-    name: "Elsy Harmer",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "8",
-    name: "Evelyn Evans",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "9",
-    name: "Isabella Ogden",
-    positions: ["DEF", "MID"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "10",
-    name: "Lyra Twinning",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: true,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "11",
-    name: "Martha Scrivens",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "12",
-    name: "Olivia Hassall",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "13",
-    name: "Poppy Bennett",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: true,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "14",
-    name: "Ruby Salter",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-]
-
-export const initialEvents: EventItem[] = [
-  {
-    id: "1",
-    title: "League Game vs Leonard Stanley",
-    date: "2026-03-15",
-    type: "match",
-    startTime: "10:00",
-    location: "",
-    opponent: "Leonard Stanley",
-    notes: "",
-  },
-  {
-    id: "2",
-    title: "Technical Training",
-    date: "2026-03-13",
-    type: "training",
-    startTime: "18:00",
-    location: "",
-    opponent: "",
-    notes: "",
-  },
-  {
-    id: "3",
-    title: "Recovery Session",
-    date: "2026-03-16",
-    type: "training",
-    startTime: "18:00",
-    location: "",
-    opponent: "",
-    notes: "",
-  },
+  { id: "1", name: "Lyra Twinning", positions: ["MID", "FWD"], mainGK: false, backupGK: false, captain: true, viceCaptain: false, seasonSeconds: 0 },
+  { id: "2", name: "Bella Bainbridge", positions: ["MID"], mainGK: false, backupGK: false, captain: false, viceCaptain: true, seasonSeconds: 0 },
+  { id: "3", name: "Betsy Rowland", positions: ["MID", "DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "4", name: "Connie Luff", positions: ["MID", "FWD"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "5", name: "Darcy-Rae Russell", positions: ["GK"], mainGK: true, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "6", name: "Ella Wilson", positions: ["MID", "DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "7", name: "Elsy Harmer", positions: ["DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "8", name: "Evelyn Evans", positions: ["MID", "DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "9", name: "Isabella Ogden", positions: ["DEF", "MID"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "10", name: "Martha Scrivens", positions: ["MID", "FWD"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "11", name: "Olivia Hassall", positions: ["DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "12", name: "Poppy Bennett", positions: ["MID", "FWD"], mainGK: false, backupGK: true, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "13", name: "Ruby Salter", positions: ["MID", "DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
+  { id: "14", name: "Bailee Dowler-Rowles", positions: ["DEF"], mainGK: false, backupGK: false, captain: false, viceCaptain: false, seasonSeconds: 0 },
 ]
 
 export const initialTrainingTemplates: TrainingTemplate[] = [
