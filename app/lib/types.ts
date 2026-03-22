@@ -1,4 +1,4 @@
-export type MainTab = "home" | "players" | "events" | "match" | "stats"
+export type MainTab = "home" | "players" | "events" | "coaches" | "match" | "stats"
 export type MatchTab = "overview" | "lineup" | "live" | "quarters" | "stats"
 export type EventType = "match" | "training" | "other"
 export type MatchFormat = "7v7" | "9v9" | "11v11"
@@ -80,6 +80,25 @@ export type SavedLineup = {
   bench: string[]
 }
 
+export type CoachItem = {
+  id: string
+  name: string
+  role: string
+  phone?: string
+  email?: string
+  notes?: string
+  active?: boolean
+}
+
+export type CoachUnavailableItem = {
+  id: string
+  coach_id: string
+  start_date: string
+  end_date: string
+  status: string
+  reason?: string
+}
+
 export const TEAM = {
   name: "Sharks Lioness",
   primary: "#06245c",
@@ -111,7 +130,7 @@ export const initialPlayers: Player[] = [
     name: "Bailee Dowler-Rowles",
     positions: ["DEF"],
     mainGK: false,
-    backupGK: true,
+    backupGK: false,
     captain: false,
     viceCaptain: false,
     seasonSeconds: 0,
@@ -131,7 +150,7 @@ export const initialPlayers: Player[] = [
     name: "Betsy Rowland",
     positions: ["MID", "DEF"],
     mainGK: false,
-    backupGK: true,
+    backupGK: false,
     captain: false,
     viceCaptain: false,
     seasonSeconds: 0,
