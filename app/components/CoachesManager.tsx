@@ -91,6 +91,7 @@ export default function CoachesManager({
       alert("Enter coach name")
       return
     }
+
     if (!coachRole.trim()) {
       alert("Enter coach role")
       return
@@ -141,12 +142,15 @@ export default function CoachesManager({
       <div style={cardStyle()}>
         <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Coaches</div>
         <div style={{ color: "#64748b", marginBottom: 14 }}>
-          Availability shown for <strong>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-GB", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          })}</strong>
+          Availability for{" "}
+          <strong>
+            {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
+          </strong>
         </div>
 
         {isAdmin ? (
@@ -163,7 +167,7 @@ export default function CoachesManager({
               placeholder="Coach role"
               style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
             />
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button onClick={() => void handleAddOrUpdateCoach()} style={buttonPrimary()}>
                 {editingCoachId ? "Update Coach" : "Add Coach"}
               </button>
