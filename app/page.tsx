@@ -108,7 +108,7 @@ function Dashboard({
   const [eventNotes, setEventNotes] = useState("")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
-  const [awayTeam, setAwayTeamState] = useState("Leonard Stanley U10 Lioness")
+  const [awayTeam, setAwayTeamState] = useState("Opposition")
   const [homeScore, setHomeScoreState] = useState(0)
   const [awayScore, setAwayScoreState] = useState(0)
 
@@ -157,7 +157,19 @@ function Dashboard({
 
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
-  const selectedDateEvents = events.filter((e) => e.date === selectedDate)
+  const selectedDateEvents = useMemo(
+    () =>
+      events
+        .filter((e) => e.date === selectedDate)
+        .slice()
+        .sort((a, b) => {
+          const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+          if (timeCompare !== 0) return timeCompare
+          return a.title.localeCompare(b.title)
+        }),
+    [events, selectedDate]
+  )
+
   const selectedEvent = events.find((e) => e.id === selectedEventId) || null
   const activeMatchEvent = events.find((e) => e.id === activeMatchEventId) || null
 
@@ -205,6 +217,8 @@ function Dashboard({
     activeMatchEvent && matchPlayers.length > 0
       ? !matchPlayers.some((p) => p.mainGK || p.backupGK || p.positions.includes("GK"))
       : false
+
+  const selectedDateCoachAvailability = coachAvailability.filter((item) => item.day === selectedDate)
 
   async function loadAll() {
     setLoading(true)
@@ -256,7 +270,7 @@ function Dashboard({
 
     if (!settingsRes.error && settingsRes.data) {
       setHomeTeamState(settingsRes.data.home_team || TEAM.name)
-      setAwayTeamState(settingsRes.data.away_team || "Leonard Stanley U10 Lioness")
+      setAwayTeamState(settingsRes.data.away_team || "Opposition")
       setHomeScoreState(settingsRes.data.home_score || 0)
       setAwayScoreState(settingsRes.data.away_score || 0)
       setMatchFormat((settingsRes.data.match_format as MatchFormat) || "7v7")
@@ -1076,7 +1090,7 @@ function Dashboard({
         padding: 16,
         background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
         color: "#0f172a",
-        paddingBottom: 110,
+        paddingBottom: 170,
         overflowX: "hidden",
         boxSizing: "border-box",
       }}
@@ -1103,41 +1117,31 @@ function Dashboard({
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
               gap: 12,
-              flexWrap: "wrap",
+              alignItems: "start",
             }}
           >
-            <div
-              style={{
-                flex: "1 1 260px",
-                minWidth: 0,
-              }}
-            >
+            <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>CLUB HUB</div>
-
               <div
                 style={{
                   fontSize: 28,
                   fontWeight: 900,
                   marginTop: 8,
                   lineHeight: 1.1,
-                  whiteSpace: "normal",
-                  wordBreak: "normal",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {TEAM.name}
               </div>
-
               <div
                 style={{
                   marginTop: 6,
                   opacity: 0.9,
-                  whiteSpace: "normal",
-                  wordBreak: "normal",
-                  lineHeight: 1.35,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
                 }}
               >
                 Supabase sync, login, admin mode, weekday calendar and better screen fit.
@@ -1146,16 +1150,12 @@ function Dashboard({
 
             <div
               style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                gap: 10,
-                flexShrink: 0,
+                textAlign: "right",
+                minWidth: 110,
               }}
             >
               <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
-
-              <button onClick={() => void signOut()} style={buttonSecondary()}>
+              <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
                 Sign Out
               </button>
             </div>
@@ -1273,35 +1273,29 @@ function Dashboard({
                 <div style={{ color: "#64748b" }}>No calendar events on this day.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
-                  {selectedDateEvents
-                    .sort((a, b) => {
-                      const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
-                      if (timeCompare !== 0) return timeCompare
-                      return a.title.localeCompare(b.title)
-                    })
-                    .map((event) => (
-                      <button
-                        key={event.id}
-                        onClick={() => setSelectedEventId(event.id)}
-                        style={{
-                          padding: 12,
-                          borderRadius: 16,
-                          border: selectedEventId === event.id ? `2px solid ${TEAM.primary}` : "1px solid #e2e8f0",
-                          background: "#f8fafc",
-                          textAlign: "left",
-                        }}
-                      >
-                        <div style={{ fontWeight: 900 }}>{event.title}</div>
-                        <div style={{ color: "#64748b", marginTop: 4 }}>
-                          {event.type}
-                          {event.startTime ? ` • ${event.startTime}` : ""}
-                          {event.location ? ` • ${event.location}` : ""}
-                        </div>
-                        <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                          Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
-                        </div>
-                      </button>
-                    ))}
+                  {selectedDateEvents.map((event) => (
+                    <button
+                      key={event.id}
+                      onClick={() => setSelectedEventId(event.id)}
+                      style={{
+                        padding: 12,
+                        borderRadius: 16,
+                        border: selectedEventId === event.id ? `2px solid ${TEAM.primary}` : "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{event.title}</div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>
+                        {event.type}
+                        {event.startTime ? ` • ${event.startTime}` : ""}
+                        {event.location ? ` • ${event.location}` : ""}
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
+                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -1492,18 +1486,118 @@ function Dashboard({
         ) : null}
 
         {tab === "coaches" ? (
-          <CoachesManager
-            isAdmin={isAdmin}
-            selectedDate={selectedDate}
-            coaches={coaches}
-            coachAvailability={coachAvailability}
-            onSaveCoaches={saveCoaches}
-            onSaveCoachAvailability={saveCoachAvailability}
-          />
+          <div style={{ display: "grid", gap: 16 }}>
+            {selectedDateCoachAvailability.length > 0 ? (
+              <div style={cardStyle("#eff6ff")}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+                  Coach Availability Snapshot
+                </div>
+                <div style={{ color: "#475569", marginBottom: 10 }}>
+                  {formatFullDate(selectedDate)}
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {selectedDateCoachAvailability.map((item) => {
+                    const coach = coaches.find((c) => c.id === item.coachId)
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: 12,
+                          borderRadius: 14,
+                          background: "white",
+                          border: "1px solid #dbe3ef",
+                        }}
+                      >
+                        <div style={{ fontWeight: 900 }}>{coach?.name || "Unknown coach"}</div>
+                        <div style={{ color: "#475569", marginTop: 4 }}>
+                          {coach?.role || "No role"} • {item.status}
+                        </div>
+                        {item.notes ? (
+                          <div style={{ color: "#64748b", marginTop: 4 }}>{item.notes}</div>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            <CoachesManager
+              isAdmin={isAdmin}
+              selectedDate={selectedDate}
+              coaches={coaches}
+              coachAvailability={coachAvailability}
+              onSaveCoaches={saveCoaches}
+              onSaveCoachAvailability={saveCoachAvailability}
+            />
+          </div>
         ) : null}
 
         {tab === "match" ? (
           <>
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
+
+              {events.filter((event) => event.type === "match").length === 0 ? (
+                <div style={{ color: "#64748b" }}>No match events created yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <select
+                    value={activeMatchEventId || ""}
+                    onChange={(e) => {
+                      const value = e.target.value || null
+                      setActiveMatchEventId(value)
+                      void persistSettings({ activeMatchEventId: value })
+                    }}
+                    style={{
+                      padding: 14,
+                      borderRadius: 14,
+                      border: "1px solid #cbd5e1",
+                      fontSize: 16,
+                      width: "100%",
+                    }}
+                  >
+                    <option value="">Choose match event</option>
+                    {events
+                      .filter((event) => event.type === "match")
+                      .slice()
+                      .sort((a, b) => {
+                        const dateCompare = a.date.localeCompare(b.date)
+                        if (dateCompare !== 0) return dateCompare
+                        const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+                        if (timeCompare !== 0) return timeCompare
+                        return a.title.localeCompare(b.title)
+                      })
+                      .map((event) => (
+                        <option key={event.id} value={event.id}>
+                          {event.date} • {event.startTime || "00:00"} • {event.title}
+                        </option>
+                      ))}
+                  </select>
+
+                  {activeMatchEvent ? (
+                    <div
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        color: "#475569",
+                      }}
+                    >
+                      Using: <strong>{activeMatchEvent.title}</strong>
+                      {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
+                      {activeMatchEvent.opponent ? ` • vs ${activeMatchEvent.opponent}` : ""}
+                    </div>
+                  ) : (
+                    <div style={{ color: "#64748b" }}>
+                      Choose which match event this match screen should track.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
 
@@ -1550,7 +1644,7 @@ function Dashboard({
                 </div>
               ) : (
                 <div style={{ color: "#64748b" }}>
-                  No active match event selected. Go to Events, open a match, and tap "Use for Match Day".
+                  No active match event selected. Choose a match above or go to Events and tap "Use for Match Day".
                 </div>
               )}
             </div>
