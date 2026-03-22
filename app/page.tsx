@@ -9,6 +9,7 @@ import RollingCalendar from "./components/RollingCalendar"
 import PlayersManager from "./components/PlayersManager"
 import QuarterPlanner from "./components/QuarterPlanner"
 import MatchCenter from "./components/MatchCenter"
+import CoachesManager from "./components/CoachesManager"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -20,6 +21,9 @@ import {
   initialTrainingTemplates,
   makeId,
   type AttendanceStatus,
+  type Coach,
+  type CoachAvailability,
+  type CoachAvailabilityStatus,
   type EventAttendance,
   type EventItem,
   type MainTab,
@@ -40,25 +44,6 @@ import {
 } from "./lib/rotation"
 
 type PeriodMode = "quarters" | "halves"
-
-type CoachItem = {
-  id: string
-  name: string
-  role: string
-  phone?: string
-  email?: string
-  notes?: string
-  active?: boolean
-}
-
-type CoachUnavailableItem = {
-  id: string
-  coach_id: string
-  start_date: string
-  end_date: string
-  status: string
-  reason?: string
-}
 
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
@@ -104,12 +89,11 @@ function Dashboard({
   const [matchTab, setMatchTab] = useState<MatchTab>("overview")
 
   const [players, setPlayers] = useState<Player[]>([])
+  const [coaches, setCoaches] = useState<Coach[]>([])
+  const [coachAvailability, setCoachAvailability] = useState<CoachAvailability[]>([])
   const [events, setEvents] = useState<EventItem[]>([])
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
-
-  const [coaches, setCoaches] = useState<CoachItem[]>([])
-  const [coachUnavailable, setCoachUnavailable] = useState<CoachUnavailableItem[]>([])
 
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingCalendarEventId, setEditingCalendarEventId] = useState<string | null>(null)
@@ -173,10 +157,7 @@ function Dashboard({
 
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
-  const selectedDateEvents = events
-    .filter((e) => e.date === selectedDate)
-    .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
-
+  const selectedDateEvents = events.filter((e) => e.date === selectedDate)
   const selectedEvent = events.find((e) => e.id === selectedEventId) || null
   const activeMatchEvent = events.find((e) => e.id === activeMatchEventId) || null
 
@@ -225,15 +206,6 @@ function Dashboard({
       ? !matchPlayers.some((p) => p.mainGK || p.backupGK || p.positions.includes("GK"))
       : false
 
-  function isCoachUnavailableOnDate(coachId: string, date: string) {
-    return coachUnavailable.find(
-      (item) =>
-        item.coach_id === coachId &&
-        date >= item.start_date &&
-        date <= item.end_date
-    )
-  }
-
   async function loadAll() {
     setLoading(true)
 
@@ -253,17 +225,17 @@ function Dashboard({
       eventsRes,
       attendanceRes,
       coachesRes,
-      coachUnavailableRes,
+      coachAvailabilityRes,
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
       supabase.from("timeline_events").select("*").order("sort_order", { ascending: true }),
       supabase.from("quarter_plans").select("*").order("quarter_number", { ascending: true }),
       supabase.from("saved_lineups").select("*").order("updated_at", { ascending: false }),
-      supabase.from("events").select("*").order("date", { ascending: true }).order("start_time", { ascending: true }),
+      supabase.from("events").select("*").order("date", { ascending: true }),
       supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
       supabase.from("coaches").select("*").order("name", { ascending: true }),
-      supabase.from("coach_unavailability").select("*").order("start_date", { ascending: true }),
+      supabase.from("coach_availability").select("*").order("day", { ascending: true }),
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -361,21 +333,22 @@ function Dashboard({
         coachesRes.data.map((row: any) => ({
           id: row.id,
           name: row.name,
-          role: row.role || "Coach",
-          phone: row.phone || "",
-          email: row.email || "",
-          notes: row.notes || "",
-          active: row.active,
+          role: row.role || "",
+          active: row.active ?? true,
         }))
       )
-    } else {
-      setCoaches([])
     }
 
-    if (!coachUnavailableRes.error && coachUnavailableRes.data) {
-      setCoachUnavailable(coachUnavailableRes.data as CoachUnavailableItem[])
-    } else {
-      setCoachUnavailable([])
+    if (!coachAvailabilityRes.error && coachAvailabilityRes.data) {
+      setCoachAvailability(
+        coachAvailabilityRes.data.map((row: any) => ({
+          id: row.id,
+          coachId: row.coach_id,
+          day: row.day,
+          status: row.status as CoachAvailabilityStatus,
+          notes: row.notes || "",
+        }))
+      )
     }
 
     setLoading(false)
@@ -486,6 +459,97 @@ function Dashboard({
     const auto = buildAutoLineup(nextPlayers, currentSlots)
     setLineupMap(auto.lineup)
     setBenchIds(auto.bench)
+  }
+
+  async function saveCoaches(nextCoaches: Coach[]) {
+    if (!supabase) return
+
+    const removedIds = coaches
+      .filter((coach) => !nextCoaches.some((n) => n.id === coach.id))
+      .map((coach) => coach.id)
+
+    if (removedIds.length > 0) {
+      await supabase.from("coaches").delete().in("id", removedIds)
+    }
+
+    if (nextCoaches.length > 0) {
+      const { error } = await supabase.from("coaches").upsert(
+        nextCoaches.map((coach) => ({
+          id: coach.id,
+          name: coach.name,
+          role: coach.role,
+          active: coach.active,
+        }))
+      )
+
+      if (error) {
+        alert(error.message)
+        return
+      }
+    }
+
+    setCoaches(nextCoaches)
+  }
+
+  async function saveCoachAvailability(
+    coachId: string,
+    day: string,
+    status: CoachAvailabilityStatus,
+    notes = ""
+  ) {
+    if (!supabase) return
+
+    if (!isAdmin) {
+      alert("Only admins can update coach availability")
+      return
+    }
+
+    const existing = coachAvailability.find((item) => item.coachId === coachId && item.day === day)
+
+    if (existing) {
+      const { error } = await supabase
+        .from("coach_availability")
+        .update({ status, notes })
+        .eq("id", existing.id)
+
+      if (error) {
+        alert(error.message)
+        return
+      }
+
+      setCoachAvailability((prev) =>
+        prev.map((item) =>
+          item.id === existing.id ? { ...item, status, notes } : item
+        )
+      )
+      return
+    }
+
+    const id = crypto.randomUUID?.() || makeId()
+
+    const { error } = await supabase.from("coach_availability").insert({
+      id,
+      coach_id: coachId,
+      day,
+      status,
+      notes,
+    })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setCoachAvailability((prev) => [
+      ...prev,
+      {
+        id,
+        coachId,
+        day,
+        status,
+        notes,
+      },
+    ])
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
@@ -603,7 +667,7 @@ function Dashboard({
         return
       }
 
-      const newId = crypto.randomUUID()
+      const newId = crypto.randomUUID?.() || makeId()
 
       const { error: insertError } = await supabase.from("event_attendance").insert({
         id: newId,
@@ -644,9 +708,10 @@ function Dashboard({
     }
 
     const safeTime = eventStartTime.trim() || "00:00"
+    const newId = editingCalendarEventId || (crypto.randomUUID?.() || makeId())
 
     const newEvent: EventItem = {
-      id: editingCalendarEventId || makeId(),
+      id: newId,
       date: selectedDate,
       title: eventTitle.trim(),
       type: eventType,
@@ -678,7 +743,9 @@ function Dashboard({
       return [...withoutOld, newEvent].sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date)
         if (dateCompare !== 0) return dateCompare
-        return (a.startTime || "").localeCompare(b.startTime || "")
+        const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+        if (timeCompare !== 0) return timeCompare
+        return a.title.localeCompare(b.title)
       })
     })
 
@@ -766,7 +833,7 @@ function Dashboard({
 
     const nextLineups = [
       {
-        id: makeId(),
+        id: crypto.randomUUID?.() || makeId(),
         name: lineupName.trim(),
         format: matchFormat,
         formation,
@@ -930,7 +997,7 @@ function Dashboard({
       : [
           ...timeline,
           {
-            id: makeId(),
+            id: crypto.randomUUID?.() || makeId(),
             minute: Math.floor(seconds / 60),
             type: eventDraft.type,
             text,
@@ -1192,29 +1259,35 @@ function Dashboard({
                 <div style={{ color: "#64748b" }}>No calendar events on this day.</div>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
-                  {selectedDateEvents.map((event) => (
-                    <button
-                      key={event.id}
-                      onClick={() => setSelectedEventId(event.id)}
-                      style={{
-                        padding: 12,
-                        borderRadius: 16,
-                        border: selectedEventId === event.id ? `2px solid ${TEAM.primary}` : "1px solid #e2e8f0",
-                        background: "#f8fafc",
-                        textAlign: "left",
-                      }}
-                    >
-                      <div style={{ fontWeight: 900 }}>{event.title}</div>
-                      <div style={{ color: "#64748b", marginTop: 4 }}>
-                        {event.type}
-                        {event.startTime ? ` • ${event.startTime}` : ""}
-                        {event.location ? ` • ${event.location}` : ""}
-                      </div>
-                      <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
-                      </div>
-                    </button>
-                  ))}
+                  {selectedDateEvents
+                    .sort((a, b) => {
+                      const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+                      if (timeCompare !== 0) return timeCompare
+                      return a.title.localeCompare(b.title)
+                    })
+                    .map((event) => (
+                      <button
+                        key={event.id}
+                        onClick={() => setSelectedEventId(event.id)}
+                        style={{
+                          padding: 12,
+                          borderRadius: 16,
+                          border: selectedEventId === event.id ? `2px solid ${TEAM.primary}` : "1px solid #e2e8f0",
+                          background: "#f8fafc",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div style={{ fontWeight: 900 }}>{event.title}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>
+                          {event.type}
+                          {event.startTime ? ` • ${event.startTime}` : ""}
+                          {event.location ? ` • ${event.location}` : ""}
+                        </div>
+                        <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
+                          Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
+                        </div>
+                      </button>
+                    ))}
                 </div>
               )}
             </div>
@@ -1405,85 +1478,14 @@ function Dashboard({
         ) : null}
 
         {tab === "coaches" ? (
-          <div style={{ display: "grid", gap: 16 }}>
-            <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Coaches</div>
-              <div style={{ color: "#64748b", marginBottom: 12 }}>
-                Availability shown for <strong>{formatFullDate(selectedDate)}</strong>
-              </div>
-
-              {coaches.length === 0 ? (
-                <div style={{ color: "#64748b" }}>No coaches found.</div>
-              ) : (
-                <div style={{ display: "grid", gap: 10 }}>
-                  {coaches.map((coach) => {
-                    const unavailable = isCoachUnavailableOnDate(coach.id, selectedDate)
-
-                    return (
-                      <div
-                        key={coach.id}
-                        style={{
-                          padding: 14,
-                          borderRadius: 16,
-                          border: "1px solid #e2e8f0",
-                          background: unavailable ? "#fee2e2" : "#f8fafc",
-                        }}
-                      >
-                        <div style={{ fontWeight: 900, fontSize: 18 }}>{coach.name}</div>
-                        <div style={{ color: "#64748b", marginTop: 4 }}>{coach.role}</div>
-
-                        {coach.phone ? (
-                          <div style={{ color: "#64748b", marginTop: 4 }}>Phone: {coach.phone}</div>
-                        ) : null}
-
-                        {coach.email ? (
-                          <div style={{ color: "#64748b", marginTop: 4 }}>Email: {coach.email}</div>
-                        ) : null}
-
-                        {unavailable ? (
-                          <div
-                            style={{
-                              marginTop: 10,
-                              padding: 10,
-                              borderRadius: 12,
-                              background: "#fff",
-                              border: "1px solid #fecaca",
-                              color: "#991b1b",
-                              fontWeight: 800,
-                            }}
-                          >
-                            Unavailable: {unavailable.status}
-                            {unavailable.reason ? ` • ${unavailable.reason}` : ""}
-                            <div style={{ fontWeight: 500, marginTop: 4 }}>
-                              {unavailable.start_date} to {unavailable.end_date}
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              marginTop: 10,
-                              padding: 10,
-                              borderRadius: 12,
-                              background: "#fff",
-                              border: "1px solid #bbf7d0",
-                              color: "#166534",
-                              fontWeight: 800,
-                            }}
-                          >
-                            Available
-                          </div>
-                        )}
-
-                        {coach.notes ? (
-                          <div style={{ color: "#475569", marginTop: 8 }}>{coach.notes}</div>
-                        ) : null}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <CoachesManager
+            isAdmin={isAdmin}
+            selectedDate={selectedDate}
+            coaches={coaches}
+            coachAvailability={coachAvailability}
+            onSaveCoaches={saveCoaches}
+            onSaveCoachAvailability={saveCoachAvailability}
+          />
         ) : null}
 
         {tab === "match" ? (
@@ -1647,7 +1649,6 @@ function Dashboard({
                 <div style={{ fontWeight: 800 }}>Players: {players.length}</div>
                 <div style={{ fontWeight: 800 }}>Main GK: {mainGk?.name || "Not set"}</div>
                 <div style={{ fontWeight: 800 }}>Backup GK: {backupGk?.name || "Not set"}</div>
-                <div style={{ fontWeight: 800 }}>Coaches: {coaches.length}</div>
               </div>
             </div>
 
