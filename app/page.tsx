@@ -490,10 +490,9 @@ function Dashboard({
   }
 
   try {
-    // 🔍 First: check if record already exists in DB (NOT just local state)
     const { data: existingRow, error: fetchError } = await supabase
       .from("event_attendance")
-      .select("id")
+      .select("id, event_id, player_id, status")
       .eq("event_id", eventId)
       .eq("player_id", playerId)
       .maybeSingle()
@@ -503,41 +502,51 @@ function Dashboard({
       return
     }
 
-    // ✏️ If exists → UPDATE
     if (existingRow) {
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("event_attendance")
         .update({ status })
         .eq("id", existingRow.id)
 
-      if (error) {
-        alert(error.message)
+      if (updateError) {
+        alert(updateError.message)
         return
       }
 
-      setAttendance((prev) =>
-        prev.map((item) =>
-          item.eventId === eventId && item.playerId === playerId
-            ? { ...item, status }
-            : item
-        )
-      )
+      setAttendance((prev) => {
+        const found = prev.some((item) => item.id === existingRow.id)
+
+        if (found) {
+          return prev.map((item) =>
+            item.id === existingRow.id ? { ...item, status } : item
+          )
+        }
+
+        return [
+          ...prev,
+          {
+            id: existingRow.id,
+            eventId,
+            playerId,
+            status,
+          },
+        ]
+      })
 
       return
     }
 
-    // ➕ If NOT exists → INSERT
     const newId = crypto.randomUUID()
 
-    const { error } = await supabase.from("event_attendance").insert({
+    const { error: insertError } = await supabase.from("event_attendance").insert({
       id: newId,
       event_id: eventId,
       player_id: playerId,
       status,
     })
 
-    if (error) {
-      alert(error.message)
+    if (insertError) {
+      alert(insertError.message)
       return
     }
 
@@ -550,12 +559,11 @@ function Dashboard({
         status,
       },
     ])
-  } catch (err) {
-    console.error(err)
+  } catch (error) {
+    console.error(error)
     alert("Something went wrong saving attendance")
   }
 }
-
   async function addEvent() {
     if (!supabase) return
     if (!isAdmin) {
