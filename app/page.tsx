@@ -163,6 +163,8 @@ function Dashboard({
         .filter((e) => e.date === selectedDate)
         .slice()
         .sort((a, b) => {
+          const dateCompare = a.date.localeCompare(b.date)
+          if (dateCompare !== 0) return dateCompare
           const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
           if (timeCompare !== 0) return timeCompare
           return a.title.localeCompare(b.title)
@@ -261,9 +263,6 @@ function Dashboard({
     const [
       playersRes,
       settingsRes,
-      timelineRes,
-      quarterRes,
-      lineupsRes,
       eventsRes,
       attendanceRes,
       coachesRes,
@@ -271,9 +270,6 @@ function Dashboard({
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
-      supabase.from("timeline_events").select("*").order("sort_order", { ascending: true }),
-      supabase.from("quarter_plans").select("*").order("quarter_number", { ascending: true }),
-      supabase.from("saved_lineups").select("*").order("updated_at", { ascending: false }),
       supabase.from("events").select("*").order("date", { ascending: true }),
       supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
       supabase.from("coaches").select("*").order("name", { ascending: true }),
@@ -297,51 +293,8 @@ function Dashboard({
     }
 
     if (!settingsRes.error && settingsRes.data) {
-      setHomeTeamState(settingsRes.data.home_team || TEAM.name)
-      setAwayTeamState(settingsRes.data.away_team || "Opposition")
-      setHomeScoreState(settingsRes.data.home_score || 0)
-      setAwayScoreState(settingsRes.data.away_score || 0)
-      setMatchFormat((settingsRes.data.match_format as MatchFormat) || "7v7")
-      setFormation(settingsRes.data.formation || "2-3-1")
-      setCurrentQuarterState(settingsRes.data.current_quarter || 1)
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
       setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
-      setPeriodModeState((settingsRes.data.period_mode as PeriodMode) || "quarters")
-      setPeriodLengthState(settingsRes.data.period_length || 10)
-    }
-
-    if (!timelineRes.error && timelineRes.data) {
-      const nextTimeline: TimelineItem[] = timelineRes.data.map((row: any) => ({
-        id: row.id,
-        minute: row.minute,
-        type: row.type,
-        text: row.text,
-        sortOrder: row.sort_order || 0,
-      }))
-      setTimeline(nextTimeline)
-    }
-
-    if (!quarterRes.error && quarterRes.data) {
-      const nextPlans: Record<number, QuarterPlan> = {}
-      quarterRes.data.forEach((row: any) => {
-        nextPlans[row.quarter_number] = {
-          lineup: JSON.parse(row.lineup_json || "{}"),
-          bench: JSON.parse(row.bench_json || "[]"),
-        }
-      })
-      setQuarterPlans(nextPlans)
-    }
-
-    if (!lineupsRes.error && lineupsRes.data) {
-      const nextLineups: SavedLineup[] = lineupsRes.data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        format: row.match_format,
-        formation: row.formation,
-        lineup: JSON.parse(row.lineup_json || "{}"),
-        bench: JSON.parse(row.bench_json || "[]"),
-      }))
-      setSavedLineups(nextLineups)
     }
 
     if (!eventsRes.error && eventsRes.data) {
@@ -396,19 +349,128 @@ function Dashboard({
     setLoading(false)
   }
 
+  async function loadMatchState(eventId: string | null) {
+    if (!supabase || !eventId) {
+      setHomeTeamState(TEAM.name)
+      setAwayTeamState("Opposition")
+      setHomeScoreState(0)
+      setAwayScoreState(0)
+      setMatchFormat("7v7")
+      setFormation("2-3-1")
+      setCurrentQuarterState(1)
+      setPeriodModeState("quarters")
+      setPeriodLengthState(10)
+      setSeconds(0)
+      setRunning(false)
+      setLiveSecondsMap({})
+      setLineupMap({})
+      setBenchIds([])
+      setTimeline([])
+      setSavedLineups([])
+      setQuarterPlans({})
+      return
+    }
+
+    const [
+      stateRes,
+      timelineRes,
+      lineupsRes,
+      quarterRes,
+    ] = await Promise.all([
+      supabase.from("match_state").select("*").eq("event_id", eventId).maybeSingle(),
+      supabase.from("match_timeline_events").select("*").eq("event_id", eventId).order("sort_order", { ascending: true }),
+      supabase.from("match_lineups").select("*").eq("event_id", eventId).order("updated_at", { ascending: false }),
+      supabase.from("match_quarter_plans").select("*").eq("event_id", eventId).order("quarter_number", { ascending: true }),
+    ])
+
+    if (!stateRes.error && stateRes.data) {
+      setHomeTeamState(stateRes.data.home_team || TEAM.name)
+      setAwayTeamState(stateRes.data.away_team || "Opposition")
+      setHomeScoreState(stateRes.data.home_score || 0)
+      setAwayScoreState(stateRes.data.away_score || 0)
+      setMatchFormat((stateRes.data.match_format as MatchFormat) || "7v7")
+      setFormation(stateRes.data.formation || "2-3-1")
+      setCurrentQuarterState(stateRes.data.current_period || 1)
+      setPeriodModeState((stateRes.data.period_mode as PeriodMode) || "quarters")
+      setPeriodLengthState(stateRes.data.period_length || 10)
+      setSeconds(stateRes.data.seconds || 0)
+      setRunning(!!stateRes.data.running)
+      setLiveSecondsMap(JSON.parse(stateRes.data.live_seconds_json || "{}"))
+      setLineupMap(JSON.parse(stateRes.data.lineup_json || "{}"))
+      setBenchIds(JSON.parse(stateRes.data.bench_json || "[]"))
+    } else {
+      const auto = buildAutoLineup(matchPlayers.length > 0 ? matchPlayers : players, currentSlots)
+      setHomeTeamState(TEAM.name)
+      setAwayTeamState(activeMatchEvent?.opponent || "Opposition")
+      setHomeScoreState(0)
+      setAwayScoreState(0)
+      setMatchFormat("7v7")
+      setFormation("2-3-1")
+      setCurrentQuarterState(1)
+      setPeriodModeState("quarters")
+      setPeriodLengthState(10)
+      setSeconds(0)
+      setRunning(false)
+      setLiveSecondsMap({})
+      setLineupMap(auto.lineup)
+      setBenchIds(auto.bench)
+    }
+
+    if (!timelineRes.error && timelineRes.data) {
+      setTimeline(
+        timelineRes.data.map((row: any) => ({
+          id: row.id,
+          minute: row.minute,
+          type: row.type,
+          text: row.text,
+          sortOrder: row.sort_order || 0,
+        }))
+      )
+    } else {
+      setTimeline([])
+    }
+
+    if (!lineupsRes.error && lineupsRes.data) {
+      setSavedLineups(
+        lineupsRes.data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          format: row.match_format,
+          formation: row.formation,
+          lineup: JSON.parse(row.lineup_json || "{}"),
+          bench: JSON.parse(row.bench_json || "[]"),
+        }))
+      )
+    } else {
+      setSavedLineups([])
+    }
+
+    if (!quarterRes.error && quarterRes.data) {
+      const nextPlans: Record<number, QuarterPlan> = {}
+      quarterRes.data.forEach((row: any) => {
+        nextPlans[row.quarter_number] = {
+          lineup: JSON.parse(row.lineup_json || "{}"),
+          bench: JSON.parse(row.bench_json || "[]"),
+        }
+      })
+      setQuarterPlans(nextPlans)
+    } else {
+      setQuarterPlans({})
+    }
+  }
+
   useEffect(() => {
     void loadAll()
   }, [])
 
   useEffect(() => {
-    if (players.length === 0) return
-    const auto = buildAutoLineup(matchPlayers, currentSlots)
-    setLineupMap((prev) => (Object.keys(prev).length === 0 ? auto.lineup : prev))
-    setBenchIds((prev) => (prev.length === 0 ? auto.bench : prev))
-  }, [players, currentSlots, activeMatchEventId, attendance.length])
+    if (!loading) {
+      void loadMatchState(activeMatchEventId)
+    }
+  }, [activeMatchEventId, loading])
 
   useEffect(() => {
-    if (!running) return
+    if (!running || !activeMatchEventId) return
     const interval = window.setInterval(() => {
       setSeconds((prev) => prev + 1)
       setLiveSecondsMap((prev) => {
@@ -423,52 +485,81 @@ function Dashboard({
       })
     }, 1000)
     return () => window.clearInterval(interval)
-  }, [running, lineupMap])
+  }, [running, lineupMap, activeMatchEventId])
 
   async function persistSettings(
     patch?: Partial<{
-      homeTeam: string
-      awayTeam: string
-      matchFormat: MatchFormat
-      formation: string
-      currentQuarter: number
-      homeScore: number
-      awayScore: number
       selectedDate: string
       activeMatchEventId: string | null
-      periodMode: PeriodMode
-      periodLength: number
     }>
   ) {
     if (!supabase) return
 
     const next = {
-      homeTeam: patch?.homeTeam ?? homeTeam,
-      awayTeam: patch?.awayTeam ?? awayTeam,
-      matchFormat: patch?.matchFormat ?? matchFormat,
-      formation: patch?.formation ?? formation,
-      currentQuarter: patch?.currentQuarter ?? currentQuarter,
-      homeScore: patch?.homeScore ?? homeScore,
-      awayScore: patch?.awayScore ?? awayScore,
       selectedDate: patch?.selectedDate ?? selectedDate,
       activeMatchEventId: patch?.activeMatchEventId ?? activeMatchEventId,
-      periodMode: patch?.periodMode ?? periodMode,
-      periodLength: patch?.periodLength ?? periodLength,
     }
 
     await supabase.from("app_settings").upsert({
       id: "main",
-      home_team: next.homeTeam,
-      away_team: next.awayTeam,
-      match_format: next.matchFormat,
-      formation: next.formation,
-      current_quarter: next.currentQuarter,
-      home_score: next.homeScore,
-      away_score: next.awayScore,
       selected_date: next.selectedDate,
       active_match_event_id: next.activeMatchEventId,
+    })
+  }
+
+  async function persistMatchState(
+    patch?: Partial<{
+      homeTeam: string
+      awayTeam: string
+      homeScore: number
+      awayScore: number
+      matchFormat: MatchFormat
+      formation: string
+      currentPeriod: number
+      periodMode: PeriodMode
+      periodLength: number
+      seconds: number
+      running: boolean
+      liveSecondsMap: Record<string, number>
+      lineupMap: Record<string, string | null>
+      benchIds: string[]
+    }>
+  ) {
+    if (!supabase || !activeMatchEventId) return
+
+    const next = {
+      homeTeam: patch?.homeTeam ?? homeTeam,
+      awayTeam: patch?.awayTeam ?? awayTeam,
+      homeScore: patch?.homeScore ?? homeScore,
+      awayScore: patch?.awayScore ?? awayScore,
+      matchFormat: patch?.matchFormat ?? matchFormat,
+      formation: patch?.formation ?? formation,
+      currentPeriod: patch?.currentPeriod ?? currentQuarter,
+      periodMode: patch?.periodMode ?? periodMode,
+      periodLength: patch?.periodLength ?? periodLength,
+      seconds: patch?.seconds ?? seconds,
+      running: patch?.running ?? running,
+      liveSecondsMap: patch?.liveSecondsMap ?? liveSecondsMap,
+      lineupMap: patch?.lineupMap ?? lineupMap,
+      benchIds: patch?.benchIds ?? benchIds,
+    }
+
+    await supabase.from("match_state").upsert({
+      event_id: activeMatchEventId,
+      home_team: next.homeTeam,
+      away_team: next.awayTeam,
+      home_score: next.homeScore,
+      away_score: next.awayScore,
+      match_format: next.matchFormat,
+      formation: next.formation,
+      current_period: next.currentPeriod,
       period_mode: next.periodMode,
       period_length: next.periodLength,
+      seconds: next.seconds,
+      running: next.running,
+      live_seconds_json: JSON.stringify(next.liveSecondsMap),
+      lineup_json: JSON.stringify(next.lineupMap),
+      bench_json: JSON.stringify(next.benchIds),
     })
   }
 
@@ -497,10 +588,6 @@ function Dashboard({
     }
 
     setPlayers(nextPlayers)
-
-    const auto = buildAutoLineup(nextPlayers, currentSlots)
-    setLineupMap(auto.lineup)
-    setBenchIds(auto.bench)
   }
 
   async function saveCoaches(nextCoaches: Coach[]) {
@@ -539,12 +626,7 @@ function Dashboard({
     status: CoachAvailabilityStatus,
     notes = ""
   ) {
-    if (!supabase) return
-
-    if (!isAdmin) {
-      alert("Only admins can update coach availability")
-      return
-    }
+    if (!supabase || !isAdmin) return
 
     const existing = coachAvailability.find((item) => item.coachId === coachId && item.day === day)
 
@@ -560,9 +642,7 @@ function Dashboard({
       }
 
       setCoachAvailability((prev) =>
-        prev.map((item) =>
-          item.id === existing.id ? { ...item, status, notes } : item
-        )
+        prev.map((item) => (item.id === existing.id ? { ...item, status, notes } : item))
       )
       return
     }
@@ -584,24 +664,19 @@ function Dashboard({
 
     setCoachAvailability((prev) => [
       ...prev,
-      {
-        id,
-        coachId,
-        day,
-        status,
-        notes,
-      },
+      { id, coachId, day, status, notes },
     ])
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
-    if (!supabase) return
+    if (!supabase || !activeMatchEventId) return
 
-    await supabase.from("saved_lineups").delete().neq("id", "")
+    await supabase.from("match_lineups").delete().eq("event_id", activeMatchEventId)
+
     if (nextLineups.length > 0) {
-      await supabase.from("saved_lineups").insert(
+      await supabase.from("match_lineups").insert(
         nextLineups.map((lineup) => ({
-          id: lineup.id,
+          event_id: activeMatchEventId,
           name: lineup.name,
           match_format: lineup.format,
           formation: lineup.formation,
@@ -610,39 +685,40 @@ function Dashboard({
         }))
       )
     }
+
     setSavedLineups(nextLineups)
   }
 
   async function saveQuarterPlans(nextPlans: Record<number, QuarterPlan>) {
-    if (!supabase) return
+    if (!supabase || !activeMatchEventId) return
 
-    await supabase.from("quarter_plans").delete().gte("quarter_number", 1)
+    await supabase.from("match_quarter_plans").delete().eq("event_id", activeMatchEventId)
+
     const entries = Object.entries(nextPlans)
     if (entries.length > 0) {
-      await supabase.from("quarter_plans").insert(
+      await supabase.from("match_quarter_plans").insert(
         entries.map(([quarterNumber, plan]) => ({
-          id: `q-${quarterNumber}`,
+          event_id: activeMatchEventId,
           quarter_number: Number(quarterNumber),
           lineup_json: JSON.stringify(plan.lineup),
           bench_json: JSON.stringify(plan.bench),
         }))
       )
     }
+
     setQuarterPlans(nextPlans)
   }
 
   async function saveTimeline(nextTimeline: TimelineItem[]) {
-    if (!supabase) return
+    if (!supabase || !activeMatchEventId) return
 
-    const removedIds = timeline.filter((t) => !nextTimeline.some((n) => n.id === t.id)).map((t) => t.id)
-    if (removedIds.length > 0) {
-      await supabase.from("timeline_events").delete().in("id", removedIds)
-    }
+    await supabase.from("match_timeline_events").delete().eq("event_id", activeMatchEventId)
 
     if (nextTimeline.length > 0) {
-      await supabase.from("timeline_events").upsert(
+      await supabase.from("match_timeline_events").insert(
         nextTimeline.map((item, index) => ({
           id: item.id,
+          event_id: activeMatchEventId,
           minute: item.minute,
           type: item.type,
           text: item.text,
@@ -655,95 +731,56 @@ function Dashboard({
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase) return
+    if (!supabase || !isAdmin) return
 
-    if (!isAdmin) {
-      alert("Only admins can update attendance")
+    const { data: existingRow, error: fetchError } = await supabase
+      .from("event_attendance")
+      .select("id, event_id, player_id, status")
+      .eq("event_id", eventId)
+      .eq("player_id", playerId)
+      .maybeSingle()
+
+    if (fetchError) {
+      alert(fetchError.message)
       return
     }
 
-    try {
-      const { data: existingRow, error: fetchError } = await supabase
+    if (existingRow) {
+      const { error: updateError } = await supabase
         .from("event_attendance")
-        .select("id, event_id, player_id, status")
-        .eq("event_id", eventId)
-        .eq("player_id", playerId)
-        .maybeSingle()
+        .update({ status })
+        .eq("id", existingRow.id)
 
-      if (fetchError) {
-        alert(fetchError.message)
+      if (updateError) {
+        alert(updateError.message)
         return
       }
 
-      if (existingRow) {
-        const { error: updateError } = await supabase
-          .from("event_attendance")
-          .update({ status })
-          .eq("id", existingRow.id)
-
-        if (updateError) {
-          alert(updateError.message)
-          return
-        }
-
-        setAttendance((prev) => {
-          const found = prev.some((item) => item.id === existingRow.id)
-
-          if (found) {
-            return prev.map((item) =>
-              item.id === existingRow.id ? { ...item, status } : item
-            )
-          }
-
-          return [
-            ...prev,
-            {
-              id: existingRow.id,
-              eventId,
-              playerId,
-              status,
-            },
-          ]
-        })
-
-        return
-      }
-
-      const newId = crypto.randomUUID?.() || makeId()
-
-      const { error: insertError } = await supabase.from("event_attendance").insert({
-        id: newId,
-        event_id: eventId,
-        player_id: playerId,
-        status,
-      })
-
-      if (insertError) {
-        alert(insertError.message)
-        return
-      }
-
-      setAttendance((prev) => [
-        ...prev,
-        {
-          id: newId,
-          eventId,
-          playerId,
-          status,
-        },
-      ])
-    } catch (error) {
-      console.error(error)
-      alert("Something went wrong saving attendance")
+      setAttendance((prev) =>
+        prev.map((item) => (item.id === existingRow.id ? { ...item, status } : item))
+      )
+      return
     }
+
+    const newId = crypto.randomUUID?.() || makeId()
+
+    const { error: insertError } = await supabase.from("event_attendance").insert({
+      id: newId,
+      event_id: eventId,
+      player_id: playerId,
+      status,
+    })
+
+    if (insertError) {
+      alert(insertError.message)
+      return
+    }
+
+    setAttendance((prev) => [...prev, { id: newId, eventId, playerId, status }])
   }
 
   async function addEvent() {
-    if (!supabase) return
-    if (!isAdmin) {
-      alert("Only admins can add events")
-      return
-    }
+    if (!supabase || !isAdmin) return
     if (!eventTitle.trim()) {
       alert("Enter event title")
       return
@@ -802,10 +839,7 @@ function Dashboard({
   }
 
   function openAddCalendarEvent() {
-    if (!isAdmin) {
-      alert("Only admins can add events")
-      return
-    }
+    if (!isAdmin) return
     setEditingCalendarEventId(null)
     setEventTitle("")
     setEventType("training")
@@ -817,10 +851,7 @@ function Dashboard({
   }
 
   function openEditCalendarEvent(event: EventItem) {
-    if (!isAdmin) {
-      alert("Only admins can edit events")
-      return
-    }
+    if (!isAdmin) return
     setEditingCalendarEventId(event.id)
     setEventTitle(event.title)
     setEventType(event.type)
@@ -833,11 +864,7 @@ function Dashboard({
   }
 
   async function deleteCalendarEvent(id: string) {
-    if (!supabase) return
-    if (!isAdmin) {
-      alert("Only admins can delete events")
-      return
-    }
+    if (!supabase || !isAdmin) return
 
     const { error } = await supabase.from("events").delete().eq("id", id)
     if (error) {
@@ -861,9 +888,11 @@ function Dashboard({
     setFormation(nextFormation)
     setLineupMap(auto.lineup)
     setBenchIds(auto.bench)
-    await persistSettings({
+    await persistMatchState({
       matchFormat: nextFormat,
       formation: nextFormation,
+      lineupMap: auto.lineup,
+      benchIds: auto.bench,
     })
   }
 
@@ -892,13 +921,17 @@ function Dashboard({
   async function handleLoadSavedLineup(id: string) {
     const preset = savedLineups.find((item) => item.id === id)
     if (!preset) return
+
     setMatchFormat(preset.format)
     setFormation(preset.formation)
     setLineupMap(preset.lineup)
     setBenchIds(preset.bench)
-    await persistSettings({
+
+    await persistMatchState({
       matchFormat: preset.format,
       formation: preset.formation,
+      lineupMap: preset.lineup,
+      benchIds: preset.bench,
     })
   }
 
@@ -932,8 +965,11 @@ function Dashboard({
 
     if (overId === "bench") {
       if (fromId === "bench") return
-      setLineupMap((prev) => ({ ...prev, [fromId]: null }))
-      setBenchIds((prev) => (prev.includes(playerId) ? prev : [...prev, playerId]))
+      const nextLineup = { ...lineupMap, [fromId]: null }
+      const nextBench = benchIds.includes(playerId) ? benchIds : [...benchIds, playerId]
+      setLineupMap(nextLineup)
+      setBenchIds(nextBench)
+      void persistMatchState({ lineupMap: nextLineup, benchIds: nextBench })
       return
     }
 
@@ -944,30 +980,28 @@ function Dashboard({
     const targetPlayerId = lineupMap[overId]
 
     if (fromId === "bench") {
-      setBenchIds((prev) => prev.filter((id) => id !== playerId))
-      setLineupMap((prev) => ({ ...prev, [overId]: playerId }))
-      if (targetPlayerId && targetPlayerId !== playerId) {
-        setBenchIds((prev) => [...prev, targetPlayerId])
-      }
+      const nextBench = benchIds.filter((id) => id !== playerId)
+      const extraBench =
+        targetPlayerId && targetPlayerId !== playerId ? [...nextBench, targetPlayerId] : nextBench
+      const nextLineup = { ...lineupMap, [overId]: playerId }
+
+      setBenchIds(extraBench)
+      setLineupMap(nextLineup)
+      void persistMatchState({ lineupMap: nextLineup, benchIds: extraBench })
       return
     }
 
     if (fromId.startsWith("slot-")) {
-      setLineupMap((prev) => {
-        const next = { ...prev }
-        next[fromId] = targetPlayerId || null
-        next[overId] = playerId
-        return next
-      })
+      const nextLineup = { ...lineupMap }
+      nextLineup[fromId] = targetPlayerId || null
+      nextLineup[overId] = playerId
+      setLineupMap(nextLineup)
+      void persistMatchState({ lineupMap: nextLineup })
     }
   }
 
   function openCreateEvent() {
-    if (!isAdmin) {
-      alert("Only admins can add match events")
-      return
-    }
-
+    if (!isAdmin) return
     setEditingTimelineId(null)
     setEventDraft({
       type: "goal",
@@ -979,11 +1013,7 @@ function Dashboard({
   }
 
   function openEditEvent(item: TimelineItem) {
-    if (!isAdmin) {
-      alert("Only admins can edit match events")
-      return
-    }
-
+    if (!isAdmin) return
     setEditingTimelineId(item.id)
     setEventDraft({
       type: item.type,
@@ -995,18 +1025,12 @@ function Dashboard({
   }
 
   async function handleDeleteTimelineItem(id: string) {
-    if (!isAdmin) {
-      alert("Only admins can delete match events")
-      return
-    }
+    if (!isAdmin) return
     await saveTimeline(timeline.filter((item) => item.id !== id))
   }
 
   async function saveMatchEvent() {
-    if (!isAdmin) {
-      alert("Only admins can save match events")
-      return
-    }
+    if (!isAdmin) return
 
     const player = matchPlayers.find((p) => p.id === eventDraft.playerId)
     const secondPlayer = matchPlayers.find((p) => p.id === eventDraft.secondPlayerId)
@@ -1016,7 +1040,7 @@ function Dashboard({
       if (!player) return alert("Choose a scorer")
       const nextScore = homeScore + 1
       setHomeScoreState(nextScore)
-      await persistSettings({ homeScore: nextScore })
+      await persistMatchState({ homeScore: nextScore })
       text = secondPlayer ? `${player.name} scored, assist ${secondPlayer.name}` : `${player.name} scored`
     } else if (eventDraft.type === "assist") {
       if (!player) return alert("Choose a player")
@@ -1070,10 +1094,15 @@ function Dashboard({
       alert(`No saved plan for ${shortLabel}${quarter}`)
       return
     }
+
     setCurrentQuarterState(quarter)
     setLineupMap(plan.lineup)
     setBenchIds(plan.bench)
-    void persistSettings({ currentQuarter: quarter })
+    void persistMatchState({
+      currentPeriod: quarter,
+      lineupMap: plan.lineup,
+      benchIds: plan.bench,
+    })
   }
 
   async function handleAutoGenerate() {
@@ -1083,7 +1112,11 @@ function Dashboard({
     setCurrentQuarterState(1)
     setLineupMap(plans[1].lineup)
     setBenchIds(plans[1].bench)
-    await persistSettings({ currentQuarter: 1 })
+    await persistMatchState({
+      currentPeriod: 1,
+      lineupMap: plans[1].lineup,
+      benchIds: plans[1].bench,
+    })
   }
 
   async function handleSaveMinutes() {
@@ -1093,6 +1126,7 @@ function Dashboard({
     }))
     setLiveSecondsMap({})
     await savePlayers(nextPlayers)
+    await persistMatchState({ liveSecondsMap: {} })
   }
 
   const totalGoals = timeline.filter((t) => t.type === "goal").length
@@ -1176,12 +1210,7 @@ function Dashboard({
               </div>
             </div>
 
-            <div
-              style={{
-                textAlign: "right",
-                minWidth: 110,
-              }}
-            >
+            <div style={{ textAlign: "right", minWidth: 110 }}>
               <div style={{ fontSize: 13, opacity: 0.8 }}>{isAdmin ? "ADMIN" : "VIEWER"}</div>
               <button onClick={() => void signOut()} style={{ ...buttonSecondary(), marginTop: 10 }}>
                 Sign Out
@@ -1240,7 +1269,7 @@ function Dashboard({
           ))}
         </div>
 
-        {tab === "home" ? (
+        {tab === "home" && (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
               <div style={cardStyle()}>
@@ -1261,13 +1290,13 @@ function Dashboard({
               </div>
             </div>
           </div>
-        ) : null}
+        )}
 
-        {tab === "players" ? (
+        {tab === "players" && (
           <PlayersManager players={players} isAdmin={isAdmin} onSavePlayers={savePlayers} />
-        ) : null}
+        )}
 
-        {tab === "events" ? (
+        {tab === "events" && (
           <div style={{ display: "grid", gap: 16 }}>
             <RollingCalendar
               selectedDate={selectedDate}
@@ -1440,89 +1469,17 @@ function Dashboard({
                 </div>
               </div>
             ) : null}
-
-            <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
-              <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
-                {trainingTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => {
-                      setSelectedTemplateId(template.id)
-                      setTrainingPlan({
-                        title: template.name,
-                        warmUp: template.warmUp,
-                        drill1: template.drill1,
-                        drill2: template.drill2,
-                        game: template.game,
-                        notes: template.notes,
-                      })
-                    }}
-                    style={{
-                      textAlign: "left",
-                      padding: 14,
-                      borderRadius: 16,
-                      border: selectedTemplateId === template.id ? `2px solid ${TEAM.primary}` : "1px solid #dbe3ef",
-                      background: selectedTemplateId === template.id ? "#dbeafe" : "#f8fafc",
-                      width: "100%",
-                      boxSizing: "border-box",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div style={{ fontWeight: 900 }}>{template.name}</div>
-                    <div
-                      style={{
-                        color: "#64748b",
-                        marginTop: 4,
-                        overflowWrap: "anywhere",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {template.notes}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Plan</div>
-              <div style={{ display: "grid", gap: 10 }}>
-                {[
-                  ["Session Title", trainingPlan.title],
-                  ["Warm Up", trainingPlan.warmUp],
-                  ["Drill 1", trainingPlan.drill1],
-                  ["Drill 2", trainingPlan.drill2],
-                  ["Game", trainingPlan.game],
-                  ["Coach Notes", trainingPlan.notes],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    style={{
-                      padding: 12,
-                      borderRadius: 16,
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      minWidth: 0,
-                    }}
-                  >
-                    <div style={{ fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                    <div style={{ color: "#475569", overflowWrap: "anywhere" }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        ) : null}
+        )}
 
-        {tab === "coaches" ? (
+        {tab === "coaches" && (
           <div style={{ display: "grid", gap: 16 }}>
             {selectedDateCoachAvailability.length > 0 ? (
               <div style={cardStyle("#eff6ff")}>
                 <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
                   Coach Availability Snapshot
                 </div>
-                <div style={{ color: "#475569", marginBottom: 10 }}>
-                  {formatFullDate(selectedDate)}
-                </div>
+                <div style={{ color: "#475569", marginBottom: 10 }}>{formatFullDate(selectedDate)}</div>
                 <div style={{ display: "grid", gap: 8 }}>
                   {selectedDateCoachAvailability.map((item) => {
                     const coach = coaches.find((c) => c.id === item.coachId)
@@ -1540,9 +1497,6 @@ function Dashboard({
                         <div style={{ color: "#475569", marginTop: 4 }}>
                           {coach?.role || "No role"} • {item.status}
                         </div>
-                        {item.notes ? (
-                          <div style={{ color: "#64748b", marginTop: 4 }}>{item.notes}</div>
-                        ) : null}
                       </div>
                     )
                   })}
@@ -1559,9 +1513,9 @@ function Dashboard({
               onSaveCoachAvailability={saveCoachAvailability}
             />
           </div>
-        ) : null}
+        )}
 
-        {tab === "match" ? (
+        {tab === "match" && (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
@@ -1618,18 +1572,14 @@ function Dashboard({
                       {activeMatchEvent.opponent ? ` • vs ${activeMatchEvent.opponent}` : ""}
                     </div>
                   ) : (
-                    <div style={{ color: "#64748b" }}>
-                      Choose which match event this match screen should track.
-                    </div>
+                    <div style={{ color: "#64748b" }}>Choose which match event this screen is tracking.</div>
                   )}
                 </div>
               )}
             </div>
 
             <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
-                Match Day Availability
-              </div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
 
               {activeMatchEvent ? (
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1674,19 +1624,16 @@ function Dashboard({
                 </div>
               ) : (
                 <div style={{ color: "#64748b" }}>
-                  No active match event selected. Choose a match above or go to Events and tap "Use for Match Day".
+                  No active match event selected.
                 </div>
               )}
             </div>
 
             <div style={cardStyle("#eff6ff")}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
-                Coaches for Match Day
-              </div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Coaches for Match Day</div>
 
               <div style={{ color: "#475569", marginBottom: 10 }}>
-                Showing coach availability for{" "}
-                <strong>{formatFullDate(matchDateForCoachView)}</strong>
+                Showing coach availability for <strong>{formatFullDate(matchDateForCoachView)}</strong>
               </div>
 
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -1702,7 +1649,6 @@ function Dashboard({
                 >
                   Available {availableCoaches.length}
                 </div>
-
                 <div
                   style={{
                     padding: "8px 12px",
@@ -1715,7 +1661,6 @@ function Dashboard({
                 >
                   Unavailable {unavailableCoachesList.length}
                 </div>
-
                 <div
                   style={{
                     padding: "8px 12px",
@@ -1761,56 +1706,6 @@ function Dashboard({
                   Warning: no Head Coach is marked as available.
                 </div>
               ) : null}
-
-              <div style={{ display: "grid", gap: 10 }}>
-                {availableCoaches.length > 0 ? (
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 12,
-                      background: "white",
-                      border: "1px solid #dbe3ef",
-                    }}
-                  >
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Available coaches</div>
-                    <div style={{ color: "#475569" }}>
-                      {availableCoaches.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
-                    </div>
-                  </div>
-                ) : null}
-
-                {unavailableCoachesList.length > 0 ? (
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 12,
-                      background: "white",
-                      border: "1px solid #dbe3ef",
-                    }}
-                  >
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Unavailable coaches</div>
-                    <div style={{ color: "#475569" }}>
-                      {unavailableCoachesList.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
-                    </div>
-                  </div>
-                ) : null}
-
-                {holidayCoachesList.length > 0 ? (
-                  <div
-                    style={{
-                      padding: 12,
-                      borderRadius: 12,
-                      background: "white",
-                      border: "1px solid #dbe3ef",
-                    }}
-                  >
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>On holiday</div>
-                    <div style={{ color: "#475569" }}>
-                      {holidayCoachesList.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
             </div>
 
             <MatchCenter
@@ -1838,25 +1733,33 @@ function Dashboard({
               setActiveDragPlayerId={setActiveDragPlayerId}
               setHomeTeam={async (value) => {
                 setHomeTeamState(value)
-                await persistSettings({ homeTeam: value })
+                await persistMatchState({ homeTeam: value })
               }}
               setAwayTeam={async (value) => {
                 setAwayTeamState(value)
-                await persistSettings({ awayTeam: value })
+                await persistMatchState({ awayTeam: value })
               }}
               setHomeScore={async (value) => {
                 setHomeScoreState(value)
-                await persistSettings({ homeScore: value })
+                await persistMatchState({ homeScore: value })
               }}
               setAwayScore={async (value) => {
                 setAwayScoreState(value)
-                await persistSettings({ awayScore: value })
+                await persistMatchState({ awayScore: value })
               }}
-              setRunning={setRunning}
+              setRunning={(value) => {
+                setRunning(value)
+                void persistMatchState({ running: value })
+              }}
               resetClock={() => {
                 setRunning(false)
                 setSeconds(0)
                 setLiveSecondsMap({})
+                void persistMatchState({
+                  running: false,
+                  seconds: 0,
+                  liveSecondsMap: {},
+                })
               }}
               saveMinutes={handleSaveMinutes}
               onChangeFormation={handleChangeFormation}
@@ -1873,17 +1776,17 @@ function Dashboard({
               currentPeriod={currentQuarter}
               setCurrentPeriod={(value) => {
                 setCurrentQuarterState(value)
-                void persistSettings({ currentQuarter: value })
+                void persistMatchState({ currentPeriod: value })
               }}
               setPeriodMode={async (value) => {
                 setPeriodModeState(value)
                 setCurrentQuarterState(1)
-                await persistSettings({ periodMode: value, currentQuarter: 1 })
+                await persistMatchState({ periodMode: value, currentPeriod: 1 })
               }}
               setPeriodLength={async (value) => {
                 const nextValue = Math.max(1, value || 1)
                 setPeriodLengthState(nextValue)
-                await persistSettings({ periodLength: nextValue })
+                await persistMatchState({ periodLength: nextValue })
               }}
             />
 
@@ -1893,7 +1796,7 @@ function Dashboard({
                 currentQuarter={currentQuarter}
                 setCurrentQuarter={(q) => {
                   setCurrentQuarterState(q)
-                  void persistSettings({ currentQuarter: q })
+                  void persistMatchState({ currentPeriod: q })
                 }}
                 quarterPlans={quarterPlans}
                 quarterWarnings={quarterWarnings}
@@ -1909,9 +1812,9 @@ function Dashboard({
               />
             ) : null}
           </div>
-        ) : null}
+        )}
 
-        {tab === "stats" ? (
+        {tab === "stats" && (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Club Stats</div>
@@ -1923,28 +1826,8 @@ function Dashboard({
                 <div style={{ fontWeight: 800 }}>Backup GK: {backupGk?.name || "Not set"}</div>
               </div>
             </div>
-
-            <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Season Minutes</div>
-              <div style={{ display: "grid", gap: 10 }}>
-                {players.map((player) => (
-                  <div
-                    key={player.id}
-                    style={{
-                      padding: 14,
-                      borderRadius: 16,
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                    }}
-                  >
-                    <div style={{ fontWeight: 900 }}>{player.name}</div>
-                    <div style={{ color: "#64748b", marginTop: 4 }}>{formatMinutes(player.seasonSeconds || 0)} min</div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        ) : null}
+        )}
       </div>
 
       {showEventForm ? (
