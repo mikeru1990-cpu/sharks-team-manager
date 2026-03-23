@@ -10,6 +10,7 @@ import PlayersManager from "./components/PlayersManager"
 import QuarterPlanner from "./components/QuarterPlanner"
 import MatchCenter from "./components/MatchCenter"
 import CoachesManager from "./components/CoachesManager"
+import LeagueTable from "./components/LeagueTable"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -18,7 +19,6 @@ import {
   cardStyle,
   formatMinutes,
   initialPlayers,
-  initialTrainingTemplates,
   makeId,
   type AttendanceStatus,
   type Coach,
@@ -34,7 +34,6 @@ import {
   type QuarterPlan,
   type SavedLineup,
   type TimelineItem,
-  type TrainingTemplate,
 } from "./lib/types"
 import {
   buildAutoLineup,
@@ -44,6 +43,7 @@ import {
 } from "./lib/rotation"
 
 type PeriodMode = "quarters" | "halves"
+type EditableEventType = "training" | "match" | "other"
 
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
@@ -101,7 +101,7 @@ function Dashboard({
   const [activeMatchEventId, setActiveMatchEventId] = useState<string | null>(null)
 
   const [eventTitle, setEventTitle] = useState("")
-  const [eventType, setEventType] = useState<"training" | "match" | "other">("training")
+  const [eventType, setEventType] = useState<EditableEventType>("training")
   const [eventStartTime, setEventStartTime] = useState("")
   const [eventLocation, setEventLocation] = useState("")
   const [eventOpponent, setEventOpponent] = useState("")
@@ -141,17 +141,6 @@ function Dashboard({
   const [quarterPlans, setQuarterPlans] = useState<Record<number, QuarterPlan>>({})
   const [quarterWarnings, setQuarterWarnings] = useState<string[]>([])
   const [activeDragPlayerId, setActiveDragPlayerId] = useState<string | null>(null)
-
-  const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
-  const [trainingTemplates] = useState<TrainingTemplate[]>(initialTrainingTemplates)
-  const [trainingPlan, setTrainingPlan] = useState({
-    title: initialTrainingTemplates[0].name,
-    warmUp: initialTrainingTemplates[0].warmUp,
-    drill1: initialTrainingTemplates[0].drill1,
-    drill2: initialTrainingTemplates[0].drill2,
-    game: initialTrainingTemplates[0].game,
-    notes: initialTrainingTemplates[0].notes,
-  })
 
   const [loading, setLoading] = useState(true)
 
@@ -308,10 +297,6 @@ function Dashboard({
           location: row.location || "",
           opponent: row.opponent || "",
           notes: row.notes || "",
-          played: !!row.played,
-          home_score: row.home_score ?? null,
-          away_score: row.away_score ?? null,
-          result_status: row.result_status || "",
         }))
       )
     }
@@ -410,13 +395,17 @@ function Dashboard({
       setLineupMap(JSON.parse(stateRes.data.lineup_json || "{}"))
       setBenchIds(JSON.parse(stateRes.data.bench_json || "[]"))
     } else {
-      const auto = buildAutoLineup(matchPlayers.length > 0 ? matchPlayers : players, currentSlots)
+      const defaultFormat: MatchFormat = "7v7"
+      const defaultFormation = "2-3-1"
+      const defaultSlots = buildPitchSlots(defaultFormat, defaultFormation)
+      const auto = buildAutoLineup(matchPlayers.length > 0 ? matchPlayers : players, defaultSlots)
+
       setHomeTeamState(TEAM.name)
       setAwayTeamState(activeMatchEvent?.opponent || "Opposition")
       setHomeScoreState(0)
       setAwayScoreState(0)
-      setMatchFormat("7v7")
-      setFormation("2-3-1")
+      setMatchFormat(defaultFormat)
+      setFormation(defaultFormation)
       setCurrentQuarterState(1)
       setPeriodModeState("quarters")
       setPeriodLengthState(10)
@@ -482,21 +471,32 @@ function Dashboard({
 
   useEffect(() => {
     if (!running || !activeMatchEventId) return
+
     const interval = window.setInterval(() => {
-      setSeconds((prev) => prev + 1)
-      setLiveSecondsMap((prev) => {
-        const next = { ...prev }
+      setSeconds((prev) => {
+        const nextSeconds = prev + 1
+        const nextLiveSecondsMap: Record<string, number> = { ...liveSecondsMap }
+
         Object.values(lineupMap)
           .filter(Boolean)
           .forEach((playerId) => {
             const id = playerId as string
-            next[id] = (next[id] || 0) + 1
+            nextLiveSecondsMap[id] = (nextLiveSecondsMap[id] || 0) + 1
           })
-        return next
+
+        setLiveSecondsMap(nextLiveSecondsMap)
+        void persistMatchState({
+          seconds: nextSeconds,
+          liveSecondsMap: nextLiveSecondsMap,
+          running: true,
+        })
+
+        return nextSeconds
       })
     }, 1000)
+
     return () => window.clearInterval(interval)
-  }, [running, lineupMap, activeMatchEventId])
+  }, [running, lineupMap, activeMatchEventId, liveSecondsMap])
 
   async function persistSettings(
     patch?: Partial<{
@@ -684,7 +684,6 @@ function Dashboard({
     if (nextLineups.length > 0) {
       await supabase.from("match_lineups").insert(
         nextLineups.map((lineup) => ({
-          id: lineup.id,
           event_id: activeMatchEventId,
           name: lineup.name,
           match_format: lineup.format,
@@ -861,9 +860,10 @@ function Dashboard({
 
   function openEditCalendarEvent(event: EventItem) {
     if (!isAdmin) return
+
     setEditingCalendarEventId(event.id)
     setEventTitle(event.title)
-    setEventType(event.type)
+    setEventType(event.type as EditableEventType)
     setEventStartTime(event.startTime || "")
     setEventLocation(event.location || "")
     setEventOpponent(event.opponent || "")
@@ -1357,11 +1357,6 @@ function Dashboard({
                         {event.startTime ? ` • ${event.startTime}` : ""}
                         {event.location ? ` • ${event.location}` : ""}
                       </div>
-                      {event.played ? (
-                        <div style={{ marginTop: 8, fontSize: 12, color: "#166534", fontWeight: 800 }}>
-                          Final score: {event.home_score ?? 0} - {event.away_score ?? 0}
-                        </div>
-                      ) : null}
                       <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
                         Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
                       </div>
@@ -1396,11 +1391,6 @@ function Dashboard({
                     ) : null}
                     {selectedEvent.notes ? (
                       <div style={{ color: "#475569", marginTop: 8 }}>{selectedEvent.notes}</div>
-                    ) : null}
-                    {selectedEvent.played ? (
-                      <div style={{ color: "#166534", marginTop: 8, fontWeight: 800 }}>
-                        Final score: {selectedEvent.home_score ?? 0} - {selectedEvent.away_score ?? 0}
-                      </div>
                     ) : null}
                   </div>
 
@@ -1589,12 +1579,6 @@ function Dashboard({
                       Using: <strong>{activeMatchEvent.title}</strong>
                       {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
                       {activeMatchEvent.opponent ? ` • vs ${activeMatchEvent.opponent}` : ""}
-                      {activeMatchEvent.played ? (
-                        <span>
-                          {" "}
-                          • Final {activeMatchEvent.home_score ?? 0}-{activeMatchEvent.away_score ?? 0}
-                        </span>
-                      ) : null}
                     </div>
                   ) : (
                     <div style={{ color: "#64748b" }}>Choose which match event this screen is tracking.</div>
@@ -1811,47 +1795,6 @@ function Dashboard({
                 setPeriodLengthState(nextValue)
                 await persistMatchState({ periodLength: nextValue })
               }}
-              trackingTitle={activeMatchEvent?.title || ""}
-              trackingTime={activeMatchEvent?.startTime || ""}
-              onSaveResult={async () => {
-                if (!activeMatchEventId) {
-                  alert("Choose a match event first")
-                  return
-                }
-
-                if (!supabase) return
-
-                const { error } = await supabase
-                  .from("events")
-                  .update({
-                    played: true,
-                    home_score: homeScore,
-                    away_score: awayScore,
-                    result_status: "full_time",
-                  })
-                  .eq("id", activeMatchEventId)
-
-                if (error) {
-                  alert(error.message)
-                  return
-                }
-
-                setEvents((prev) =>
-                  prev.map((event) =>
-                    event.id === activeMatchEventId
-                      ? {
-                          ...event,
-                          played: true,
-                          home_score: homeScore,
-                          away_score: awayScore,
-                          result_status: "full_time",
-                        }
-                      : event
-                  )
-                )
-
-                alert("Result saved ✅")
-              }}
             />
 
             {matchTab === "quarters" ? (
@@ -1891,43 +1834,27 @@ function Dashboard({
               </div>
             </div>
 
+            <LeagueTable />
+
             <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Results</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Season Minutes</div>
               <div style={{ display: "grid", gap: 10 }}>
-                {events.filter((event) => event.type === "match" && event.played).length === 0 ? (
-                  <div style={{ color: "#64748b" }}>No saved results yet.</div>
-                ) : (
-                  events
-                    .filter((event) => event.type === "match" && event.played)
-                    .sort((a, b) => {
-                      const dateCompare = a.date.localeCompare(b.date)
-                      if (dateCompare !== 0) return dateCompare
-                      const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
-                      if (timeCompare !== 0) return timeCompare
-                      return a.title.localeCompare(b.title)
-                    })
-                    .map((event) => (
-                      <div
-                        key={event.id}
-                        style={{
-                          padding: 14,
-                          borderRadius: 16,
-                          background: "#f8fafc",
-                          border: "1px solid #e2e8f0",
-                        }}
-                      >
-                        <div style={{ fontWeight: 900 }}>{event.title}</div>
-                        <div style={{ color: "#64748b", marginTop: 4 }}>
-                          {event.date}
-                          {event.startTime ? ` • ${event.startTime}` : ""}
-                          {event.opponent ? ` • vs ${event.opponent}` : ""}
-                        </div>
-                        <div style={{ marginTop: 8, fontWeight: 900, fontSize: 18 }}>
-                          {event.home_score ?? 0} - {event.away_score ?? 0}
-                        </div>
-                      </div>
-                    ))
-                )}
+                {players.map((player) => (
+                  <div
+                    key={player.id}
+                    style={{
+                      padding: 14,
+                      borderRadius: 16,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900 }}>{player.name}</div>
+                    <div style={{ color: "#64748b", marginTop: 4 }}>
+                      {formatMinutes(player.seasonSeconds || 0)} min
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1961,7 +1888,7 @@ function Dashboard({
 
               <select
                 value={eventType}
-                onChange={(e) => setEventType(e.target.value as "training" | "match" | "other")}
+                onChange={(e) => setEventType(e.target.value as EditableEventType)}
                 style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
               >
                 <option value="training">Training</option>
@@ -2099,7 +2026,9 @@ function Dashboard({
                   onChange={(e) => setEventDraft((prev) => ({ ...prev, secondPlayerId: e.target.value }))}
                   style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
                 >
-                  <option value="">{eventDraft.type === "goal" ? "Optional assist" : "Choose second player"}</option>
+                  <option value="">
+                    {eventDraft.type === "goal" ? "Optional assist" : "Choose second player"}
+                  </option>
                   {matchPlayers
                     .filter((player) => player.id !== eventDraft.playerId)
                     .map((player) => (
@@ -2151,7 +2080,9 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
+      {({ user, isAdmin, signOut }) => (
+        <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />
+      )}
     </AuthGate>
   )
 }
