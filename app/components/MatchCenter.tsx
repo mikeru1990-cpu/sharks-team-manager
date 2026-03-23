@@ -77,7 +77,40 @@ type Props = {
   setPeriodMode: (value: PeriodMode) => Promise<void>
   setPeriodLength: (value: number) => Promise<void>
 }
+{isAdmin ? (
+  <button
+    onClick={async () => {
+      if (!trackingTitle) {
+        alert("No match selected")
+        return
+      }
 
+      if (!confirm("Save final result?")) return
+
+      await fetch("/api/save-result", {
+        method: "POST",
+        body: JSON.stringify({
+          title: trackingTitle,
+          homeScore,
+          awayScore,
+        }),
+      })
+
+      alert("Result saved ✅")
+    }}
+    style={{
+      marginTop: 12,
+      padding: "12px 16px",
+      borderRadius: 12,
+      background: "#16a34a",
+      color: "white",
+      fontWeight: 900,
+      border: "none",
+    }}
+  >
+    Full Time / Save Result
+  </button>
+) : null}
 function ShirtMarker({
   player,
   compact = false,
