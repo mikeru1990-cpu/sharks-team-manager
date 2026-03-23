@@ -42,7 +42,7 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
-
+import LeagueTable from "./components/LeagueTable"
 type PeriodMode = "quarters" | "halves"
 
 function formatFullDate(date: string) {
