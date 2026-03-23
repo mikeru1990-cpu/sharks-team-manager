@@ -181,6 +181,13 @@ function Dashboard({
     return attendance.find((a) => a.eventId === eventId && a.playerId === playerId)?.status || null
   }
 
+  function getCoachStatusForDay(coachId: string, day: string): CoachAvailabilityStatus {
+    return (
+      coachAvailability.find((item) => item.coachId === coachId && item.day === day)?.status ||
+      "available"
+    )
+  }
+
   const activeMatchAvailableIds = activeMatchEvent
     ? attendance
         .filter((a) => a.eventId === activeMatchEvent.id && a.status === "available")
@@ -219,6 +226,27 @@ function Dashboard({
       : false
 
   const selectedDateCoachAvailability = coachAvailability.filter((item) => item.day === selectedDate)
+
+  const matchDateForCoachView = activeMatchEvent?.date || selectedDate
+  const activeCoaches = coaches.filter((coach) => coach.active)
+
+  const availableCoaches = activeCoaches.filter(
+    (coach) => getCoachStatusForDay(coach.id, matchDateForCoachView) === "available"
+  )
+
+  const unavailableCoachesList = activeCoaches.filter(
+    (coach) => getCoachStatusForDay(coach.id, matchDateForCoachView) === "unavailable"
+  )
+
+  const holidayCoachesList = activeCoaches.filter(
+    (coach) => getCoachStatusForDay(coach.id, matchDateForCoachView) === "holiday"
+  )
+
+  const headCoachAvailable = availableCoaches.some((coach) =>
+    coach.role.toLowerCase().includes("head coach")
+  )
+
+  const noAvailableCoaches = availableCoaches.length === 0
 
   async function loadAll() {
     setLoading(true)
@@ -1534,7 +1562,7 @@ function Dashboard({
         ) : null}
 
         {tab === "match" ? (
-          <>
+          <div style={{ display: "grid", gap: 16 }}>
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
 
@@ -1599,7 +1627,9 @@ function Dashboard({
             </div>
 
             <div style={cardStyle()}>
-              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+                Match Day Availability
+              </div>
 
               {activeMatchEvent ? (
                 <div style={{ display: "grid", gap: 10 }}>
@@ -1638,7 +1668,7 @@ function Dashboard({
                         color: "#475569",
                       }}
                     >
-                      Unavailable: {unavailablePlayers.map((p) => p.name).join(", ")}
+                      Unavailable players: {unavailablePlayers.map((p) => p.name).join(", ")}
                     </div>
                   ) : null}
                 </div>
@@ -1647,6 +1677,140 @@ function Dashboard({
                   No active match event selected. Choose a match above or go to Events and tap "Use for Match Day".
                 </div>
               )}
+            </div>
+
+            <div style={cardStyle("#eff6ff")}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+                Coaches for Match Day
+              </div>
+
+              <div style={{ color: "#475569", marginBottom: 10 }}>
+                Showing coach availability for{" "}
+                <strong>{formatFullDate(matchDateForCoachView)}</strong>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    background: "#dcfce7",
+                    border: "1px solid #86efac",
+                    color: "#166534",
+                    fontWeight: 800,
+                  }}
+                >
+                  Available {availableCoaches.length}
+                </div>
+
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    background: "#fee2e2",
+                    border: "1px solid #fecaca",
+                    color: "#991b1b",
+                    fontWeight: 800,
+                  }}
+                >
+                  Unavailable {unavailableCoachesList.length}
+                </div>
+
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    background: "#fef3c7",
+                    border: "1px solid #fcd34d",
+                    color: "#92400e",
+                    fontWeight: 800,
+                  }}
+                >
+                  Holiday {holidayCoachesList.length}
+                </div>
+              </div>
+
+              {noAvailableCoaches ? (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 12,
+                    background: "#fee2e2",
+                    border: "1px solid #fecaca",
+                    color: "#991b1b",
+                    fontWeight: 800,
+                    marginBottom: 10,
+                  }}
+                >
+                  Warning: no coaches are available for this day.
+                </div>
+              ) : null}
+
+              {!headCoachAvailable ? (
+                <div
+                  style={{
+                    padding: 12,
+                    borderRadius: 12,
+                    background: "#fff7ed",
+                    border: "1px solid #fdba74",
+                    color: "#9a3412",
+                    fontWeight: 800,
+                    marginBottom: 10,
+                  }}
+                >
+                  Warning: no Head Coach is marked as available.
+                </div>
+              ) : null}
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {availableCoaches.length > 0 ? (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: "white",
+                      border: "1px solid #dbe3ef",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Available coaches</div>
+                    <div style={{ color: "#475569" }}>
+                      {availableCoaches.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+
+                {unavailableCoachesList.length > 0 ? (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: "white",
+                      border: "1px solid #dbe3ef",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, marginBottom: 6 }}>Unavailable coaches</div>
+                    <div style={{ color: "#475569" }}>
+                      {unavailableCoachesList.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+
+                {holidayCoachesList.length > 0 ? (
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: "white",
+                      border: "1px solid #dbe3ef",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, marginBottom: 6 }}>On holiday</div>
+                    <div style={{ color: "#475569" }}>
+                      {holidayCoachesList.map((coach) => `${coach.name} (${coach.role})`).join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <MatchCenter
@@ -1744,7 +1908,7 @@ function Dashboard({
                 periodLength={periodLength}
               />
             ) : null}
-          </>
+          </div>
         ) : null}
 
         {tab === "stats" ? (
@@ -2004,4 +2168,3 @@ export default function Page() {
     </AuthGate>
   )
 }
-
