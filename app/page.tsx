@@ -1768,7 +1768,36 @@ function Dashboard({
                   liveSecondsMap: {},
                 })
               }}
-              saveMinutes={handleSaveMinutes}
+              saveMinutes={handleSaveMinutes}onEndGame={async () => {
+  if (!activeMatchEventId) {
+    alert("Choose a match event first")
+    return
+  }
+
+  const confirmed = window.confirm("End game and save result?")
+  if (!confirmed) return
+
+  setRunning(false)
+
+  await persistMatchState({
+    running: false,
+    seconds,
+    homeScore,
+    awayScore,
+    liveSecondsMap,
+    lineupMap,
+    benchIds,
+    currentPeriod: currentQuarter,
+    matchFormat,
+    formation,
+    periodMode,
+    periodLength,
+    homeTeam,
+    awayTeam,
+  })
+
+  alert("Game result saved")
+}}
               onChangeFormation={handleChangeFormation}
               onSaveLineup={handleSaveLineup}
               onLoadSavedLineup={handleLoadSavedLineup}
