@@ -11,13 +11,20 @@ export type EventItem = {
   id: string
   title: string
   date: string
-  type: EventType
+  type: string
   startTime?: string
   location?: string
   opponent?: string
   notes?: string
-}
 
+  // NEW
+  is_match?: boolean
+  competition?: string
+  played?: boolean
+  home_score?: number
+  away_score?: number
+  result_status?: "scheduled" | "live" | "full_time"
+}
 export type EventAttendance = {
   id: string
   eventId: string
