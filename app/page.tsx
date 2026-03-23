@@ -42,7 +42,7 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
-import LeagueTable from "./components/LeagueTable"
+
 type PeriodMode = "quarters" | "halves"
 
 function formatFullDate(date: string) {
@@ -308,6 +308,10 @@ function Dashboard({
           location: row.location || "",
           opponent: row.opponent || "",
           notes: row.notes || "",
+          played: !!row.played,
+          home_score: row.home_score ?? null,
+          away_score: row.away_score ?? null,
+          result_status: row.result_status || "",
         }))
       )
     }
@@ -371,16 +375,23 @@ function Dashboard({
       return
     }
 
-    const [
-      stateRes,
-      timelineRes,
-      lineupsRes,
-      quarterRes,
-    ] = await Promise.all([
+    const [stateRes, timelineRes, lineupsRes, quarterRes] = await Promise.all([
       supabase.from("match_state").select("*").eq("event_id", eventId).maybeSingle(),
-      supabase.from("match_timeline_events").select("*").eq("event_id", eventId).order("sort_order", { ascending: true }),
-      supabase.from("match_lineups").select("*").eq("event_id", eventId).order("updated_at", { ascending: false }),
-      supabase.from("match_quarter_plans").select("*").eq("event_id", eventId).order("quarter_number", { ascending: true }),
+      supabase
+        .from("match_timeline_events")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("match_lineups")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("match_quarter_plans")
+        .select("*")
+        .eq("event_id", eventId)
+        .order("quarter_number", { ascending: true }),
     ])
 
     if (!stateRes.error && stateRes.data) {
@@ -662,10 +673,7 @@ function Dashboard({
       return
     }
 
-    setCoachAvailability((prev) => [
-      ...prev,
-      { id, coachId, day, status, notes },
-    ])
+    setCoachAvailability((prev) => [...prev, { id, coachId, day, status, notes }])
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
@@ -676,6 +684,7 @@ function Dashboard({
     if (nextLineups.length > 0) {
       await supabase.from("match_lineups").insert(
         nextLineups.map((lineup) => ({
+          id: lineup.id,
           event_id: activeMatchEventId,
           name: lineup.name,
           match_format: lineup.format,
@@ -1348,6 +1357,11 @@ function Dashboard({
                         {event.startTime ? ` • ${event.startTime}` : ""}
                         {event.location ? ` • ${event.location}` : ""}
                       </div>
+                      {event.played ? (
+                        <div style={{ marginTop: 8, fontSize: 12, color: "#166534", fontWeight: 800 }}>
+                          Final score: {event.home_score ?? 0} - {event.away_score ?? 0}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
                         Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail {countAttendance(event.id, "unavailable")}
                       </div>
@@ -1382,6 +1396,11 @@ function Dashboard({
                     ) : null}
                     {selectedEvent.notes ? (
                       <div style={{ color: "#475569", marginTop: 8 }}>{selectedEvent.notes}</div>
+                    ) : null}
+                    {selectedEvent.played ? (
+                      <div style={{ color: "#166534", marginTop: 8, fontWeight: 800 }}>
+                        Final score: {selectedEvent.home_score ?? 0} - {selectedEvent.away_score ?? 0}
+                      </div>
                     ) : null}
                   </div>
 
@@ -1570,6 +1589,12 @@ function Dashboard({
                       Using: <strong>{activeMatchEvent.title}</strong>
                       {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
                       {activeMatchEvent.opponent ? ` • vs ${activeMatchEvent.opponent}` : ""}
+                      {activeMatchEvent.played ? (
+                        <span>
+                          {" "}
+                          • Final {activeMatchEvent.home_score ?? 0}-{activeMatchEvent.away_score ?? 0}
+                        </span>
+                      ) : null}
                     </div>
                   ) : (
                     <div style={{ color: "#64748b" }}>Choose which match event this screen is tracking.</div>
@@ -1623,9 +1648,7 @@ function Dashboard({
                   ) : null}
                 </div>
               ) : (
-                <div style={{ color: "#64748b" }}>
-                  No active match event selected.
-                </div>
+                <div style={{ color: "#64748b" }}>No active match event selected.</div>
               )}
             </div>
 
@@ -1788,6 +1811,47 @@ function Dashboard({
                 setPeriodLengthState(nextValue)
                 await persistMatchState({ periodLength: nextValue })
               }}
+              trackingTitle={activeMatchEvent?.title || ""}
+              trackingTime={activeMatchEvent?.startTime || ""}
+              onSaveResult={async () => {
+                if (!activeMatchEventId) {
+                  alert("Choose a match event first")
+                  return
+                }
+
+                if (!supabase) return
+
+                const { error } = await supabase
+                  .from("events")
+                  .update({
+                    played: true,
+                    home_score: homeScore,
+                    away_score: awayScore,
+                    result_status: "full_time",
+                  })
+                  .eq("id", activeMatchEventId)
+
+                if (error) {
+                  alert(error.message)
+                  return
+                }
+
+                setEvents((prev) =>
+                  prev.map((event) =>
+                    event.id === activeMatchEventId
+                      ? {
+                          ...event,
+                          played: true,
+                          home_score: homeScore,
+                          away_score: awayScore,
+                          result_status: "full_time",
+                        }
+                      : event
+                  )
+                )
+
+                alert("Result saved ✅")
+              }}
             />
 
             {matchTab === "quarters" ? (
@@ -1824,6 +1888,46 @@ function Dashboard({
                 <div style={{ fontWeight: 800 }}>Players: {players.length}</div>
                 <div style={{ fontWeight: 800 }}>Main GK: {mainGk?.name || "Not set"}</div>
                 <div style={{ fontWeight: 800 }}>Backup GK: {backupGk?.name || "Not set"}</div>
+              </div>
+            </div>
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Results</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {events.filter((event) => event.type === "match" && event.played).length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No saved results yet.</div>
+                ) : (
+                  events
+                    .filter((event) => event.type === "match" && event.played)
+                    .sort((a, b) => {
+                      const dateCompare = a.date.localeCompare(b.date)
+                      if (dateCompare !== 0) return dateCompare
+                      const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+                      if (timeCompare !== 0) return timeCompare
+                      return a.title.localeCompare(b.title)
+                    })
+                    .map((event) => (
+                      <div
+                        key={event.id}
+                        style={{
+                          padding: 14,
+                          borderRadius: 16,
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        <div style={{ fontWeight: 900 }}>{event.title}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>
+                          {event.date}
+                          {event.startTime ? ` • ${event.startTime}` : ""}
+                          {event.opponent ? ` • vs ${event.opponent}` : ""}
+                        </div>
+                        <div style={{ marginTop: 8, fontWeight: 900, fontSize: 18 }}>
+                          {event.home_score ?? 0} - {event.away_score ?? 0}
+                        </div>
+                      </div>
+                    ))
+                )}
               </div>
             </div>
           </div>
