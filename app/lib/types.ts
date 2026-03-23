@@ -1,9 +1,12 @@
 export type MainTab = "home" | "players" | "events" | "coaches" | "match" | "stats"
 export type MatchTab = "overview" | "lineup" | "live" | "quarters" | "stats"
+
 export type EventType = "match" | "training" | "other"
 export type MatchFormat = "7v7" | "9v9" | "11v11"
 export type PitchPosition = "GK" | "DEF" | "MID" | "FWD"
+
 export type TimelineEventType = "goal" | "assist" | "sub" | "injury" | "note"
+
 export type AttendanceStatus = "available" | "maybe" | "unavailable"
 export type CoachAvailabilityStatus = "available" | "unavailable" | "holiday"
 
@@ -11,20 +14,19 @@ export type EventItem = {
   id: string
   title: string
   date: string
-  type: string
+  type: EventType
   startTime?: string
   location?: string
   opponent?: string
   notes?: string
 
-  // NEW
-  is_match?: boolean
-  competition?: string
+  // ✅ NEW (results support)
   played?: boolean
-  home_score?: number
-  away_score?: number
-  result_status?: "scheduled" | "live" | "full_time"
+  home_score?: number | null
+  away_score?: number | null
+  result_status?: string
 }
+
 export type EventAttendance = {
   id: string
   eventId: string
@@ -128,215 +130,12 @@ export const FORMATIONS: Record<MatchFormat, Record<string, PitchPosition[]>> = 
   },
 }
 
-export const initialPlayers: Player[] = [
-  {
-    id: "1",
-    name: "Lyra Twinning",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: true,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "2",
-    name: "Bella Bainbridge",
-    positions: ["MID"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: true,
-    seasonSeconds: 0,
-  },
-  {
-    id: "3",
-    name: "Betsy Rowland",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "4",
-    name: "Connie Luff",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "5",
-    name: "Darcy-Rae Russell",
-    positions: ["GK"],
-    mainGK: true,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "6",
-    name: "Ella Wilson",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "7",
-    name: "Elsy Harmer",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "8",
-    name: "Evelyn Evans",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "9",
-    name: "Isabella Ogden",
-    positions: ["DEF", "MID"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "10",
-    name: "Martha Scrivens",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "11",
-    name: "Olivia Hassall",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "12",
-    name: "Poppy Bennett",
-    positions: ["MID", "FWD"],
-    mainGK: false,
-    backupGK: true,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "13",
-    name: "Ruby Salter",
-    positions: ["MID", "DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-  {
-    id: "14",
-    name: "Bailee Dowler-Rowles",
-    positions: ["DEF"],
-    mainGK: false,
-    backupGK: false,
-    captain: false,
-    viceCaptain: false,
-    seasonSeconds: 0,
-  },
-]
-
-export const initialTrainingTemplates: TrainingTemplate[] = [
-  {
-    id: "t1",
-    name: "Passing Under Pressure",
-    warmUp: "Dynamic movement + partner passing gates",
-    drill1: "4v1 rondo, 2-touch max",
-    drill2: "3v2 overload to target goals",
-    game: "5v5 condition game, score after 5 passes",
-    notes: "Focus on scanning and body shape before receiving.",
-  },
-  {
-    id: "t2",
-    name: "Finishing & Movement",
-    warmUp: "Ball mastery + quick finishing pattern",
-    drill1: "Combination play around mannequins",
-    drill2: "Wide delivery and first-time finishing",
-    game: "4-goal game with bonus for one-touch finish",
-    notes: "Coach timing of runs and composure in the box.",
-  },
-]
-
-export function getToday() {
-  return new Date().toISOString().split("T")[0]
-}
-
-export function getNext7Days() {
-  const arr: string[] = []
-  const today = new Date()
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today)
-    d.setDate(today.getDate() + i)
-    arr.push(d.toISOString().split("T")[0])
-  }
-  return arr
-}
-
-export function getWeekdayLabel(date: string) {
-  const d = new Date(`${date}T12:00:00`)
-  return d.toLocaleDateString("en-GB", { weekday: "short" })
-}
-
-export function formatClock(seconds: number) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${s.toString().padStart(2, "0")}`
-}
-
-export function formatMinutes(seconds: number) {
-  return (seconds / 60).toFixed(1)
-}
-
-export function formatShortDate(date: string) {
-  return date.slice(5)
-}
-
 export function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0] || "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
+export function formatMinutes(seconds: number) {
+  return (seconds / 60).toFixed(1)
 }
 
 export function cardStyle(bg = "#ffffff") {
@@ -372,17 +171,5 @@ export function buttonSecondary() {
     color: "#0f172a",
     fontWeight: 800,
     fontSize: 16,
-  } as const
-}
-
-export function chipStyle(active: boolean) {
-  return {
-    padding: "10px 14px",
-    borderRadius: 999,
-    border: active ? `2px solid ${TEAM.primary}` : "1px solid #cbd5e1",
-    background: active ? "#dbeafe" : "white",
-    color: active ? TEAM.primary : "#334155",
-    fontWeight: 800,
-    minWidth: 70,
   } as const
 }
