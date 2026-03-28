@@ -6,6 +6,7 @@ import {
   buttonSecondary,
   cardStyle,
   type TrainingTemplate,
+  type TrainingSession,
 } from "../lib/types"
 
 type SessionBlock = {
@@ -16,6 +17,7 @@ type SessionBlock = {
 
 type Props = {
   plan: TrainingTemplate | null
+  session?: TrainingSession | null
 }
 
 function formatSeconds(total: number) {
@@ -24,7 +26,7 @@ function formatSeconds(total: number) {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
 }
 
-export default function SessionTimer({ plan }: Props) {
+export default function SessionTimer({ plan, session = null }: Props) {
   const blocks = useMemo<SessionBlock[]>(() => {
     if (!plan) return []
 
@@ -40,6 +42,16 @@ export default function SessionTimer({ plan }: Props) {
   const [activeIndex, setActiveIndex] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [running, setRunning] = useState(false)
+
+  const [seconds, setSeconds] = useState(0)
+  const [currentBlockIndex, setCurrentBlockIndex] = useState(0)
+
+  const activeBlock = blocks[activeIndex] || null
+  const totalSeconds = blocks.reduce((sum, block) => sum + (durations[block.key] || 0), 0)
+
+  const currentBlock = session?.blocks[currentBlockIndex] || null
+  const sessionTotalMinutes =
+    session?.blocks.reduce((sum, block) => sum + (block.duration || 0), 0) || 0
 
   useEffect(() => {
     if (blocks.length === 0) {
@@ -59,9 +71,46 @@ export default function SessionTimer({ plan }: Props) {
     const currentKey = blocks[Math.min(activeIndex, blocks.length - 1)]?.key
     setActiveIndex((prev) => Math.min(prev, blocks.length - 1))
     setSecondsLeft(nextDurations[currentKey] || 600)
-  }, [plan?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.id])
 
   useEffect(() => {
+    if (!session) {
+      setSeconds(0)
+      setCurrentBlockIndex(0)
+      return
+    }
+
+    setSeconds(0)
+    setCurrentBlockIndex(0)
+    setRunning(false)
+  }, [session?.id])
+
+  useEffect(() => {
+    if (session && currentBlock) {
+      if (!running) return
+
+      const interval = window.setInterval(() => {
+        setSeconds((prev) => {
+          const next = prev + 1
+
+          if (next >= currentBlock.duration * 60) {
+            if (currentBlockIndex < session.blocks.length - 1) {
+              setCurrentBlockIndex((i) => i + 1)
+              return 0
+            }
+
+            setRunning(false)
+            return currentBlock.duration * 60
+          }
+
+          return next
+        })
+      }, 1000)
+
+      return () => window.clearInterval(interval)
+    }
+
     if (!running) return
     if (secondsLeft <= 0) return
 
@@ -76,10 +125,7 @@ export default function SessionTimer({ plan }: Props) {
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [running, secondsLeft])
-
-  const activeBlock = blocks[activeIndex] || null
-  const totalSeconds = blocks.reduce((sum, block) => sum + (durations[block.key] || 0), 0)
+  }, [running, secondsLeft, session, currentBlock, currentBlockIndex])
 
   function updateDuration(key: string, minutes: number) {
     const safe = Math.max(1, minutes || 1)
@@ -101,12 +147,26 @@ export default function SessionTimer({ plan }: Props) {
   }
 
   function resetCurrent() {
+    if (session && currentBlock) {
+      setSeconds(0)
+      setRunning(false)
+      return
+    }
+
     if (!activeBlock) return
     setSecondsLeft(durations[activeBlock.key] || 600)
     setRunning(false)
   }
 
   function nextBlock() {
+    if (session && session.blocks.length > 0) {
+      if (currentBlockIndex >= session.blocks.length - 1) return
+      setCurrentBlockIndex((prev) => prev + 1)
+      setSeconds(0)
+      setRunning(false)
+      return
+    }
+
     if (activeIndex >= blocks.length - 1) return
     const nextIndex = activeIndex + 1
     const nextBlock = blocks[nextIndex]
@@ -116,6 +176,14 @@ export default function SessionTimer({ plan }: Props) {
   }
 
   function prevBlock() {
+    if (session && session.blocks.length > 0) {
+      if (currentBlockIndex <= 0) return
+      setCurrentBlockIndex((prev) => prev - 1)
+      setSeconds(0)
+      setRunning(false)
+      return
+    }
+
     if (activeIndex <= 0) return
     const nextIndex = activeIndex - 1
     const prev = blocks[nextIndex]
@@ -131,6 +199,61 @@ export default function SessionTimer({ plan }: Props) {
 
         {!plan ? (
           <div style={{ color: "#64748b" }}>Choose a training plan to run a live session timer.</div>
+        ) : session && currentBlock ? (
+          <>
+            <div style={{ color: "#475569", marginBottom: 12 }}>
+              Running generated session: <strong>{session.name}</strong>
+            </div>
+
+            <div
+              style={{
+                padding: 18,
+                borderRadius: 18,
+                background: "white",
+                border: "1px solid #dbeafe",
+                display: "grid",
+                gap: 10,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#64748b" }}>
+                Block {currentBlockIndex + 1} of {session.blocks.length}
+              </div>
+
+              <div style={{ fontWeight: 900, fontSize: 22 }}>{currentBlock.title}</div>
+
+              <div style={{ fontSize: 54, fontWeight: 900, lineHeight: 1 }}>
+                {formatSeconds(seconds)}
+              </div>
+
+              <div style={{ color: "#475569" }}>{currentBlock.description}</div>
+
+              <div style={{ fontSize: 12, marginTop: 4, color: "#64748b" }}>
+                {currentBlock.duration} min
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                <button onClick={() => setRunning(true)} style={buttonPrimary()}>
+                  Start
+                </button>
+                <button onClick={() => setRunning(false)} style={buttonSecondary()}>
+                  Pause
+                </button>
+                <button onClick={resetCurrent} style={buttonSecondary()}>
+                  Reset Block
+                </button>
+                <button onClick={prevBlock} style={buttonSecondary()}>
+                  Previous
+                </button>
+                <button onClick={nextBlock} style={buttonSecondary()}>
+                  Next
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, color: "#475569", fontWeight: 800 }}>
+              Total generated session time: {sessionTotalMinutes} mins
+            </div>
+          </>
         ) : blocks.length === 0 ? (
           <div style={{ color: "#64748b" }}>This training plan has no timed blocks yet.</div>
         ) : (
@@ -183,7 +306,59 @@ export default function SessionTimer({ plan }: Props) {
         )}
       </div>
 
-      {blocks.length > 0 ? (
+      {session && session.blocks.length > 0 ? (
+        <div style={cardStyle()}>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Generated Session Blocks</div>
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {session.blocks.map((block, index) => {
+              const isActive = index === currentBlockIndex
+              return (
+                <div
+                  key={block.id}
+                  style={{
+                    padding: 14,
+                    borderRadius: 16,
+                    border: isActive ? "2px solid #2563eb" : "1px solid #e2e8f0",
+                    background: isActive ? "#eff6ff" : "#f8fafc",
+                    display: "grid",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 900 }}>{block.title}</div>
+                      <div style={{ color: "#475569", marginTop: 4 }}>{block.description}</div>
+                      <div style={{ fontSize: 12, marginTop: 6, color: "#64748b" }}>
+                        {block.duration} min
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setCurrentBlockIndex(index)
+                        setSeconds(0)
+                        setRunning(false)
+                      }}
+                      style={buttonSecondary()}
+                    >
+                      {isActive ? "Selected" : "Select"}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : blocks.length > 0 ? (
         <div style={cardStyle()}>
           <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Session Blocks</div>
 
