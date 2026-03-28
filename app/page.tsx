@@ -13,6 +13,8 @@ import CoachesManager from "./components/CoachesManager"
 import LeagueTable from "./components/LeagueTable"
 import TrainingPlansManager from "./components/TrainingPlansManager"
 import SessionTimer from "./components/SessionTimer"
+import SessionHistory from "./components/SessionHistory"
+import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -39,6 +41,7 @@ import {
   type SavedLineup,
   type TimelineItem,
   type TrainingSession,
+  type TrainingSessionRecord,
   type TrainingTemplate,
 } from "./lib/types"
 import {
@@ -47,7 +50,6 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
-import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 
 type PeriodMode = "quarters" | "halves"
 
@@ -170,7 +172,6 @@ function Dashboard({
   const allTrainingPlans = dbTrainingPlans.length > 0 ? dbTrainingPlans : initialTrainingTemplates
 
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
-  const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
   const [trainingPlan, setTrainingPlan] = useState({
     title: initialTrainingTemplates[0].name,
     warmUp: initialTrainingTemplates[0].warmUp,
@@ -179,6 +180,9 @@ function Dashboard({
     game: initialTrainingTemplates[0].game,
     notes: initialTrainingTemplates[0].notes,
   })
+
+  const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
+  const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
 
   const [loading, setLoading] = useState(true)
 
@@ -223,7 +227,6 @@ function Dashboard({
     if (!plan) return
 
     setSelectedTemplateId(plan.id)
-    setActiveSession(null)
     setTrainingPlan({
       title: plan.name,
       warmUp: plan.warmUp,
@@ -314,6 +317,7 @@ function Dashboard({
       coachAvailabilityRes,
       leagueRes,
       trainingPlansRes,
+      sessionHistoryRes,
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
@@ -323,6 +327,7 @@ function Dashboard({
       supabase.from("coach_availability").select("*").order("day", { ascending: true }),
       supabase.from("league_results").select("*").order("played_on", { ascending: false }),
       supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
+      supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -423,6 +428,7 @@ function Dashboard({
         game: row.game || "",
         notes: row.notes || "",
       }))
+
       setDbTrainingPlans(nextPlans)
 
       if (nextPlans.length > 0) {
@@ -436,6 +442,18 @@ function Dashboard({
           notes: nextPlans[0].notes,
         })
       }
+    }
+
+    if (!sessionHistoryRes.error && sessionHistoryRes.data) {
+      setSessionHistory(
+        sessionHistoryRes.data.map((row: any) => ({
+          id: row.id,
+          date: row.session_date,
+          planName: row.plan_name,
+          notes: row.notes || "",
+          blocks: JSON.parse(row.blocks_json || "[]"),
+        }))
+      )
     }
 
     setLoading(false)
@@ -574,6 +592,7 @@ function Dashboard({
 
   useEffect(() => {
     if (!running || !activeMatchEventId) return
+
     const interval = window.setInterval(() => {
       setSeconds((prev) => prev + 1)
       setLiveSecondsMap((prev) => {
@@ -587,6 +606,7 @@ function Dashboard({
         return next
       })
     }, 1000)
+
     return () => window.clearInterval(interval)
   }, [running, lineupMap, activeMatchEventId])
 
@@ -813,6 +833,25 @@ function Dashboard({
         notes: selected.notes,
       })
     }
+  }
+
+  async function saveSessionRecord(record: TrainingSessionRecord) {
+    if (!supabase) return
+
+    const { error } = await supabase.from("training_session_history").insert({
+      id: record.id,
+      session_date: record.date,
+      plan_name: record.planName,
+      notes: record.notes,
+      blocks_json: JSON.stringify(record.blocks),
+    })
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setSessionHistory((prev) => [record, ...prev])
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
@@ -1704,14 +1743,12 @@ function Dashboard({
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
-
               <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
                 {allTrainingPlans.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => {
                       setSelectedTemplateId(template.id)
-                      setActiveSession(null)
                       setTrainingPlan({
                         title: template.name,
                         warmUp: template.warmUp,
@@ -1747,25 +1784,7 @@ function Dashboard({
                 ))}
               </div>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-                <button
-                  onClick={() => {
-                    const template = allTrainingPlans.find((p) => p.id === selectedTemplateId)
-                    if (!template) return
-                    setActiveSession(buildSessionFromTemplate(template))
-                  }}
-                  style={buttonPrimary()}
-                >
-                  Generate Session
-                </button>
-
-                <button onClick={() => setActiveSession(null)} style={buttonSecondary()}>
-                  Clear Session
-                </button>
-              </div>
-
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Plan</div>
-
               <div style={{ display: "grid", gap: 10 }}>
                 {[
                   ["Session Title", trainingPlan.title],
@@ -1792,13 +1811,31 @@ function Dashboard({
               </div>
             </div>
 
-            <SessionTimer
-              plan={
-                allTrainingPlans.find((plan) => plan.id === selectedTemplateId) ||
-                (allTrainingPlans[0] ?? null)
-              }
-              session={activeSession}
-            />
+            <div style={cardStyle()}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ fontSize: 22, fontWeight: 900 }}>Live Session Builder</div>
+                <button
+                  onClick={() => {
+                    const template = allTrainingPlans.find((plan) => plan.id === selectedTemplateId)
+                    if (!template) return
+                    setActiveSession(buildSessionFromTemplate(template))
+                  }}
+                  style={buttonPrimary()}
+                >
+                  Generate Session
+                </button>
+              </div>
+            </div>
+
+            <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
 
             <TrainingPlansManager
               isAdmin={isAdmin}
@@ -1806,7 +1843,6 @@ function Dashboard({
               onSaveTrainingPlans={saveTrainingPlans}
               onUsePlan={(plan) => {
                 setSelectedTemplateId(plan.id)
-                setActiveSession(null)
                 setTrainingPlan({
                   title: plan.name,
                   warmUp: plan.warmUp,
@@ -1818,6 +1854,8 @@ function Dashboard({
                 setSelectedDbTrainingPlanId(plan.id)
               }}
             />
+
+            <SessionHistory sessions={sessionHistory} />
           </div>
         )}
 
@@ -2136,11 +2174,6 @@ function Dashboard({
                 setPeriodLengthState(nextValue)
                 await persistMatchState({ periodLength: nextValue })
               }}
-              trackingTitle={
-                activeMatchEvent
-                  ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
-                  : ""
-              }
             />
 
             {matchTab === "quarters" ? (
