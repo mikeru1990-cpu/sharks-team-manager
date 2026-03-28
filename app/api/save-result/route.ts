@@ -1,55 +1,54 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-export const dynamic = "force-dynamic"
-
-type SaveResultBody = {
-  eventId?: string
-  homeScore?: number
-  awayScore?: number
-}
+import { supabaseAdmin } from "@/app/lib/supabase-admin"
 
 export async function POST(req: Request) {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseAdmin) {
       return NextResponse.json(
-        {
-          error:
-            "Missing Supabase server environment variables. Add NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel.",
-        },
+        { error: "Supabase admin env vars are missing" },
         { status: 500 }
       )
     }
 
-    const body = (await req.json()) as SaveResultBody
-    const eventId = body.eventId
-    const homeScore = Number(body.homeScore ?? 0)
-    const awayScore = Number(body.awayScore ?? 0)
+    const body = await req.json()
 
-    if (!eventId) {
-      return NextResponse.json({ error: "eventId is required" }, { status: 400 })
-    }
+    const {
+      playedOn,
+      eventId,
+      opponent,
+      homeTeam,
+      awayTeam,
+      homeScore,
+      awayScore,
+      competition,
+    } = body
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    const { error } = await supabase
-      .from("match_state")
-      .update({
+    const { data, error } = await supabaseAdmin
+      .from("league_results")
+      .upsert({
+        id: body.id ?? crypto.randomUUID(),
+        played_on: playedOn,
+        event_id: eventId ?? null,
+        opponent,
+        home_team: homeTeam,
+        away_team: awayTeam,
         home_score: homeScore,
         away_score: awayScore,
+        competition: competition ?? "",
       })
-      .eq("event_id", eventId)
+      .select()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, data })
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    )
   }
 }
