@@ -11,6 +11,7 @@ import QuarterPlanner from "./components/QuarterPlanner"
 import MatchCenter from "./components/MatchCenter"
 import CoachesManager from "./components/CoachesManager"
 import LeagueTable from "./components/LeagueTable"
+import TrainingPlansManager from "./components/TrainingPlansManager"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -52,7 +53,7 @@ type EventWithPlan = EventItem & {
   trainingPlanName?: string
 }
 
-type DbTrainingPlan = {
+type DbTrainingPlanRow = {
   id: string
   name: string
   warm_up: string | null
@@ -226,6 +227,7 @@ function Dashboard({
       game: plan.game,
       notes: plan.notes,
     })
+    setSelectedDbTrainingPlanId(plan.id)
   }
 
   const activeMatchAvailableIds = activeMatchEvent
@@ -407,17 +409,28 @@ function Dashboard({
     }
 
     if (!trainingPlansRes.error && trainingPlansRes.data) {
-      setDbTrainingPlans(
-        (trainingPlansRes.data as DbTrainingPlan[]).map((row) => ({
-          id: row.id,
-          name: row.name,
-          warmUp: row.warm_up || "",
-          drill1: row.drill_1 || "",
-          drill2: row.drill_2 || "",
-          game: row.game || "",
-          notes: row.notes || "",
-        }))
-      )
+      const nextPlans = (trainingPlansRes.data as DbTrainingPlanRow[]).map((row) => ({
+        id: row.id,
+        name: row.name,
+        warmUp: row.warm_up || "",
+        drill1: row.drill_1 || "",
+        drill2: row.drill_2 || "",
+        game: row.game || "",
+        notes: row.notes || "",
+      }))
+      setDbTrainingPlans(nextPlans)
+
+      if (nextPlans.length > 0) {
+        setSelectedTemplateId(nextPlans[0].id)
+        setTrainingPlan({
+          title: nextPlans[0].name,
+          warmUp: nextPlans[0].warmUp,
+          drill1: nextPlans[0].drill1,
+          drill2: nextPlans[0].drill2,
+          game: nextPlans[0].game,
+          notes: nextPlans[0].notes,
+        })
+      }
     }
 
     setLoading(false)
@@ -751,6 +764,52 @@ function Dashboard({
     setCoachAvailability((prev) => [...prev, { id, coachId, day, status, notes }])
   }
 
+  async function saveTrainingPlans(nextPlans: TrainingTemplate[]) {
+    if (!supabase) return
+
+    const currentIds = allTrainingPlans.map((plan) => plan.id)
+    const nextIds = nextPlans.map((plan) => plan.id)
+
+    const removedIds = currentIds.filter((id) => !nextIds.includes(id))
+    if (removedIds.length > 0) {
+      await supabase.from("training_plans").delete().in("id", removedIds)
+    }
+
+    if (nextPlans.length > 0) {
+      const { error } = await supabase.from("training_plans").upsert(
+        nextPlans.map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          warm_up: plan.warmUp,
+          drill_1: plan.drill1,
+          drill_2: plan.drill2,
+          game: plan.game,
+          notes: plan.notes,
+        }))
+      )
+
+      if (error) {
+        alert(error.message)
+        return
+      }
+    }
+
+    setDbTrainingPlans(nextPlans)
+
+    const selected = nextPlans.find((plan) => plan.id === selectedTemplateId) || nextPlans[0]
+    if (selected) {
+      setSelectedTemplateId(selected.id)
+      setTrainingPlan({
+        title: selected.name,
+        warmUp: selected.warmUp,
+        drill1: selected.drill1,
+        drill2: selected.drill2,
+        game: selected.game,
+        notes: selected.notes,
+      })
+    }
+  }
+
   async function saveLineups(nextLineups: SavedLineup[]) {
     if (!supabase || !activeMatchEventId) return
 
@@ -873,8 +932,7 @@ function Dashboard({
 
     const safeTime = eventStartTime.trim() || "00:00"
     const newId = editingCalendarEventId || (crypto.randomUUID?.() || makeId())
-    const linkedPlan =
-      allTrainingPlans.find((plan) => plan.id === selectedDbTrainingPlanId) || null
+    const linkedPlan = allTrainingPlans.find((plan) => plan.id === selectedDbTrainingPlanId) || null
 
     const newEvent: EventWithPlan = {
       id: newId,
@@ -1708,6 +1766,24 @@ function Dashboard({
                 ))}
               </div>
             </div>
+
+            <TrainingPlansManager
+              isAdmin={isAdmin}
+              trainingPlans={allTrainingPlans}
+              onSaveTrainingPlans={saveTrainingPlans}
+              onUsePlan={(plan) => {
+                setSelectedTemplateId(plan.id)
+                setTrainingPlan({
+                  title: plan.name,
+                  warmUp: plan.warmUp,
+                  drill1: plan.drill1,
+                  drill2: plan.drill2,
+                  game: plan.game,
+                  notes: plan.notes,
+                })
+                setSelectedDbTrainingPlanId(plan.id)
+              }}
+            />
           </div>
         )}
 
