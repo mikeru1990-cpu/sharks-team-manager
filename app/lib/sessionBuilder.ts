@@ -9,26 +9,26 @@ export function buildSessionFromTemplate(template: TrainingTemplate): TrainingSe
         id: makeId(),
         title: "Warm Up",
         duration: 10,
-        description: template.warmUp,
+        description: template.warmUp || "",
       },
       {
         id: makeId(),
         title: "Drill 1",
         duration: 15,
-        description: template.drill1,
+        description: template.drill1 || "",
       },
       {
         id: makeId(),
         title: "Drill 2",
         duration: 15,
-        description: template.drill2,
+        description: template.drill2 || "",
       },
       {
         id: makeId(),
         title: "Game",
         duration: 20,
-        description: template.game,
+        description: template.game || "",
       },
-    ],
+    ].filter((block) => block.description.trim().length > 0),
   }
 }
