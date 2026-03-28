@@ -12,6 +12,7 @@ import MatchCenter from "./components/MatchCenter"
 import CoachesManager from "./components/CoachesManager"
 import LeagueTable from "./components/LeagueTable"
 import TrainingPlansManager from "./components/TrainingPlansManager"
+import SessionTimer from "./components/SessionTimer"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -1766,6 +1767,13 @@ function Dashboard({
                 ))}
               </div>
             </div>
+
+            <SessionTimer
+              plan={
+                allTrainingPlans.find((plan) => plan.id === selectedTemplateId) ||
+                (allTrainingPlans[0] ?? null)
+              }
+            />
 
             <TrainingPlansManager
               isAdmin={isAdmin}
