@@ -60,7 +60,6 @@ type Props = {
   setRunning: (value: boolean) => void
   resetClock: () => void
   saveMinutes: () => Promise<void>
-  onEndGame: () => Promise<void>
   onChangeFormation: (format: MatchFormat, formation: string) => Promise<void>
   onSaveLineup: () => Promise<void>
   onLoadSavedLineup: (id: string) => Promise<void>
@@ -70,6 +69,9 @@ type Props = {
   onOpenCreateEvent: () => void
   onOpenEditEvent: (item: TimelineItem) => void
   onDeleteTimelineItem: (id: string) => Promise<void>
+  onEndGame: () => Promise<void> | void
+  trackingTitle: string
+
   periodMode: PeriodMode
   periodLength: number
   currentPeriod: number
@@ -346,7 +348,6 @@ export default function MatchCenter(props: Props) {
     setRunning,
     resetClock,
     saveMinutes,
-    onEndGame,
     onChangeFormation,
     onSaveLineup,
     onLoadSavedLineup,
@@ -356,6 +357,8 @@ export default function MatchCenter(props: Props) {
     onOpenCreateEvent,
     onOpenEditEvent,
     onDeleteTimelineItem,
+    onEndGame,
+    trackingTitle,
     periodMode,
     periodLength,
     currentPeriod,
@@ -397,6 +400,20 @@ export default function MatchCenter(props: Props) {
         }}
       >
         <div style={{ fontSize: 14, opacity: 0.82, fontWeight: 800 }}>MATCH CENTER</div>
+
+        {trackingTitle ? (
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 14,
+              fontWeight: 700,
+              opacity: 0.95,
+              overflowWrap: "anywhere",
+            }}
+          >
+            Tracking: {trackingTitle}
+          </div>
+        ) : null}
 
         <div
           style={{
@@ -510,6 +527,24 @@ export default function MatchCenter(props: Props) {
             ) : null}
           </div>
         </div>
+
+        {isAdmin ? (
+          <div style={{ marginTop: 14, display: "flex", justifyContent: "center" }}>
+            <button
+              onClick={() => void onEndGame()}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 14,
+                background: "#16a34a",
+                color: "white",
+                fontWeight: 900,
+                border: "none",
+              }}
+            >
+              End Game & Save Result
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -621,42 +656,25 @@ export default function MatchCenter(props: Props) {
             </div>
 
             {isAdmin ? (
-              <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
-                    gap: 10,
-                  }}
-                >
-                  <button onClick={() => setRunning(true)} style={buttonPrimary()}>
-                    Start
-                  </button>
-                  <button onClick={() => setRunning(false)} style={buttonSecondary()}>
-                    Pause
-                  </button>
-                  <button onClick={resetClock} style={buttonSecondary()}>
-                    Reset
-                  </button>
-                  <button onClick={() => void saveMinutes()} style={buttonSecondary()}>
-                    Save
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => void onEndGame()}
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: 16,
-                    border: "none",
-                    background: "#16a34a",
-                    color: "white",
-                    fontWeight: 900,
-                    fontSize: 16,
-                    width: "100%",
-                  }}
-                >
-                  Full Time / Save Result
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+                  gap: 10,
+                  marginTop: 14,
+                }}
+              >
+                <button onClick={() => setRunning(true)} style={buttonPrimary()}>
+                  Start
+                </button>
+                <button onClick={() => setRunning(false)} style={buttonSecondary()}>
+                  Pause
+                </button>
+                <button onClick={resetClock} style={buttonSecondary()}>
+                  Reset
+                </button>
+                <button onClick={() => void saveMinutes()} style={buttonSecondary()}>
+                  Save
                 </button>
               </div>
             ) : null}
