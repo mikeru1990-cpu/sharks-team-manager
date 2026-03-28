@@ -1,384 +1,1108 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import type { Coach, CoachAvailability, CoachAvailabilityStatus } from "../lib/types"
-import { TEAM, buttonPrimary, buttonSecondary, cardStyle, makeId } from "../lib/types"
+import {
+  DndContext,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core"
+import type {
+  MatchTab,
+  MatchFormat,
+  PitchSlot,
+  Player,
+  SavedLineup,
+  TimelineItem,
+} from "../lib/types"
+import {
+  TEAM,
+  buttonPrimary,
+  buttonSecondary,
+  cardStyle,
+  chipStyle,
+  formatClock,
+  formatMinutes,
+  initials,
+} from "../lib/types"
+import { canPlaySlot } from "../lib/rotation"
+
+type PeriodMode = "quarters" | "halves"
 
 type Props = {
   isAdmin: boolean
-  selectedDate: string
-  coaches: Coach[]
-  coachAvailability: CoachAvailability[]
-  onSaveCoaches: (nextCoaches: Coach[]) => Promise<void>
-  onSaveCoachAvailability: (
-    coachId: string,
-    day: string,
-    status: CoachAvailabilityStatus,
-    notes?: string
-  ) => Promise<void>
+  matchTab: MatchTab
+  setMatchTab: (tab: MatchTab) => void
+  matchFormat: MatchFormat
+  formation: string
+  currentSlots: PitchSlot[]
+  players: Player[]
+  lineupMap: Record<string, string | null>
+  benchIds: string[]
+  homeTeam: string
+  awayTeam: string
+  homeScore: number
+  awayScore: number
+  seconds: number
+  running: boolean
+  liveSecondsMap: Record<string, number>
+  timeline: TimelineItem[]
+  savedLineups: SavedLineup[]
+  lineupName: string
+  setLineupName: (value: string) => void
+  activeDragPlayerId: string | null
+  setActiveDragPlayerId: (id: string | null) => void
+  setHomeTeam: (value: string) => Promise<void>
+  setAwayTeam: (value: string) => Promise<void>
+  setHomeScore: (value: number) => Promise<void>
+  setAwayScore: (value: number) => Promise<void>
+  setRunning: (value: boolean) => void
+  resetClock: () => void
+  saveMinutes: () => Promise<void>
+  onChangeFormation: (format: MatchFormat, formation: string) => Promise<void>
+  onSaveLineup: () => Promise<void>
+  onLoadSavedLineup: (id: string) => Promise<void>
+  onDeleteSavedLineup: (id: string) => Promise<void>
+  onDragStartExternal: (event: DragStartEvent) => void
+  onDragEndExternal: (event: DragEndEvent) => void
+  onOpenCreateEvent: () => void
+  onOpenEditEvent: (item: TimelineItem) => void
+  onDeleteTimelineItem: (id: string) => Promise<void>
+  onEndGame?: () => Promise<void>
+
+  periodMode: PeriodMode
+  periodLength: number
+  currentPeriod: number
+  setCurrentPeriod: (value: number) => void
+  setPeriodMode: (value: PeriodMode) => Promise<void>
+  setPeriodLength: (value: number) => Promise<void>
+
+  trackingTitle?: string
 }
 
-function statusStyle(status: CoachAvailabilityStatus, active: boolean) {
-  if (!active) {
-    return {
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid #cbd5e1",
-      background: "white",
-      color: "#334155",
-      fontWeight: 800,
-      fontSize: 15,
-      textTransform: "capitalize" as const,
-    }
-  }
-
-  if (status === "available") {
-    return {
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid #16a34a",
-      background: "#dcfce7",
-      color: "#166534",
-      fontWeight: 800,
-      fontSize: 15,
-      textTransform: "capitalize" as const,
-    }
-  }
-
-  if (status === "holiday") {
-    return {
-      padding: "10px 12px",
-      borderRadius: 999,
-      border: "1px solid #d97706",
-      background: "#fef3c7",
-      color: "#92400e",
-      fontWeight: 800,
-      fontSize: 15,
-      textTransform: "capitalize" as const,
-    }
-  }
-
-  return {
-    padding: "10px 12px",
-    borderRadius: 999,
-    border: "1px solid #dc2626",
-    background: "#fee2e2",
-    color: "#991b1b",
-    fontWeight: 800,
-    fontSize: 15,
-    textTransform: "capitalize" as const,
-  }
+function ShirtMarker({
+  player,
+  compact = false,
+}: {
+  player: Player
+  compact?: boolean
+}) {
+  return (
+    <div
+      style={{
+        width: compact ? 52 : 60,
+        height: compact ? 52 : 60,
+        margin: "0 auto",
+        position: "relative",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          clipPath:
+            "polygon(18% 6%, 32% 6%, 39% 18%, 61% 18%, 68% 6%, 82% 6%, 94% 30%, 79% 38%, 79% 100%, 21% 100%, 21% 38%, 6% 30%)",
+          background: `linear-gradient(180deg, ${TEAM.secondary} 0%, ${TEAM.primary} 100%)`,
+          border: "2px solid rgba(255,255,255,0.75)",
+          boxShadow: "0 8px 16px rgba(2,6,23,0.18)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          placeItems: "center",
+          color: "white",
+          fontSize: compact ? 11 : 12,
+          fontWeight: 900,
+          textShadow: "0 2px 4px rgba(0,0,0,0.25)",
+        }}
+      >
+        {initials(player.name)}
+      </div>
+    </div>
+  )
 }
 
-function formatSelectedDate(selectedDate: string) {
-  return new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-GB", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
+function PlayerBadges({ player }: { player: Player }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap",
+        justifyContent: "flex-start",
+      }}
+    >
+      {player.mainGK ? <span style={{ fontSize: 11, fontWeight: 900 }}>MAIN GK</span> : null}
+      {player.backupGK ? <span style={{ fontSize: 11, fontWeight: 900 }}>BACKUP GK</span> : null}
+      {player.captain ? <span style={{ fontSize: 11, fontWeight: 900 }}>C</span> : null}
+      {player.viceCaptain ? <span style={{ fontSize: 11, fontWeight: 900 }}>VC</span> : null}
+    </div>
+  )
+}
+
+function parseDragId(value: string) {
+  const parts = value.split("::")
+  if (parts.length !== 4) return null
+  return { playerId: parts[1], fromId: parts[3] }
+}
+
+function DraggablePlayerCard({
+  player,
+  originId,
+  compact = false,
+  subtitle,
+}: {
+  player: Player
+  originId: string
+  compact?: boolean
+  subtitle?: string
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `player::${player.id}::from::${originId}`,
   })
-}
 
-export default function CoachesManager({
-  isAdmin,
-  selectedDate,
-  coaches,
-  coachAvailability,
-  onSaveCoaches,
-  onSaveCoachAvailability,
-}: Props) {
-  const [coachName, setCoachName] = useState("")
-  const [coachRole, setCoachRole] = useState("")
-  const [editingCoachId, setEditingCoachId] = useState<string | null>(null)
-  const [savingCoachId, setSavingCoachId] = useState<string | null>(null)
+  const dragStyle = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    opacity: isDragging ? 0.55 : 1,
+    touchAction: "none" as const,
+    cursor: "grab",
+  }
 
-  const activeCoaches = useMemo(
-    () =>
-      coaches
-        .filter((coach) => coach.active)
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [coaches]
-  )
-
-  const selectedDayAvailability = useMemo(
-    () => coachAvailability.filter((item) => item.day === selectedDate),
-    [coachAvailability, selectedDate]
-  )
-
-  const availableCount = selectedDayAvailability.filter((item) => item.status === "available").length
-  const unavailableCount = selectedDayAvailability.filter((item) => item.status === "unavailable").length
-  const holidayCount = selectedDayAvailability.filter((item) => item.status === "holiday").length
-
-  function getCoachStatus(coachId: string): CoachAvailabilityStatus {
+  if (compact) {
     return (
-      coachAvailability.find((item) => item.coachId === coachId && item.day === selectedDate)?.status ||
-      "available"
+      <div
+        ref={setNodeRef}
+        {...listeners}
+        {...attributes}
+        style={{
+          ...dragStyle,
+          width: "100%",
+          maxWidth: 160,
+          borderRadius: 18,
+          background: "rgba(255,255,255,0.16)",
+          padding: 10,
+          textAlign: "center",
+          color: "white",
+        }}
+      >
+        <ShirtMarker player={player} compact />
+        <div
+          style={{
+            marginTop: 8,
+            fontWeight: 900,
+            fontSize: 13,
+            lineHeight: 1.2,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {player.name}
+        </div>
+        <div style={{ marginTop: 4, fontSize: 11 }}>{player.positions.join("/")}</div>
+        <div style={{ marginTop: 6 }}>
+          <PlayerBadges player={player} />
+        </div>
+        {subtitle ? <div style={{ marginTop: 6, fontSize: 11 }}>{subtitle}</div> : null}
+      </div>
     )
   }
 
-  async function handleAddOrUpdateCoach() {
-    if (!isAdmin) return
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{
+        ...dragStyle,
+        border: "1px solid #e2e8f0",
+        padding: 14,
+        borderRadius: 18,
+        background: "white",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+      }}
+    >
+      <ShirtMarker player={player} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontWeight: 900,
+            fontSize: 18,
+            overflowWrap: "anywhere",
+          }}
+        >
+          {player.name}
+        </div>
+        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+        <div style={{ marginTop: 6 }}>
+          <PlayerBadges player={player} />
+        </div>
+        {subtitle ? <div style={{ color: "#64748b", marginTop: 6 }}>{subtitle}</div> : null}
+      </div>
+    </div>
+  )
+}
 
-    if (!coachName.trim()) {
-      alert("Enter coach name")
-      return
-    }
+function PitchDropSlot({
+  slot,
+  player,
+  activePlayer,
+  liveSeconds,
+}: {
+  slot: PitchSlot
+  player?: Player
+  activePlayer?: Player | null
+  liveSeconds?: number
+}) {
+  const { isOver, setNodeRef } = useDroppable({ id: slot.id })
+  const invalid = activePlayer ? !canPlaySlot(activePlayer, slot.position) : false
 
-    if (!coachRole.trim()) {
-      alert("Enter coach role")
-      return
-    }
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        minHeight: 132,
+        borderRadius: 22,
+        border: isOver
+          ? invalid
+            ? "2px solid #ef4444"
+            : "2px solid #93c5fd"
+          : "1px solid rgba(255,255,255,0.22)",
+        background: isOver
+          ? invalid
+            ? "rgba(239,68,68,0.22)"
+            : "rgba(147,197,253,0.25)"
+          : "rgba(255,255,255,0.12)",
+        display: "grid",
+        placeItems: "center",
+        padding: 10,
+      }}
+    >
+      {player ? (
+        <DraggablePlayerCard
+          player={player}
+          originId={slot.id}
+          compact
+          subtitle={typeof liveSeconds === "number" ? `${formatMinutes(liveSeconds)} min` : undefined}
+        />
+      ) : (
+        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.95)" }}>
+          <div style={{ fontWeight: 900, fontSize: 12 }}>{slot.label}</div>
+          <div style={{ marginTop: 4, fontSize: 12 }}>{slot.position}</div>
+        </div>
+      )}
+    </div>
+  )
+}
 
-    if (editingCoachId) {
-      const next = coaches.map((coach) =>
-        coach.id === editingCoachId
-          ? { ...coach, name: coachName.trim(), role: coachRole.trim() }
-          : coach
-      )
-      await onSaveCoaches(next)
-      setEditingCoachId(null)
-      setCoachName("")
-      setCoachRole("")
-      return
-    }
+function BenchDropZone({ children }: { children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: "bench" })
 
-    const next = [
-      ...coaches,
-      {
-        id: crypto.randomUUID?.() || makeId(),
-        name: coachName.trim(),
-        role: coachRole.trim(),
-        active: true,
-      },
-    ]
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        padding: 14,
+        borderRadius: 20,
+        border: isOver ? `2px solid ${TEAM.secondary}` : "1px solid #e2e8f0",
+        background: isOver ? "#eff6ff" : "#fff7ed",
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
-    await onSaveCoaches(next)
-    setCoachName("")
-    setCoachRole("")
-  }
+export default function MatchCenter(props: Props) {
+  const {
+    isAdmin,
+    matchTab,
+    setMatchTab,
+    matchFormat,
+    formation,
+    currentSlots,
+    players,
+    lineupMap,
+    benchIds,
+    homeTeam,
+    awayTeam,
+    homeScore,
+    awayScore,
+    seconds,
+    running,
+    liveSecondsMap,
+    timeline,
+    savedLineups,
+    lineupName,
+    setLineupName,
+    activeDragPlayerId,
+    setActiveDragPlayerId,
+    setHomeTeam,
+    setAwayTeam,
+    setHomeScore,
+    setAwayScore,
+    setRunning,
+    resetClock,
+    saveMinutes,
+    onChangeFormation,
+    onSaveLineup,
+    onLoadSavedLineup,
+    onDeleteSavedLineup,
+    onDragStartExternal,
+    onDragEndExternal,
+    onOpenCreateEvent,
+    onOpenEditEvent,
+    onDeleteTimelineItem,
+    onEndGame,
+    periodMode,
+    periodLength,
+    currentPeriod,
+    setCurrentPeriod,
+    setPeriodMode,
+    setPeriodLength,
+    trackingTitle,
+  } = props
 
-  async function handleDeleteCoach(id: string) {
-    if (!isAdmin) return
-    const confirmed = window.confirm("Delete this coach?")
-    if (!confirmed) return
-    await onSaveCoaches(coaches.filter((coach) => coach.id !== id))
-  }
+  const lineupPlayers = Object.values(lineupMap)
+    .filter(Boolean)
+    .map((id) => players.find((p) => p.id === id))
+    .filter(Boolean) as Player[]
 
-  function handleEditCoach(coach: Coach) {
-    setEditingCoachId(coach.id)
-    setCoachName(coach.name)
-    setCoachRole(coach.role)
-  }
+  const benchPlayers = benchIds
+    .map((id) => players.find((p) => p.id === id))
+    .filter(Boolean) as Player[]
 
-  async function handleSaveStatus(coachId: string, status: CoachAvailabilityStatus) {
-    if (!isAdmin) return
-    try {
-      setSavingCoachId(coachId)
-      await onSaveCoachAvailability(coachId, selectedDate, status)
-    } finally {
-      setSavingCoachId(null)
-    }
-  }
+  const activeDragPlayer = players.find((p) => p.id === activeDragPlayerId) || null
+
+  const pitchRows = [
+    currentSlots.filter((s) => s.position === "FWD"),
+    currentSlots.filter((s) => s.position === "MID"),
+    currentSlots.filter((s) => s.position === "DEF"),
+    currentSlots.filter((s) => s.position === "GK"),
+  ]
+
+  const periodCount = periodMode === "quarters" ? 4 : 2
+  const periodLabel = periodMode === "quarters" ? `Q${currentPeriod}` : `H${currentPeriod}`
+  const periodName = periodMode === "quarters" ? "Quarter" : "Half"
+  const periodsTabLabel = periodMode === "quarters" ? "Quarters" : "Halves"
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={cardStyle("#eff6ff")}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>Coach Availability</div>
-        <div style={{ color: "#475569", marginBottom: 12 }}>
-          Tracking for <strong>{formatSelectedDate(selectedDate)}</strong>
-        </div>
+      <div
+        style={{
+          ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
+          color: "white",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ fontSize: 14, opacity: 0.82, fontWeight: 800 }}>MATCH CENTER</div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#dcfce7",
-              border: "1px solid #86efac",
-              color: "#166534",
-              fontWeight: 800,
-            }}
-          >
-            Available {availableCount}
-          </div>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#fee2e2",
-              border: "1px solid #fecaca",
-              color: "#991b1b",
-              fontWeight: 800,
-            }}
-          >
-            Unavailable {unavailableCount}
-          </div>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#fef3c7",
-              border: "1px solid #fcd34d",
-              color: "#92400e",
-              fontWeight: 800,
-            }}
-          >
-            Holiday {holidayCount}
-          </div>
-        </div>
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Coaches</div>
-
-        {isAdmin ? (
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              marginBottom: 18,
-              padding: 14,
-              borderRadius: 18,
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-            }}
-          >
-            <div style={{ fontWeight: 800, color: "#475569" }}>
-              {editingCoachId ? "Edit coach" : "Add coach"}
-            </div>
-
-            <input
-              value={coachName}
-              onChange={(e) => setCoachName(e.target.value)}
-              placeholder="Coach name"
-              style={{
-                padding: 14,
-                borderRadius: 14,
-                border: "1px solid #cbd5e1",
-                fontSize: 16,
-                width: "100%",
-                boxSizing: "border-box",
-              }}
-            />
-
-            <input
-              value={coachRole}
-              onChange={(e) => setCoachRole(e.target.value)}
-              placeholder="Coach role"
-              style={{
-                padding: 14,
-                borderRadius: 14,
-                border: "1px solid #cbd5e1",
-                fontSize: 16,
-                width: "100%",
-                boxSizing: "border-box",
-              }}
-            />
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => void handleAddOrUpdateCoach()} style={buttonPrimary()}>
-                {editingCoachId ? "Update Coach" : "Add Coach"}
-              </button>
-
-              {editingCoachId ? (
-                <button
-                  onClick={() => {
-                    setEditingCoachId(null)
-                    setCoachName("")
-                    setCoachRole("")
-                  }}
-                  style={buttonSecondary()}
-                >
-                  Cancel
-                </button>
-              ) : null}
-            </div>
+        {trackingTitle ? (
+          <div style={{ marginTop: 8, fontSize: 14, opacity: 0.9 }}>
+            Tracking: {trackingTitle}
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 12 }}>
-          {activeCoaches.length === 0 ? (
-            <div style={{ color: "#64748b" }}>No coaches found.</div>
-          ) : (
-            activeCoaches.map((coach) => {
-              const currentStatus = getCoachStatus(coach.id)
-              const isSaving = savingCoachId === coach.id
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+            gap: 12,
+            alignItems: "center",
+            marginTop: 10,
+          }}
+        >
+          <input
+            value={homeTeam}
+            disabled={!isAdmin}
+            onChange={(e) => void setHomeTeam(e.target.value)}
+            style={{
+              width: "100%",
+              background: "transparent",
+              color: "white",
+              border: "none",
+              borderBottom: "1px solid rgba(255,255,255,0.25)",
+              fontSize: 18,
+              fontWeight: 800,
+              padding: "6px 0",
+              outline: "none",
+              minWidth: 0,
+            }}
+          />
 
-              return (
-                <div
-                  key={coach.id}
+          <div style={{ fontSize: 22, fontWeight: 900, opacity: 0.8 }}>vs</div>
+
+          <input
+            value={awayTeam}
+            disabled={!isAdmin}
+            onChange={(e) => void setAwayTeam(e.target.value)}
+            style={{
+              width: "100%",
+              background: "transparent",
+              color: "white",
+              border: "none",
+              borderBottom: "1px solid rgba(255,255,255,0.25)",
+              fontSize: 18,
+              fontWeight: 800,
+              padding: "6px 0",
+              outline: "none",
+              textAlign: "right",
+              minWidth: 0,
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 12,
+            alignItems: "center",
+            marginTop: 16,
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 64, fontWeight: 900, lineHeight: 1 }}>{homeScore}</div>
+            {isAdmin ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button onClick={() => void setHomeScore(homeScore + 1)} style={buttonSecondary()}>
+                  +1
+                </button>
+                <button onClick={() => void setHomeScore(Math.max(0, homeScore - 1))} style={buttonSecondary()}>
+                  -1
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 16, fontWeight: 900, opacity: 0.9 }}>{periodLabel}</div>
+            <div style={{ fontSize: 42, fontWeight: 900, opacity: 0.95, lineHeight: 1.05 }}>
+              {formatClock(seconds)}
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
+              {periodLength} min {periodName.toLowerCase()}
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 64, fontWeight: 900, lineHeight: 1 }}>{awayScore}</div>
+            {isAdmin ? (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  gap: 8,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button onClick={() => void setAwayScore(awayScore + 1)} style={buttonSecondary()}>
+                  +1
+                </button>
+                <button onClick={() => void setAwayScore(Math.max(0, awayScore - 1))} style={buttonSecondary()}>
+                  -1
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {isAdmin && onEndGame ? (
+          <button
+            onClick={() => void onEndGame()}
+            style={{
+              marginTop: 14,
+              width: "100%",
+              padding: "14px 16px",
+              borderRadius: 16,
+              border: "none",
+              background: "#16a34a",
+              color: "white",
+              fontWeight: 900,
+              fontSize: 16,
+            }}
+          >
+            End Game & Save Result
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        {[
+          ["overview", "Overview"],
+          ["lineup", "Lineup"],
+          ["live", "Live"],
+          ["quarters", periodsTabLabel],
+          ["stats", "Stats"],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            onClick={() => setMatchTab(value as MatchTab)}
+            style={{
+              ...chipStyle(matchTab === value),
+              whiteSpace: "nowrap",
+              minWidth: 0,
+              width: "100%",
+              fontSize: 12,
+              padding: "12px 8px",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {matchTab === "overview" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Settings</div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Game Type</div>
+                <select
+                  value={periodMode}
+                  disabled={!isAdmin}
+                  onChange={(e) => void setPeriodMode(e.target.value as PeriodMode)}
                   style={{
                     padding: 14,
-                    borderRadius: 18,
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    display: "grid",
-                    gap: 12,
+                    borderRadius: 14,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 16,
+                    width: "100%",
                   }}
                 >
+                  <option value="quarters">4 Quarters</option>
+                  <option value="halves">2 Halves</option>
+                </select>
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                  {periodMode === "quarters" ? "Quarter Length" : "Half Length"}
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  value={periodLength}
+                  disabled={!isAdmin}
+                  onChange={(e) => void setPeriodLength(Math.max(1, Number(e.target.value) || 1))}
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 16,
+                    width: "100%",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>Current {periodName}</div>
+                <select
+                  value={currentPeriod}
+                  disabled={!isAdmin}
+                  onChange={(e) => setCurrentPeriod(Number(e.target.value))}
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 16,
+                    width: "100%",
+                  }}
+                >
+                  {Array.from({ length: periodCount }, (_, i) => i + 1).map((period) => (
+                    <option key={period} value={period}>
+                      {periodMode === "quarters" ? `Quarter ${period}` : `Half ${period}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div style={cardStyle("#ecfccb")}>
+            <div style={{ color: "#4d7c0f", fontWeight: 900, fontSize: 16 }}>Match Clock</div>
+            <div style={{ fontSize: 52, fontWeight: 900, marginTop: 8 }}>{formatClock(seconds)}</div>
+            <div style={{ marginTop: 6, fontWeight: 800 }}>
+              {periodLabel} • {periodLength} min
+            </div>
+
+            {isAdmin ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+                  gap: 10,
+                  marginTop: 14,
+                }}
+              >
+                <button onClick={() => setRunning(true)} style={buttonPrimary()}>
+                  Start
+                </button>
+                <button onClick={() => setRunning(false)} style={buttonSecondary()}>
+                  Pause
+                </button>
+                <button onClick={resetClock} style={buttonSecondary()}>
+                  Reset
+                </button>
+                <button onClick={() => void saveMinutes()} style={buttonSecondary()}>
+                  Save
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+                Starting XI / Starting Group
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {lineupPlayers.length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No lineup selected yet.</div>
+                ) : (
+                  lineupPlayers.map((player) => (
+                    <div
+                      key={player.id}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 18,
+                        padding: 12,
+                        background: "#f8fafc",
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      <ShirtMarker player={player} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, overflowWrap: "anywhere" }}>{player.name}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                        <div style={{ marginTop: 6 }}>
+                          <PlayerBadges player={player} />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Bench</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {benchPlayers.length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No players on the bench.</div>
+                ) : (
+                  benchPlayers.map((player) => (
+                    <div
+                      key={player.id}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 18,
+                        padding: 12,
+                        background: "#fff7ed",
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      <ShirtMarker player={player} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 900, overflowWrap: "anywhere" }}>{player.name}</div>
+                        <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                        <div style={{ marginTop: 6 }}>
+                          <PlayerBadges player={player} />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {matchTab === "lineup" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+              Formation & Saved Lineups
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0,1fr))",
+                gap: 10,
+                marginBottom: 10,
+              }}
+            >
+              <select
+                value={matchFormat}
+                disabled={!isAdmin}
+                onChange={(e) => {
+                  const nextFormat = e.target.value as MatchFormat
+                  const nextFormation =
+                    nextFormat === "7v7" ? "2-3-1" : nextFormat === "9v9" ? "3-3-2" : "4-3-3"
+                  void onChangeFormation(nextFormat, nextFormation)
+                }}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              >
+                <option value="7v7">7v7</option>
+                <option value="9v9">9v9</option>
+                <option value="11v11">11v11</option>
+              </select>
+
+              <select
+                value={formation}
+                disabled={!isAdmin}
+                onChange={(e) => void onChangeFormation(matchFormat, e.target.value)}
+                style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              >
+                {Object.keys(
+                  matchFormat === "7v7"
+                    ? { "2-3-1": true, "3-2-1": true }
+                    : matchFormat === "9v9"
+                    ? { "3-3-2": true, "3-4-1": true }
+                    : { "4-3-3": true, "4-4-2": true, "3-5-2": true }
+                ).map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {isAdmin ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+                <input
+                  value={lineupName}
+                  onChange={(e) => setLineupName(e.target.value)}
+                  placeholder="Save lineup name"
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+                />
+                <button onClick={() => void onSaveLineup()} style={buttonPrimary()}>
+                  Save
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {savedLineups.length > 0 && (
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Lineups</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {savedLineups.map((item) => (
                   <div
+                    key={item.id}
                     style={{
+                      padding: 14,
+                      borderRadius: 16,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
                       display: "grid",
-                      gridTemplateColumns: isAdmin ? "minmax(0,1fr) auto" : "1fr",
-                      gap: 10,
-                      alignItems: "start",
+                      gridTemplateColumns: "1fr auto auto",
+                      gap: 8,
+                      alignItems: "center",
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 900,
-                          fontSize: 18,
-                          overflowWrap: "anywhere",
-                        }}
-                      >
-                        {coach.name}
-                      </div>
-                      <div style={{ color: "#64748b", marginTop: 4, overflowWrap: "anywhere" }}>
-                        {coach.role}
+                      <div style={{ fontWeight: 900, overflowWrap: "anywhere" }}>{item.name}</div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>
+                        {item.format} • {item.formation}
                       </div>
                     </div>
-
+                    <button onClick={() => void onLoadSavedLineup(item.id)} style={buttonSecondary()}>
+                      Load
+                    </button>
                     {isAdmin ? (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button onClick={() => handleEditCoach(coach)} style={buttonSecondary()}>
-                          Edit
-                        </button>
-                        <button onClick={() => void handleDeleteCoach(coach.id)} style={buttonSecondary()}>
-                          Delete
-                        </button>
-                      </div>
+                      <button onClick={() => void onDeleteSavedLineup(item.id)} style={buttonSecondary()}>
+                        Delete
+                      </button>
                     ) : null}
                   </div>
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {(["available", "unavailable", "holiday"] as CoachAvailabilityStatus[]).map((status) => (
-                      <button
-                        key={status}
-                        disabled={!isAdmin || isSaving}
-                        onClick={() => void handleSaveStatus(coach.id, status)}
-                        style={{
-                          ...statusStyle(status, currentStatus === status),
-                          opacity: !isAdmin || isSaving ? 0.85 : 1,
-                        }}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-
-                  {isSaving ? (
-                    <div style={{ color: TEAM.primary, fontWeight: 700, fontSize: 14 }}>
-                      Saving...
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })
+                ))}
+              </div>
+            </div>
           )}
+
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+              Real Drag-and-Drop Tactics Board
+            </div>
+
+            <DndContext
+              collisionDetection={closestCenter}
+              onDragStart={(e) => {
+                const parsed = parseDragId(String(e.active.id))
+                setActiveDragPlayerId(parsed?.playerId || null)
+                onDragStartExternal(e)
+              }}
+              onDragEnd={(e) => {
+                setActiveDragPlayerId(null)
+                onDragEndExternal(e)
+              }}
+            >
+              <div
+                style={{
+                  ...cardStyle("linear-gradient(180deg, #1d8a3f 0%, #157435 100%)"),
+                  color: "white",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 14,
+                    border: "2px solid rgba(255,255,255,0.25)",
+                    borderRadius: 26,
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: 14,
+                    bottom: 14,
+                    width: 2,
+                    background: "rgba(255,255,255,0.20)",
+                    transform: "translateX(-50%)",
+                    pointerEvents: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    top: "50%",
+                    width: 110,
+                    height: 110,
+                    borderRadius: "50%",
+                    border: "2px solid rgba(255,255,255,0.22)",
+                    transform: "translate(-50%, -50%)",
+                    pointerEvents: "none",
+                  }}
+                />
+
+                <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 18 }}>
+                  {pitchRows.map((row, rowIndex) => (
+                    <div
+                      key={rowIndex}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: `repeat(${Math.max(row.length, 1)}, minmax(0, 1fr))`,
+                        gap: 12,
+                        alignItems: "center",
+                      }}
+                    >
+                      {row.map((slot) => {
+                        const playerId = lineupMap[slot.id]
+                        const player = players.find((p) => p.id === playerId)
+                        return (
+                          <PitchDropSlot
+                            key={slot.id}
+                            slot={slot}
+                            player={player}
+                            activePlayer={activeDragPlayer}
+                            liveSeconds={playerId ? liveSecondsMap[playerId] || 0 : 0}
+                          />
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Bench</div>
+                <BenchDropZone>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {benchPlayers.length === 0 ? (
+                      <div style={{ color: "#64748b" }}>No players on the bench.</div>
+                    ) : (
+                      benchPlayers.map((player) => (
+                        <DraggablePlayerCard
+                          key={player.id}
+                          player={player}
+                          originId="bench"
+                          subtitle={`${formatMinutes(liveSecondsMap[player.id] || 0)} min live`}
+                        />
+                      ))
+                    )}
+                  </div>
+                </BenchDropZone>
+              </div>
+            </DndContext>
+          </div>
         </div>
-      </div>
+      )}
+
+      {matchTab === "live" && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={cardStyle()}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontSize: 22, fontWeight: 900 }}>Match Timeline</div>
+              {isAdmin ? (
+                <button onClick={onOpenCreateEvent} style={buttonPrimary()}>
+                  Add Event
+                </button>
+              ) : null}
+            </div>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {timeline.length === 0 ? (
+                <div style={{ color: "#64748b" }}>No live events yet.</div>
+              ) : (
+                [...timeline]
+                  .sort((a, b) => a.minute - b.minute || a.sortOrder - b.sortOrder)
+                  .map((t) => (
+                    <div
+                      key={t.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: isAdmin ? "60px 1fr auto auto" : "60px 1fr",
+                        gap: 12,
+                        padding: 12,
+                        borderRadius: 14,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{t.minute}'</div>
+                      <div>
+                        <div style={{ fontWeight: 800, textTransform: "capitalize" }}>{t.type}</div>
+                        <div style={{ color: "#475569", marginTop: 4 }}>{t.text}</div>
+                      </div>
+                      {isAdmin ? (
+                        <button onClick={() => onOpenEditEvent(t)} style={buttonSecondary()}>
+                          Edit
+                        </button>
+                      ) : null}
+                      {isAdmin ? (
+                        <button onClick={() => void onDeleteTimelineItem(t.id)} style={buttonSecondary()}>
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Live Minutes</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {players.map((player) => (
+                <div
+                  key={player.id}
+                  style={{
+                    padding: 14,
+                    borderRadius: 16,
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                    <ShirtMarker player={player} compact />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 900, overflowWrap: "anywhere" }}>{player.name}</div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>{player.positions.join("/")}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontWeight: 900 }}>{formatMinutes(liveSecondsMap[player.id] || 0)} min</div>
+                    <div style={{ color: "#64748b", fontSize: 13 }}>
+                      season {formatMinutes(player.seasonSeconds || 0)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {matchTab === "quarters" && (
+        <div style={cardStyle()}>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
+            {periodMode === "quarters" ? "Quarter Summary" : "Half Summary"}
+          </div>
+          <div style={{ color: "#475569" }}>
+            Use the planner section below this card to save, load, and auto-generate{" "}
+            {periodMode === "quarters" ? "quarter" : "half"} plans.
+          </div>
+        </div>
+      )}
+
+      {matchTab === "stats" && (
+        <div style={cardStyle()}>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Match Stats</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {players.map((player) => (
+              <div
+                key={player.id}
+                style={{
+                  padding: 14,
+                  borderRadius: 16,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <ShirtMarker player={player} compact />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 900, overflowWrap: "anywhere" }}>{player.name}</div>
+                  <div style={{ color: "#64748b", marginTop: 4 }}>
+                    Live: {formatMinutes(liveSecondsMap[player.id] || 0)} min • Season:{" "}
+                    {formatMinutes(player.seasonSeconds || 0)} min
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
