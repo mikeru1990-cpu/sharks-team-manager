@@ -47,6 +47,21 @@ import {
 
 type PeriodMode = "quarters" | "halves"
 
+type EventWithPlan = EventItem & {
+  trainingPlanId?: string
+  trainingPlanName?: string
+}
+
+type DbTrainingPlan = {
+  id: string
+  name: string
+  warm_up: string | null
+  drill_1: string | null
+  drill_2: string | null
+  game: string | null
+  notes: string | null
+}
+
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
@@ -93,7 +108,7 @@ function Dashboard({
   const [players, setPlayers] = useState<Player[]>([])
   const [coaches, setCoaches] = useState<Coach[]>([])
   const [coachAvailability, setCoachAvailability] = useState<CoachAvailability[]>([])
-  const [events, setEvents] = useState<EventItem[]>([])
+  const [events, setEvents] = useState<EventWithPlan[]>([])
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [leagueResults, setLeagueResults] = useState<LeagueResult[]>([])
 
@@ -110,6 +125,7 @@ function Dashboard({
   const [eventLocation, setEventLocation] = useState("")
   const [eventOpponent, setEventOpponent] = useState("")
   const [eventNotes, setEventNotes] = useState("")
+  const [selectedDbTrainingPlanId, setSelectedDbTrainingPlanId] = useState("")
 
   const [homeTeam, setHomeTeamState] = useState(TEAM.name)
   const [awayTeam, setAwayTeamState] = useState("Opposition")
@@ -146,8 +162,10 @@ function Dashboard({
   const [quarterWarnings, setQuarterWarnings] = useState<string[]>([])
   const [activeDragPlayerId, setActiveDragPlayerId] = useState<string | null>(null)
 
+  const [dbTrainingPlans, setDbTrainingPlans] = useState<TrainingTemplate[]>([])
+  const allTrainingPlans = dbTrainingPlans.length > 0 ? dbTrainingPlans : initialTrainingTemplates
+
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
-  const [trainingTemplates] = useState<TrainingTemplate[]>(initialTrainingTemplates)
   const [trainingPlan, setTrainingPlan] = useState({
     title: initialTrainingTemplates[0].name,
     warmUp: initialTrainingTemplates[0].warmUp,
@@ -192,6 +210,22 @@ function Dashboard({
       coachAvailability.find((item) => item.coachId === coachId && item.day === day)?.status ||
       "available"
     )
+  }
+
+  function loadTrainingPlanFromEvent(event: EventWithPlan) {
+    if (!event.trainingPlanId) return
+    const plan = allTrainingPlans.find((item) => item.id === event.trainingPlanId)
+    if (!plan) return
+
+    setSelectedTemplateId(plan.id)
+    setTrainingPlan({
+      title: plan.name,
+      warmUp: plan.warmUp,
+      drill1: plan.drill1,
+      drill2: plan.drill2,
+      game: plan.game,
+      notes: plan.notes,
+    })
   }
 
   const activeMatchAvailableIds = activeMatchEvent
@@ -272,6 +306,7 @@ function Dashboard({
       coachesRes,
       coachAvailabilityRes,
       leagueRes,
+      trainingPlansRes,
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
@@ -280,6 +315,7 @@ function Dashboard({
       supabase.from("coaches").select("*").order("name", { ascending: true }),
       supabase.from("coach_availability").select("*").order("day", { ascending: true }),
       supabase.from("league_results").select("*").order("played_on", { ascending: false }),
+      supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -314,6 +350,8 @@ function Dashboard({
           location: row.location || "",
           opponent: row.opponent || "",
           notes: row.notes || "",
+          trainingPlanId: row.training_plan_id || "",
+          trainingPlanName: row.training_plan_name || "",
         }))
       )
     }
@@ -364,6 +402,20 @@ function Dashboard({
           homeScore: row.home_score,
           awayScore: row.away_score,
           competition: row.competition || "",
+        }))
+      )
+    }
+
+    if (!trainingPlansRes.error && trainingPlansRes.data) {
+      setDbTrainingPlans(
+        (trainingPlansRes.data as DbTrainingPlan[]).map((row) => ({
+          id: row.id,
+          name: row.name,
+          warmUp: row.warm_up || "",
+          drill1: row.drill_1 || "",
+          drill2: row.drill_2 || "",
+          game: row.game || "",
+          notes: row.notes || "",
         }))
       )
     }
@@ -821,8 +873,10 @@ function Dashboard({
 
     const safeTime = eventStartTime.trim() || "00:00"
     const newId = editingCalendarEventId || (crypto.randomUUID?.() || makeId())
+    const linkedPlan =
+      allTrainingPlans.find((plan) => plan.id === selectedDbTrainingPlanId) || null
 
-    const newEvent: EventItem = {
+    const newEvent: EventWithPlan = {
       id: newId,
       date: selectedDate,
       title: eventTitle.trim(),
@@ -831,6 +885,8 @@ function Dashboard({
       location: eventLocation.trim(),
       opponent: eventOpponent.trim(),
       notes: eventNotes.trim(),
+      trainingPlanId: linkedPlan?.id || "",
+      trainingPlanName: linkedPlan?.name || "",
     }
 
     const { error } = await supabase.from("events").upsert({
@@ -843,6 +899,8 @@ function Dashboard({
       location: newEvent.location || "",
       opponent: newEvent.opponent || "",
       notes: newEvent.notes || "",
+      training_plan_id: linkedPlan?.id || null,
+      training_plan_name: linkedPlan?.name || "",
     })
 
     if (error) {
@@ -867,6 +925,7 @@ function Dashboard({
     setEventLocation("")
     setEventOpponent("")
     setEventNotes("")
+    setSelectedDbTrainingPlanId("")
     setEditingCalendarEventId(null)
     setShowEventForm(false)
   }
@@ -880,10 +939,11 @@ function Dashboard({
     setEventLocation("")
     setEventOpponent("")
     setEventNotes("")
+    setSelectedDbTrainingPlanId("")
     setShowEventForm(true)
   }
 
-  function openEditCalendarEvent(event: EventItem) {
+  function openEditCalendarEvent(event: EventWithPlan) {
     if (!isAdmin) return
     setEditingCalendarEventId(event.id)
     setEventTitle(event.title)
@@ -892,6 +952,7 @@ function Dashboard({
     setEventLocation(event.location || "")
     setEventOpponent(event.opponent || "")
     setEventNotes(event.notes || "")
+    setSelectedDbTrainingPlanId(event.trainingPlanId || "")
     setSelectedDate(event.date)
     setShowEventForm(true)
   }
@@ -1172,7 +1233,8 @@ function Dashboard({
     const confirmed = window.confirm("End game and save result?")
     if (!confirmed) return
 
-    const resultId = crypto.randomUUID?.() || makeId()
+    const existing = leagueResults.find((item) => item.eventId === activeMatchEvent.id)
+    const resultId = existing?.id || crypto.randomUUID?.() || makeId()
 
     const resultRow = {
       id: resultId,
@@ -1421,7 +1483,12 @@ function Dashboard({
                   {selectedDateEvents.map((event) => (
                     <button
                       key={event.id}
-                      onClick={() => setSelectedEventId(event.id)}
+                      onClick={() => {
+                        setSelectedEventId(event.id)
+                        if (event.type === "training") {
+                          loadTrainingPlanFromEvent(event)
+                        }
+                      }}
                       style={{
                         padding: 12,
                         borderRadius: 16,
@@ -1437,9 +1504,14 @@ function Dashboard({
                         {event.startTime ? ` • ${event.startTime}` : ""}
                         {event.location ? ` • ${event.location}` : ""}
                       </div>
+                      {event.trainingPlanName ? (
+                        <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>
+                          Training plan: {event.trainingPlanName}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •
-                        {" "}Unavail {countAttendance(event.id, "unavailable")}
+                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •{" "}
+                        Unavail {countAttendance(event.id, "unavailable")}
                       </div>
                     </button>
                   ))}
@@ -1467,6 +1539,11 @@ function Dashboard({
                       {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
                       {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
                     </div>
+                    {selectedEvent.trainingPlanName ? (
+                      <div style={{ color: "#475569", marginTop: 8 }}>
+                        Training plan: <strong>{selectedEvent.trainingPlanName}</strong>
+                      </div>
+                    ) : null}
                     {selectedEvent.opponent ? (
                       <div style={{ color: "#64748b", marginTop: 6 }}>Opponent: {selectedEvent.opponent}</div>
                     ) : null}
@@ -1565,7 +1642,7 @@ function Dashboard({
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
               <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
-                {trainingTemplates.map((template) => (
+                {allTrainingPlans.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => {
@@ -2055,6 +2132,21 @@ function Dashboard({
                 <option value="other">Other</option>
               </select>
 
+              {eventType === "training" ? (
+                <select
+                  value={selectedDbTrainingPlanId}
+                  onChange={(e) => setSelectedDbTrainingPlanId(e.target.value)}
+                  style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+                >
+                  <option value="">No linked training plan</option>
+                  {allTrainingPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+
               <input
                 value={eventStartTime}
                 onChange={(e) => setEventStartTime(e.target.value)}
@@ -2117,6 +2209,7 @@ function Dashboard({
                   setEventLocation("")
                   setEventOpponent("")
                   setEventNotes("")
+                  setSelectedDbTrainingPlanId("")
                 }}
                 style={{ ...buttonSecondary(), flex: 1 }}
               >
