@@ -49,6 +49,22 @@ export type TrainingSession = {
   blocks: SessionBlock[]
 }
 
+export type CompletedSessionBlock = {
+  id: string
+  title: string
+  duration: number
+  description: string
+  completed: boolean
+}
+
+export type TrainingSessionRecord = {
+  id: string
+  date: string
+  planName: string
+  notes: string
+  blocks: CompletedSessionBlock[]
+}
+
 export type Coach = {
   id: string
   name: string
