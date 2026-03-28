@@ -38,6 +38,7 @@ import {
   type QuarterPlan,
   type SavedLineup,
   type TimelineItem,
+  type TrainingSession,
   type TrainingTemplate,
 } from "./lib/types"
 import {
@@ -46,6 +47,7 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
+import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 
 type PeriodMode = "quarters" | "halves"
 
@@ -168,6 +170,7 @@ function Dashboard({
   const allTrainingPlans = dbTrainingPlans.length > 0 ? dbTrainingPlans : initialTrainingTemplates
 
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
+  const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
   const [trainingPlan, setTrainingPlan] = useState({
     title: initialTrainingTemplates[0].name,
     warmUp: initialTrainingTemplates[0].warmUp,
@@ -220,6 +223,7 @@ function Dashboard({
     if (!plan) return
 
     setSelectedTemplateId(plan.id)
+    setActiveSession(null)
     setTrainingPlan({
       title: plan.name,
       warmUp: plan.warmUp,
@@ -1700,12 +1704,14 @@ function Dashboard({
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
+
               <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
                 {allTrainingPlans.map((template) => (
                   <button
                     key={template.id}
                     onClick={() => {
                       setSelectedTemplateId(template.id)
+                      setActiveSession(null)
                       setTrainingPlan({
                         title: template.name,
                         warmUp: template.warmUp,
@@ -1741,7 +1747,25 @@ function Dashboard({
                 ))}
               </div>
 
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  onClick={() => {
+                    const template = allTrainingPlans.find((p) => p.id === selectedTemplateId)
+                    if (!template) return
+                    setActiveSession(buildSessionFromTemplate(template))
+                  }}
+                  style={buttonPrimary()}
+                >
+                  Generate Session
+                </button>
+
+                <button onClick={() => setActiveSession(null)} style={buttonSecondary()}>
+                  Clear Session
+                </button>
+              </div>
+
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Plan</div>
+
               <div style={{ display: "grid", gap: 10 }}>
                 {[
                   ["Session Title", trainingPlan.title],
@@ -1773,6 +1797,7 @@ function Dashboard({
                 allTrainingPlans.find((plan) => plan.id === selectedTemplateId) ||
                 (allTrainingPlans[0] ?? null)
               }
+              session={activeSession}
             />
 
             <TrainingPlansManager
@@ -1781,6 +1806,7 @@ function Dashboard({
               onSaveTrainingPlans={saveTrainingPlans}
               onUsePlan={(plan) => {
                 setSelectedTemplateId(plan.id)
+                setActiveSession(null)
                 setTrainingPlan({
                   title: plan.name,
                   warmUp: plan.warmUp,
