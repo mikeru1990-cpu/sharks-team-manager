@@ -36,6 +36,19 @@ export type Player = {
   seasonSeconds: number
 }
 
+export type SessionBlock = {
+  id: string
+  title: string
+  duration: number // minutes
+  description: string
+}
+
+export type TrainingSession = {
+  id: string
+  name: string
+  blocks: SessionBlock[]
+}
+
 export type Coach = {
   id: string
   name: string
