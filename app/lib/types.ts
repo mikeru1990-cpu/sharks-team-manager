@@ -96,6 +96,18 @@ export type SavedLineup = {
   bench: string[]
 }
 
+export type LeagueResult = {
+  id: string
+  playedOn: string
+  eventId?: string | null
+  opponent: string
+  homeTeam: string
+  awayTeam: string
+  homeScore: number
+  awayScore: number
+  competition?: string
+}
+
 export const TEAM = {
   name: "Sharks Lioness",
   primary: "#06245c",
