@@ -1869,8 +1869,8 @@ function Dashboard({
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •
-                        {" "}Unavail {countAttendance(event.id, "unavailable")}
+                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •{" "}
+                        Unavail {countAttendance(event.id, "unavailable")}
                       </div>
                     </button>
                   ))}
