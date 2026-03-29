@@ -17,6 +17,7 @@ import SessionHistory from "./components/SessionHistory"
 import MatchRatingsManager from "./components/MatchRatingsManager"
 import PlayerFormTable from "./components/PlayerFormTable"
 import SeasonAwards from "./components/SeasonAwards"
+import MatchReportGenerator from "./components/MatchReportGenerator"
 import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
@@ -38,6 +39,7 @@ import {
   type MainTab,
   type MatchEventDraft,
   type MatchFormat,
+  type MatchReport,
   type MatchTab,
   type Player,
   type PlayerAwardRow,
@@ -124,6 +126,7 @@ function Dashboard({
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [leagueResults, setLeagueResults] = useState<LeagueResult[]>([])
   const [playerRatings, setPlayerRatings] = useState<PlayerMatchRating[]>([])
+  const [matchReports, setMatchReports] = useState<MatchReport[]>([])
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
 
@@ -385,6 +388,31 @@ function Dashboard({
       .sort((a, b) => b.averageRating - a.averageRating)
   }, [players, playerRatings, playerOfMatchMap])
 
+  const activeMatchRatings = useMemo(() => {
+    if (!activeMatchEventId) return []
+    return playerRatings
+      .filter((item) => item.eventId === activeMatchEventId)
+      .slice()
+      .sort((a, b) => b.rating - a.rating)
+  }, [playerRatings, activeMatchEventId])
+
+  const activeTopPerformers = useMemo(() => {
+    return activeMatchRatings
+      .slice(0, 3)
+      .map((item) => players.find((p) => p.id === item.playerId)?.name || "Unknown")
+  }, [activeMatchRatings, players])
+
+  const activeGoalsSummary = useMemo(() => {
+    return timeline
+      .filter((item) => item.type === "goal")
+      .map((item) => `${item.minute}' - ${item.text}`)
+  }, [timeline])
+
+  const latestActiveMatchReport = useMemo(() => {
+    if (!activeMatchEventId) return null
+    return matchReports.find((item) => item.eventId === activeMatchEventId) || null
+  }, [matchReports, activeMatchEventId])
+
   async function loadAll() {
     setLoading(true)
 
@@ -406,6 +434,7 @@ function Dashboard({
       trainingPlansRes,
       sessionHistoryRes,
       ratingsRes,
+      reportsRes,
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
@@ -417,6 +446,7 @@ function Dashboard({
       supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
       supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
       supabase.from("player_match_ratings").select("*").order("created_at", { ascending: false }),
+      supabase.from("match_reports").select("*").order("created_at", { ascending: false }),
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -553,6 +583,25 @@ function Dashboard({
           playerId: row.player_id,
           rating: Number(row.rating || 0),
           notes: row.notes || "",
+        }))
+      )
+    }
+
+    if (!reportsRes.error && reportsRes.data) {
+      setMatchReports(
+        reportsRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          title: row.title,
+          matchDate: row.match_date,
+          opponent: row.opponent,
+          scoreLine: row.score_line,
+          playerOfTheMatch: row.player_of_the_match,
+          topPerformers: JSON.parse(row.top_performers_json || "[]"),
+          goalsSummary: JSON.parse(row.goals_summary_json || "[]"),
+          coachNotes: row.coach_notes || "",
+          reportText: row.report_text,
+          createdAt: row.created_at || "",
         }))
       )
     }
@@ -1524,6 +1573,73 @@ function Dashboard({
     alert("Game result saved")
   }
 
+  async function saveMatchReport(coachNotes: string) {
+    if (!supabase || !activeMatchEvent || !isAdmin) return
+
+    const reportId = latestActiveMatchReport?.id || crypto.randomUUID?.() || makeId()
+
+    const playerOfTheMatchName =
+      players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || "TBC"
+
+    const scoreLine = `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`
+
+    const reportText = [
+      activeMatchEvent.title,
+      activeMatchEvent.date,
+      `Result: ${scoreLine}`,
+      `Opponent: ${activeMatchEvent.opponent || awayTeam}`,
+      `Player of the Match: ${playerOfTheMatchName}`,
+      activeTopPerformers.length ? `Top performers: ${activeTopPerformers.join(", ")}` : "",
+      activeGoalsSummary.length ? `Goals: ${activeGoalsSummary.join(" | ")}` : "Goals: none logged",
+      coachNotes.trim() ? `Coach notes: ${coachNotes.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+
+    const payload = {
+      id: reportId,
+      event_id: activeMatchEvent.id,
+      title: activeMatchEvent.title,
+      match_date: activeMatchEvent.date,
+      opponent: activeMatchEvent.opponent || awayTeam,
+      score_line: scoreLine,
+      player_of_the_match: playerOfTheMatchName,
+      top_performers_json: JSON.stringify(activeTopPerformers),
+      goals_summary_json: JSON.stringify(activeGoalsSummary),
+      coach_notes: coachNotes.trim(),
+      report_text: reportText,
+    }
+
+    const { error } = await supabase.from("match_reports").upsert(payload)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    const nextReport: MatchReport = {
+      id: reportId,
+      eventId: activeMatchEvent.id,
+      title: activeMatchEvent.title,
+      matchDate: activeMatchEvent.date,
+      opponent: activeMatchEvent.opponent || awayTeam,
+      scoreLine,
+      playerOfTheMatch: playerOfTheMatchName,
+      topPerformers: activeTopPerformers,
+      goalsSummary: activeGoalsSummary,
+      coachNotes: coachNotes.trim(),
+      reportText,
+      createdAt: new Date().toISOString(),
+    }
+
+    setMatchReports((prev) => {
+      const filtered = prev.filter((item) => item.eventId !== activeMatchEvent.id)
+      return [nextReport, ...filtered]
+    })
+
+    alert("Match report saved")
+  }
+
   const totalGoals = timeline.filter((t) => t.type === "goal").length
   const totalAssists = timeline.filter((t) => t.type === "assist").length
   const mainGk = players.find((p) => p.mainGK)
@@ -1753,8 +1869,8 @@ function Dashboard({
                         </div>
                       ) : null}
                       <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •{" "}
-                        Unavail {countAttendance(event.id, "unavailable")}
+                        Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •
+                        {" "}Unavail {countAttendance(event.id, "unavailable")}
                       </div>
                     </button>
                   ))}
@@ -1826,7 +1942,9 @@ function Dashboard({
                   <div style={{ ...statusStyle("maybe"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
                     Maybe {maybeCount}
                   </div>
-                  <div style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
+                  <div
+                    style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}
+                  >
                     Unavailable {unavailableCount}
                   </div>
                 </div>
@@ -2359,6 +2477,23 @@ function Dashboard({
                   {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
                 </div>
               </div>
+            ) : null}
+
+            {activeMatchEvent ? (
+              <MatchReportGenerator
+                isAdmin={isAdmin}
+                activeMatchTitle={activeMatchEvent.title}
+                activeMatchDate={activeMatchEvent.date}
+                opponent={activeMatchEvent.opponent || awayTeam}
+                scoreLine={`${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`}
+                playerOfTheMatch={
+                  players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || ""
+                }
+                topPerformers={activeTopPerformers}
+                goalsSummary={activeGoalsSummary}
+                onSaveReport={saveMatchReport}
+                latestReport={latestActiveMatchReport}
+              />
             ) : null}
           </div>
         )}
