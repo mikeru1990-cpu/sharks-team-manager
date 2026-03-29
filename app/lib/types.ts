@@ -25,6 +25,23 @@ export type EventAttendance = {
   status: AttendanceStatus
 }
 
+export type PlayerMatchRating = {
+  id: string
+  eventId: string
+  playerId: string
+  rating: number
+  notes: string
+}
+
+export type PlayerFormRow = {
+  playerId: string
+  playerName: string
+  averageRating: number
+  ratingsCount: number
+  recentForm: number[]
+  bestRating: number
+}
+
 export type Player = {
   id: string
   name: string
