@@ -14,6 +14,9 @@ import LeagueTable from "./components/LeagueTable"
 import TrainingPlansManager from "./components/TrainingPlansManager"
 import SessionTimer from "./components/SessionTimer"
 import SessionHistory from "./components/SessionHistory"
+import MatchRatingsManager from "./components/MatchRatingsManager"
+import PlayerFormTable from "./components/PlayerFormTable"
+import SeasonAwards from "./components/SeasonAwards"
 import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
@@ -37,6 +40,9 @@ import {
   type MatchFormat,
   type MatchTab,
   type Player,
+  type PlayerAwardRow,
+  type PlayerFormRow,
+  type PlayerMatchRating,
   type QuarterPlan,
   type SavedLineup,
   type TimelineItem,
@@ -117,6 +123,7 @@ function Dashboard({
   const [events, setEvents] = useState<EventWithPlan[]>([])
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [leagueResults, setLeagueResults] = useState<LeagueResult[]>([])
+  const [playerRatings, setPlayerRatings] = useState<PlayerMatchRating[]>([])
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
 
@@ -298,6 +305,86 @@ function Dashboard({
 
   const noAvailableCoaches = availableCoaches.length === 0
 
+  const playerOfMatchMap = useMemo(() => {
+    const byEvent: Record<string, PlayerMatchRating[]> = {}
+
+    for (const rating of playerRatings) {
+      if (!byEvent[rating.eventId]) byEvent[rating.eventId] = []
+      byEvent[rating.eventId].push(rating)
+    }
+
+    const winners: Record<string, string> = {}
+
+    for (const eventId of Object.keys(byEvent)) {
+      const sorted = byEvent[eventId].slice().sort((a, b) => b.rating - a.rating)
+      if (sorted.length > 0) {
+        winners[eventId] = sorted[0].playerId
+      }
+    }
+
+    return winners
+  }, [playerRatings])
+
+  const playerFormRows: PlayerFormRow[] = useMemo(() => {
+    return players
+      .map((player) => {
+        const ratings = playerRatings
+          .filter((item) => item.playerId === player.id)
+          .map((item) => item.rating)
+
+        if (ratings.length === 0) {
+          return {
+            playerId: player.id,
+            playerName: player.name,
+            averageRating: 0,
+            ratingsCount: 0,
+            recentForm: [],
+            bestRating: 0,
+          }
+        }
+
+        const averageRating = ratings.reduce((sum, value) => sum + value, 0) / ratings.length
+
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          averageRating,
+          ratingsCount: ratings.length,
+          recentForm: ratings.slice(0, 5),
+          bestRating: Math.max(...ratings),
+        }
+      })
+      .sort((a, b) => b.averageRating - a.averageRating)
+  }, [players, playerRatings])
+
+  const playerAwardRows: PlayerAwardRow[] = useMemo(() => {
+    return players
+      .map((player) => {
+        const ratings = playerRatings
+          .filter((item) => item.playerId === player.id)
+          .map((item) => item.rating)
+
+        const recentForm = ratings.slice(0, 5)
+        const averageRating =
+          ratings.length > 0 ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : 0
+
+        const playerOfMatchCount = Object.values(playerOfMatchMap).filter(
+          (winnerId) => winnerId === player.id
+        ).length
+
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          averageRating,
+          ratingsCount: ratings.length,
+          playerOfMatchCount,
+          recentForm,
+          bestRating: ratings.length > 0 ? Math.max(...ratings) : 0,
+        }
+      })
+      .sort((a, b) => b.averageRating - a.averageRating)
+  }, [players, playerRatings, playerOfMatchMap])
+
   async function loadAll() {
     setLoading(true)
 
@@ -318,6 +405,7 @@ function Dashboard({
       leagueRes,
       trainingPlansRes,
       sessionHistoryRes,
+      ratingsRes,
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
@@ -328,6 +416,7 @@ function Dashboard({
       supabase.from("league_results").select("*").order("played_on", { ascending: false }),
       supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
       supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
+      supabase.from("player_match_ratings").select("*").order("created_at", { ascending: false }),
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
@@ -452,6 +541,18 @@ function Dashboard({
           planName: row.plan_name,
           notes: row.notes || "",
           blocks: JSON.parse(row.blocks_json || "[]"),
+        }))
+      )
+    }
+
+    if (!ratingsRes.error && ratingsRes.data) {
+      setPlayerRatings(
+        ratingsRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          playerId: row.player_id,
+          rating: Number(row.rating || 0),
+          notes: row.notes || "",
         }))
       )
     }
@@ -852,6 +953,48 @@ function Dashboard({
     }
 
     setSessionHistory((prev) => [record, ...prev])
+  }
+
+  async function savePlayerRating(playerId: string, rating: number, notes: string) {
+    if (!supabase || !activeMatchEventId || !isAdmin) return
+
+    const existing = playerRatings.find(
+      (item) => item.eventId === activeMatchEventId && item.playerId === playerId
+    )
+
+    const nextId = existing?.id || crypto.randomUUID?.() || makeId()
+
+    const payload = {
+      id: nextId,
+      event_id: activeMatchEventId,
+      player_id: playerId,
+      rating,
+      notes,
+    }
+
+    const { error } = await supabase.from("player_match_ratings").upsert(payload)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setPlayerRatings((prev) => {
+      const filtered = prev.filter(
+        (item) => !(item.eventId === activeMatchEventId && item.playerId === playerId)
+      )
+
+      return [
+        {
+          id: nextId,
+          eventId: activeMatchEventId,
+          playerId,
+          rating,
+          notes,
+        },
+        ...filtered,
+      ]
+    })
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
@@ -1587,9 +1730,7 @@ function Dashboard({
                       key={event.id}
                       onClick={() => {
                         setSelectedEventId(event.id)
-                        if (event.type === "training") {
-                          loadTrainingPlanFromEvent(event)
-                        }
+                        if (event.type === "training") loadTrainingPlanFromEvent(event)
                       }}
                       style={{
                         padding: 12,
@@ -1685,9 +1826,7 @@ function Dashboard({
                   <div style={{ ...statusStyle("maybe"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
                     Maybe {maybeCount}
                   </div>
-                  <div
-                    style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}
-                  >
+                  <div style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
                     Unavailable {unavailableCount}
                   </div>
                 </div>
@@ -2175,10 +2314,10 @@ function Dashboard({
                 await persistMatchState({ periodLength: nextValue })
               }}
               trackingTitle={
-  activeMatchEvent
-    ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
-    : ""
-}
+                activeMatchEvent
+                  ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
+                  : ""
+              }
             />
 
             {matchTab === "quarters" ? (
@@ -2202,6 +2341,25 @@ function Dashboard({
                 periodLength={periodLength}
               />
             ) : null}
+
+            <MatchRatingsManager
+              isAdmin={isAdmin}
+              players={matchPlayers}
+              activeEventId={activeMatchEventId}
+              ratings={playerRatings}
+              onSaveRating={savePlayerRating}
+            />
+
+            {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
+              <div style={cardStyle("#fef3c7")}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
+                  Auto Player of the Match
+                </div>
+                <div style={{ color: "#92400e", fontWeight: 800 }}>
+                  {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -2219,6 +2377,10 @@ function Dashboard({
             </div>
 
             <LeagueTable results={leagueResults} teamName={TEAM.name} />
+
+            <PlayerFormTable rows={playerFormRows.filter((row) => row.ratingsCount > 0)} />
+
+            <SeasonAwards rows={playerAwardRows.filter((row) => row.ratingsCount > 0)} />
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Season Minutes</div>
