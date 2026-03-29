@@ -76,6 +76,18 @@ type DbTrainingPlanRow = {
   notes: string | null
 }
 
+type StandingRow = {
+  team: string
+  played: number
+  wins: number
+  draws: number
+  losses: number
+  goals_for: number
+  goals_against: number
+  goal_difference: number
+  points: number
+}
+
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
@@ -125,6 +137,7 @@ function Dashboard({
   const [events, setEvents] = useState<EventWithPlan[]>([])
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [leagueResults, setLeagueResults] = useState<LeagueResult[]>([])
+  const [leagueStandings, setLeagueStandings] = useState<StandingRow[]>([])
   const [playerRatings, setPlayerRatings] = useState<PlayerMatchRating[]>([])
   const [matchReports, setMatchReports] = useState<MatchReport[]>([])
 
@@ -413,6 +426,44 @@ function Dashboard({
     return matchReports.find((item) => item.eventId === activeMatchEventId) || null
   }, [matchReports, activeMatchEventId])
 
+  async function loadLeagueResults() {
+    try {
+      const res = await fetch("/api/get-league-results", { cache: "no-store" })
+      const data = await res.json()
+
+      if (Array.isArray(data)) {
+        setLeagueResults(
+          data.map((row: any) => ({
+            id: row.id,
+            playedOn: row.played_on,
+            eventId: row.event_id || null,
+            opponent: row.opponent || "",
+            homeTeam: row.home_team,
+            awayTeam: row.away_team,
+            homeScore: row.home_score,
+            awayScore: row.away_score,
+            competition: row.competition || "",
+          }))
+        )
+      }
+    } catch (error) {
+      console.error("Failed to load league results", error)
+    }
+  }
+
+  async function loadLeagueStandings() {
+    try {
+      const res = await fetch("/api/get-league-standings", { cache: "no-store" })
+      const data = await res.json()
+
+      if (Array.isArray(data)) {
+        setLeagueStandings(data)
+      }
+    } catch (error) {
+      console.error("Failed to load league standings", error)
+    }
+  }
+
   async function loadAll() {
     setLoading(true)
 
@@ -430,7 +481,6 @@ function Dashboard({
       attendanceRes,
       coachesRes,
       coachAvailabilityRes,
-      leagueRes,
       trainingPlansRes,
       sessionHistoryRes,
       ratingsRes,
@@ -442,7 +492,6 @@ function Dashboard({
       supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
       supabase.from("coaches").select("*").order("name", { ascending: true }),
       supabase.from("coach_availability").select("*").order("day", { ascending: true }),
-      supabase.from("league_results").select("*").order("played_on", { ascending: false }),
       supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
       supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
       supabase.from("player_match_ratings").select("*").order("created_at", { ascending: false }),
@@ -517,22 +566,6 @@ function Dashboard({
           day: row.day,
           status: row.status as CoachAvailabilityStatus,
           notes: row.notes || "",
-        }))
-      )
-    }
-
-    if (!leagueRes.error && leagueRes.data) {
-      setLeagueResults(
-        leagueRes.data.map((row: any) => ({
-          id: row.id,
-          playedOn: row.played_on,
-          eventId: row.event_id || null,
-          opponent: row.opponent,
-          homeTeam: row.home_team,
-          awayTeam: row.away_team,
-          homeScore: row.home_score,
-          awayScore: row.away_score,
-          competition: row.competition || "",
         }))
       )
     }
@@ -732,6 +765,8 @@ function Dashboard({
 
   useEffect(() => {
     void loadAll()
+    void loadLeagueResults()
+    void loadLeagueStandings()
   }, [])
 
   useEffect(() => {
@@ -1522,53 +1557,40 @@ function Dashboard({
   }
 
   async function handleEndGame() {
-    if (!supabase || !activeMatchEvent || !isAdmin) return
+    if (!activeMatchEvent || !isAdmin) return
 
     const confirmed = window.confirm("End game and save result?")
     if (!confirmed) return
 
-    const existing = leagueResults.find((item) => item.eventId === activeMatchEvent.id)
-    const resultId = existing?.id || crypto.randomUUID?.() || makeId()
+    const response = await fetch("/api/save-result", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playedOn: activeMatchEvent.date,
+        eventId: activeMatchEvent.id,
+        competition: activeMatchEvent.title || "",
+        homeTeam,
+        awayTeam,
+        homeScore,
+        awayScore,
+        venue: activeMatchEvent.location || "",
+        notes: "",
+        isFinal: true,
+      }),
+    })
 
-    const resultRow = {
-      id: resultId,
-      played_on: activeMatchEvent.date,
-      event_id: activeMatchEvent.id,
-      opponent: activeMatchEvent.opponent || awayTeam,
-      home_team: homeTeam,
-      away_team: awayTeam,
-      home_score: homeScore,
-      away_score: awayScore,
-      competition: activeMatchEvent.title || "",
-    }
+    const data = await response.json()
 
-    const { error } = await supabase.from("league_results").upsert(resultRow)
-
-    if (error) {
-      alert(error.message)
+    if (!response.ok) {
+      alert(data?.error || "Could not save result")
       return
     }
 
-    setLeagueResults((prev) => {
-      const next = prev.filter((item) => item.eventId !== activeMatchEvent.id)
-      return [
-        {
-          id: resultId,
-          playedOn: activeMatchEvent.date,
-          eventId: activeMatchEvent.id,
-          opponent: activeMatchEvent.opponent || awayTeam,
-          homeTeam,
-          awayTeam,
-          homeScore,
-          awayScore,
-          competition: activeMatchEvent.title || "",
-        },
-        ...next,
-      ]
-    })
-
     setRunning(false)
     await persistMatchState({ running: false })
+
+    await loadLeagueResults()
+    await loadLeagueStandings()
 
     alert("Game result saved")
   }
@@ -2511,7 +2533,36 @@ function Dashboard({
               </div>
             </div>
 
-            <LeagueTable results={leagueResults} teamName={TEAM.name} />
+            <LeagueTable standings={leagueStandings} teamName={TEAM.name} />
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Results</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {leagueResults.length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No saved results yet.</div>
+                ) : (
+                  leagueResults.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 14,
+                        border: "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>
+                        {item.homeTeam} {item.homeScore} - {item.awayScore} {item.awayTeam}
+                      </div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>
+                        {item.playedOn}
+                        {item.competition ? ` • ${item.competition}` : ""}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
 
             <PlayerFormTable rows={playerFormRows.filter((row) => row.ratingsCount > 0)} />
 
