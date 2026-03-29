@@ -2174,6 +2174,11 @@ function Dashboard({
                 setPeriodLengthState(nextValue)
                 await persistMatchState({ periodLength: nextValue })
               }}
+              trackingTitle={
+  activeMatchEvent
+    ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
+    : ""
+}
             />
 
             {matchTab === "quarters" ? (
