@@ -121,6 +121,130 @@ function statusStyle(status: AttendanceStatus) {
   }
 }
 
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div
+      style={{
+        background: "#f1f5f9",
+        padding: 12,
+        borderRadius: 10,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 900 }}>{value}</div>
+    </div>
+  )
+}
+
+function FormBadge({ value }: { value: "W" | "D" | "L" }) {
+  const styles =
+    value === "W"
+      ? { background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }
+      : value === "D"
+      ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" }
+      : { background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" }
+
+  return (
+    <div
+      style={{
+        ...styles,
+        width: 34,
+        height: 34,
+        borderRadius: 999,
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 900,
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 12,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{label}</div>
+      <div style={{ marginTop: 4, fontWeight: 800 }}>{value}</div>
+    </div>
+  )
+}
+
+function getHeadToHeadDetails(teamName: string, opponentName: string, results: LeagueResult[]) {
+  const matches = results
+    .filter(
+      (m) =>
+        (m.homeTeam === teamName && m.awayTeam === opponentName) ||
+        (m.awayTeam === teamName && m.homeTeam === opponentName)
+    )
+    .slice()
+    .sort((a, b) => b.playedOn.localeCompare(a.playedOn))
+
+  let wins = 0
+  let draws = 0
+  let losses = 0
+  let goalsFor = 0
+  let goalsAgainst = 0
+
+  const form: string[] = []
+  let lastResult: string | null = null
+  let biggestWin: { margin: number; score: string } | null = null
+  let heaviestLoss: { margin: number; score: string } | null = null
+
+  matches.forEach((m, index) => {
+    const isHome = m.homeTeam === teamName
+    const gf = isHome ? m.homeScore : m.awayScore
+    const ga = isHome ? m.awayScore : m.homeScore
+    const score = `${teamName} ${gf} - ${ga} ${opponentName}`
+
+    goalsFor += gf
+    goalsAgainst += ga
+
+    if (gf > ga) {
+      wins += 1
+      form.push("W")
+      const margin = gf - ga
+      if (!biggestWin || margin > biggestWin.margin) {
+        biggestWin = { margin, score }
+      }
+    } else if (gf === ga) {
+      draws += 1
+      form.push("D")
+    } else {
+      losses += 1
+      form.push("L")
+      const margin = ga - gf
+      if (!heaviestLoss || margin > heaviestLoss.margin) {
+        heaviestLoss = { margin, score }
+      }
+    }
+
+    if (index === 0) {
+      lastResult = `${m.playedOn}: ${score}`
+    }
+  })
+
+  return {
+    played: matches.length,
+    wins,
+    draws,
+    losses,
+    goalsFor,
+    goalsAgainst,
+    form: form.slice(0, 5),
+    lastResult,
+    biggestWin,
+    heaviestLoss,
+  }
+}
+
 function Dashboard({
   isAdmin,
   signOut,
@@ -206,6 +330,8 @@ function Dashboard({
 
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
   const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
+
+  const [selectedOpponent, setSelectedOpponent] = useState<string>("")
 
   const [loading, setLoading] = useState(true)
 
@@ -425,6 +551,19 @@ function Dashboard({
     if (!activeMatchEventId) return null
     return matchReports.find((item) => item.eventId === activeMatchEventId) || null
   }, [matchReports, activeMatchEventId])
+
+  const opponents = useMemo(
+    () =>
+      Array.from(new Set(leagueResults.flatMap((m) => [m.homeTeam, m.awayTeam])))
+        .filter((team) => team !== TEAM.name)
+        .sort(),
+    [leagueResults]
+  )
+
+  const headToHead =
+    selectedOpponent && leagueResults.length
+      ? getHeadToHeadDetails(TEAM.name, selectedOpponent, leagueResults)
+      : null
 
   async function loadLeagueResults() {
     try {
@@ -2534,6 +2673,82 @@ function Dashboard({
             </div>
 
             <LeagueTable standings={leagueStandings} teamName={TEAM.name} />
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Head-to-Head</div>
+
+              <select
+                value={selectedOpponent}
+                onChange={(e) => setSelectedOpponent(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  marginBottom: 16,
+                  fontSize: 16,
+                  background: "white",
+                }}
+              >
+                <option value="">Select opponent</option>
+                {opponents.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
+                ))}
+              </select>
+
+              {!selectedOpponent ? (
+                <div style={{ color: "#64748b" }}>Choose a team to view the record.</div>
+              ) : headToHead ? (
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Stat label="Played" value={headToHead.played} />
+                    <Stat label="Won" value={headToHead.wins} />
+                    <Stat label="Drawn" value={headToHead.draws} />
+                    <Stat label="Lost" value={headToHead.losses} />
+                    <Stat label="GF" value={headToHead.goalsFor} />
+                    <Stat label="GA" value={headToHead.goalsAgainst} />
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700, marginBottom: 8 }}>
+                      Recent Form
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {headToHead.form.length > 0 ? (
+                        headToHead.form.map((item, index) => (
+                          <FormBadge key={`${item}-${index}`} value={item as "W" | "D" | "L"} />
+                        ))
+                      ) : (
+                        <div style={{ color: "#64748b" }}>No games yet.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {headToHead.lastResult ? (
+                      <InfoRow label="Last Result" value={headToHead.lastResult} />
+                    ) : null}
+                    {headToHead.biggestWin ? (
+                      <InfoRow label="Biggest Win" value={headToHead.biggestWin.score} />
+                    ) : null}
+                    {headToHead.heaviestLoss ? (
+                      <InfoRow label="Heaviest Loss" value={headToHead.heaviestLoss.score} />
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ color: "#64748b" }}>No record found.</div>
+              )}
+            </div>
 
             <div style={cardStyle()}>
               <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Results</div>
