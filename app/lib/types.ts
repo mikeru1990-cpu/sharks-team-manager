@@ -154,6 +154,16 @@ export type LeagueResult = {
   competition?: string
 }
 
+export type PlayerAwardRow = {
+  playerId: string
+  playerName: string
+  averageRating: number
+  ratingsCount: number
+  playerOfMatchCount: number
+  recentForm: number[]
+  bestRating: number
+}
+
 export const TEAM = {
   name: "Sharks Lioness",
   primary: "#06245c",
