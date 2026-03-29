@@ -164,6 +164,21 @@ export type PlayerAwardRow = {
   bestRating: number
 }
 
+export type MatchReport = {
+  id: string
+  eventId: string
+  title: string
+  matchDate: string
+  opponent: string
+  scoreLine: string
+  playerOfTheMatch: string
+  topPerformers: string[]
+  goalsSummary: string[]
+  coachNotes: string
+  reportText: string
+  createdAt: string
+}
+
 export const TEAM = {
   name: "Sharks Lioness",
   primary: "#06245c",
