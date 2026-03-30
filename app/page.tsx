@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic"
 
-import dynamic from "next/dynamic"
+import nextDynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
@@ -56,7 +56,7 @@ import {
   generateQuarterPlans,
 } from "./lib/rotation"
 
-const StatsTab = dynamic(() => import("./components/tabs/StatsTab"))
+const StatsTab = nextDynamic(() => import("./components/tabs/StatsTab"))
 
 type PeriodMode = "quarters" | "halves"
 
