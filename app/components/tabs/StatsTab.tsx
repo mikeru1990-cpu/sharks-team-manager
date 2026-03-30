@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { cardStyle } from "../../lib/types"
 import LeagueTable from "../LeagueTable"
+import SectionCard from "../ui/SectionCard"
+import EmptyState from "../ui/EmptyState"
 
 type Result = {
   homeTeam: string
@@ -30,6 +31,7 @@ type Props = {
   standings: StandingRow[]
 }
 
+// 🔹 Head-to-head calculator
 function getHeadToHead(teamName: string, opponent: string, results: Result[]) {
   const matches = results.filter(
     (m) =>
@@ -62,6 +64,7 @@ function getHeadToHead(teamName: string, opponent: string, results: Result[]) {
 export default function StatsTab({ teamName, results, standings }: Props) {
   const [selectedOpponent, setSelectedOpponent] = useState("")
 
+  // 🔹 Get unique opponents
   const opponents = useMemo(() => {
     return Array.from(
       new Set(results.flatMap((m) => [m.homeTeam, m.awayTeam]))
@@ -70,6 +73,7 @@ export default function StatsTab({ teamName, results, standings }: Props) {
       .sort()
   }, [results, teamName])
 
+  // 🔹 Calculate H2H
   const headToHead = useMemo(() => {
     if (!selectedOpponent) return null
     return getHeadToHead(teamName, selectedOpponent, results)
@@ -77,14 +81,14 @@ export default function StatsTab({ teamName, results, standings }: Props) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {/* League Table */}
-      <LeagueTable standings={standings} teamName={teamName} />
 
-      {/* Head to Head */}
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>
-          Head-to-Head
-        </div>
+      {/* 🏆 League Table */}
+      <SectionCard title="League Table">
+        <LeagueTable standings={standings} teamName={teamName} />
+      </SectionCard>
+
+      {/* 🤝 Head-to-Head */}
+      <SectionCard title="Head-to-Head">
 
         <select
           value={selectedOpponent}
@@ -106,31 +110,34 @@ export default function StatsTab({ teamName, results, standings }: Props) {
         </select>
 
         {!selectedOpponent ? (
-          <div style={{ color: "#64748b" }}>Select a team</div>
+          <EmptyState text="Select a team to view stats" />
         ) : headToHead ? (
-          <div style={{ display: "flex", gap: 20 }}>
+          <div style={{ display: "flex", gap: 12 }}>
             <Stat label="Played" value={headToHead.played} />
             <Stat label="Won" value={headToHead.wins} />
             <Stat label="Drawn" value={headToHead.draws} />
             <Stat label="Lost" value={headToHead.losses} />
           </div>
         ) : (
-          <div style={{ color: "#64748b" }}>No data</div>
+          <EmptyState text="No matches found" />
         )}
-      </div>
+      </SectionCard>
+
     </div>
   )
 }
 
+// 🔹 Small stat card
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div
       style={{
         flex: 1,
-        padding: 12,
+        padding: 14,
         borderRadius: 12,
         background: "#f8fafc",
         textAlign: "center",
+        border: "1px solid #e2e8f0",
       }}
     >
       <div style={{ fontSize: 20, fontWeight: 900 }}>{value}</div>
