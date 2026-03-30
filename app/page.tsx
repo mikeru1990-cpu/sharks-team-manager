@@ -2,7 +2,6 @@
 
 export const dynamic = "force-dynamic"
 
-import nextDynamic from "next/dynamic"
 import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
@@ -11,12 +10,14 @@ import PlayersManager from "./components/PlayersManager"
 import QuarterPlanner from "./components/QuarterPlanner"
 import MatchCenter from "./components/MatchCenter"
 import CoachesManager from "./components/CoachesManager"
+import LeagueTable from "./components/LeagueTable"
 import TrainingPlansManager from "./components/TrainingPlansManager"
 import SessionTimer from "./components/SessionTimer"
 import SessionHistory from "./components/SessionHistory"
 import MatchRatingsManager from "./components/MatchRatingsManager"
+import PlayerFormTable from "./components/PlayerFormTable"
+import SeasonAwards from "./components/SeasonAwards"
 import MatchReportGenerator from "./components/MatchReportGenerator"
-import SectionCard from "./components/ui/SectionCard"
 import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
@@ -41,6 +42,8 @@ import {
   type MatchReport,
   type MatchTab,
   type Player,
+  type PlayerAwardRow,
+  type PlayerFormRow,
   type PlayerMatchRating,
   type QuarterPlan,
   type SavedLineup,
@@ -55,8 +58,6 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
-
-const StatsTab = nextDynamic(() => import("./components/tabs/StatsTab"))
 
 type PeriodMode = "quarters" | "halves"
 
@@ -85,6 +86,7 @@ type StandingRow = {
   goals_against: number
   goal_difference: number
   points: number
+  form?: ("W" | "D" | "L")[]
 }
 
 function formatFullDate(date: string) {
@@ -117,6 +119,244 @@ function statusStyle(status: AttendanceStatus) {
     border: "1px solid #dc2626",
     background: "#fee2e2",
     color: "#991b1b",
+  }
+}
+
+function normalizeTeamName(name: string) {
+  const value = name.trim()
+
+  const map: Record<string, string> = {
+    "U10 Lionesses 25/26": "Leonard Stanley U10 Lioness",
+    "U10 Lionesses": "Leonard Stanley U10 Lioness",
+    "Sharks Lioness": "Leonard Stanley U10 Lioness",
+    "Sharks Lionesses": "Leonard Stanley U10 Lioness",
+
+    "Tewkesbury Town Colts Youth U10": "Tewkesbury Town Colts",
+    "Tewkesbury Town Colts Youth": "Tewkesbury Town Colts",
+    "Tewkesbury Town Colts Youth U10 ": "Tewkesbury Town Colts",
+
+    "Stonehouse TownYouth U10": "Stonehouse Town",
+    "Stonehouse Town Youth U10": "Stonehouse Town",
+    "Stonehouse TownYouth": "Stonehouse Town",
+
+    "Rodborough Youth U10 Lioness": "Rodborough Lionesses",
+    "Rodborough Youth U10 Lionesses": "Rodborough Lionesses",
+    "Rodborough Youth U10 Lionesss": "Rodborough Lionesses",
+
+    "Leonard Stanley U10 Lionesses": "Leonard Stanley U10 Lioness",
+    "Leonard Stanley U10 Lioness ": "Leonard Stanley U10 Lioness",
+  }
+
+  return map[value] || value
+}
+
+function buildStandings(results: LeagueResult[]): StandingRow[] {
+  const table: Record<
+    string,
+    StandingRow & {
+      form: ("W" | "D" | "L")[]
+    }
+  > = {}
+
+  function getTeam(name: string) {
+    const normalized = normalizeTeamName(name)
+
+    if (!table[normalized]) {
+      table[normalized] = {
+        team: normalized,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goals_for: 0,
+        goals_against: 0,
+        goal_difference: 0,
+        points: 0,
+        form: [],
+      }
+    }
+
+    return table[normalized]
+  }
+
+  const sortedResults = results
+    .slice()
+    .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
+
+  for (const match of sortedResults) {
+    const home = getTeam(match.homeTeam)
+    const away = getTeam(match.awayTeam)
+
+    home.played += 1
+    away.played += 1
+
+    home.goals_for += match.homeScore
+    home.goals_against += match.awayScore
+    away.goals_for += match.awayScore
+    away.goals_against += match.homeScore
+
+    if (match.homeScore > match.awayScore) {
+      home.wins += 1
+      home.points += 3
+      away.losses += 1
+      home.form.push("W")
+      away.form.push("L")
+    } else if (match.homeScore < match.awayScore) {
+      away.wins += 1
+      away.points += 3
+      home.losses += 1
+      away.form.push("W")
+      home.form.push("L")
+    } else {
+      home.draws += 1
+      away.draws += 1
+      home.points += 1
+      away.points += 1
+      home.form.push("D")
+      away.form.push("D")
+    }
+  }
+
+  return Object.values(table)
+    .map((team) => ({
+      ...team,
+      goal_difference: team.goals_for - team.goals_against,
+      form: team.form.slice(-5).reverse(),
+    }))
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points
+      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference
+      if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for
+      return a.team.localeCompare(b.team)
+    })
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div
+      style={{
+        background: "#f1f5f9",
+        padding: 12,
+        borderRadius: 10,
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 900 }}>{value}</div>
+    </div>
+  )
+}
+
+function FormBadge({ value }: { value: "W" | "D" | "L" }) {
+  const styles =
+    value === "W"
+      ? { background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }
+      : value === "D"
+      ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" }
+      : { background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5" }
+
+  return (
+    <div
+      style={{
+        ...styles,
+        width: 34,
+        height: 34,
+        borderRadius: 999,
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 900,
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 12,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{label}</div>
+      <div style={{ marginTop: 4, fontWeight: 800 }}>{value}</div>
+    </div>
+  )
+}
+
+function getHeadToHeadDetails(teamName: string, opponentName: string, results: LeagueResult[]) {
+  const mainTeam = normalizeTeamName(teamName)
+  const rival = normalizeTeamName(opponentName)
+
+  const matches = results
+    .filter((m) => {
+      const home = normalizeTeamName(m.homeTeam)
+      const away = normalizeTeamName(m.awayTeam)
+
+      return (home === mainTeam && away === rival) || (away === mainTeam && home === rival)
+    })
+    .slice()
+    .sort((a, b) => b.playedOn.localeCompare(a.playedOn))
+
+  let wins = 0
+  let draws = 0
+  let losses = 0
+  let goalsFor = 0
+  let goalsAgainst = 0
+
+  const form: string[] = []
+  let lastResult: string | null = null
+  let biggestWin: { margin: number; score: string } | null = null
+  let heaviestLoss: { margin: number; score: string } | null = null
+
+  matches.forEach((m, index) => {
+    const home = normalizeTeamName(m.homeTeam)
+    const isHome = home === mainTeam
+    const gf = isHome ? m.homeScore : m.awayScore
+    const ga = isHome ? m.awayScore : m.homeScore
+    const score = `${mainTeam} ${gf} - ${ga} ${rival}`
+
+    goalsFor += gf
+    goalsAgainst += ga
+
+    if (gf > ga) {
+      wins += 1
+      form.push("W")
+      const margin = gf - ga
+      if (!biggestWin || margin > biggestWin.margin) {
+        biggestWin = { margin, score }
+      }
+    } else if (gf === ga) {
+      draws += 1
+      form.push("D")
+    } else {
+      losses += 1
+      form.push("L")
+      const margin = ga - gf
+      if (!heaviestLoss || margin > heaviestLoss.margin) {
+        heaviestLoss = { margin, score }
+      }
+    }
+
+    if (index === 0) {
+      lastResult = `${m.playedOn}: ${score}`
+    }
+  })
+
+  return {
+    played: matches.length,
+    wins,
+    draws,
+    losses,
+    goalsFor,
+    goalsAgainst,
+    form: form.slice(0, 5),
+    lastResult,
+    biggestWin,
+    heaviestLoss,
   }
 }
 
@@ -205,6 +445,8 @@ function Dashboard({
 
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
   const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
+
+  const [selectedOpponent, setSelectedOpponent] = useState<string>("")
 
   const [loading, setLoading] = useState(true)
 
@@ -340,6 +582,66 @@ function Dashboard({
     return winners
   }, [playerRatings])
 
+  const playerFormRows: PlayerFormRow[] = useMemo(() => {
+    return players
+      .map((player) => {
+        const ratings = playerRatings
+          .filter((item) => item.playerId === player.id)
+          .map((item) => item.rating)
+
+        if (ratings.length === 0) {
+          return {
+            playerId: player.id,
+            playerName: player.name,
+            averageRating: 0,
+            ratingsCount: 0,
+            recentForm: [],
+            bestRating: 0,
+          }
+        }
+
+        const averageRating = ratings.reduce((sum, value) => sum + value, 0) / ratings.length
+
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          averageRating,
+          ratingsCount: ratings.length,
+          recentForm: ratings.slice(0, 5),
+          bestRating: Math.max(...ratings),
+        }
+      })
+      .sort((a, b) => b.averageRating - a.averageRating)
+  }, [players, playerRatings])
+
+  const playerAwardRows: PlayerAwardRow[] = useMemo(() => {
+    return players
+      .map((player) => {
+        const ratings = playerRatings
+          .filter((item) => item.playerId === player.id)
+          .map((item) => item.rating)
+
+        const recentForm = ratings.slice(0, 5)
+        const averageRating =
+          ratings.length > 0 ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : 0
+
+        const playerOfMatchCount = Object.values(playerOfMatchMap).filter(
+          (winnerId) => winnerId === player.id
+        ).length
+
+        return {
+          playerId: player.id,
+          playerName: player.name,
+          averageRating,
+          ratingsCount: ratings.length,
+          playerOfMatchCount,
+          recentForm,
+          bestRating: ratings.length > 0 ? Math.max(...ratings) : 0,
+        }
+      })
+      .sort((a, b) => b.averageRating - a.averageRating)
+  }, [players, playerRatings, playerOfMatchMap])
+
   const activeMatchRatings = useMemo(() => {
     if (!activeMatchEventId) return []
     return playerRatings
@@ -365,42 +667,52 @@ function Dashboard({
     return matchReports.find((item) => item.eventId === activeMatchEventId) || null
   }, [matchReports, activeMatchEventId])
 
-  async function loadLeagueResults() {
-    try {
-      const res = await fetch("/api/get-league-results", { cache: "no-store" })
-      const data = await res.json()
+  const normalizedTeamName = normalizeTeamName(TEAM.name)
 
-      if (Array.isArray(data)) {
-        setLeagueResults(
-          data.map((row: any) => ({
-            id: row.id,
-            playedOn: row.played_on,
-            eventId: row.event_id || null,
-            opponent: row.opponent || "",
-            homeTeam: row.home_team,
-            awayTeam: row.away_team,
-            homeScore: row.home_score,
-            awayScore: row.away_score,
-            competition: row.competition || "",
-          }))
+  const opponents = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          leagueResults.flatMap((m) => [normalizeTeamName(m.homeTeam), normalizeTeamName(m.awayTeam)])
         )
-      }
-    } catch (error) {
+      )
+        .filter((team) => team !== normalizedTeamName)
+        .sort(),
+    [leagueResults, normalizedTeamName]
+  )
+
+  const headToHead =
+    selectedOpponent && leagueResults.length
+      ? getHeadToHeadDetails(normalizedTeamName, selectedOpponent, leagueResults)
+      : null
+
+  async function loadLeagueResults() {
+    if (!supabase) return
+
+    const { data, error } = await supabase
+      .from("league_results")
+      .select("*")
+      .order("played_on", { ascending: false })
+
+    if (error) {
       console.error("Failed to load league results", error)
+      return
     }
-  }
 
-  async function loadLeagueStandings() {
-    try {
-      const res = await fetch("/api/get-league-standings", { cache: "no-store" })
-      const data = await res.json()
+    const results: LeagueResult[] = (data || []).map((row: any) => ({
+      id: row.id,
+      playedOn: row.played_on,
+      eventId: row.event_id || null,
+      opponent: row.opponent || "",
+      homeTeam: row.home_team,
+      awayTeam: row.away_team,
+      homeScore: row.home_score,
+      awayScore: row.away_score,
+      competition: row.competition || "",
+    }))
 
-      if (Array.isArray(data)) {
-        setLeagueStandings(data)
-      }
-    } catch (error) {
-      console.error("Failed to load league standings", error)
-    }
+    setLeagueResults(results)
+    setLeagueStandings(buildStandings(results))
   }
 
   async function loadAll() {
@@ -705,7 +1017,6 @@ function Dashboard({
   useEffect(() => {
     void loadAll()
     void loadLeagueResults()
-    void loadLeagueStandings()
   }, [])
 
   useEffect(() => {
@@ -1085,7 +1396,7 @@ function Dashboard({
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase || !isAdmin) return
+    if (!supabase) return
 
     const { data: existingRow, error: fetchError } = await supabase
       .from("event_attendance")
@@ -1527,9 +1838,7 @@ function Dashboard({
 
     setRunning(false)
     await persistMatchState({ running: false })
-
     await loadLeagueResults()
-    await loadLeagueStandings()
 
     alert("Game result saved")
   }
@@ -1744,25 +2053,22 @@ function Dashboard({
         {tab === "home" && (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-              <SectionCard>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Players</div>
                 <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{players.length}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Goals Logged</div>
                 <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{totalGoals}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Main GK</div>
                 <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{mainGk?.name || "Not set"}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Backup GK</div>
                 <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{backupGk?.name || "Not set"}</div>
-              </SectionCard>
+              </div>
             </div>
           </div>
         )}
@@ -1782,7 +2088,7 @@ function Dashboard({
               events={events}
             />
 
-            <SectionCard title="Calendar Events">
+            <div style={cardStyle()}>
               <div
                 style={{
                   display: "flex",
@@ -1793,7 +2099,7 @@ function Dashboard({
                   marginBottom: 12,
                 }}
               >
-                <div />
+                <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar Events</div>
                 {isAdmin ? (
                   <button onClick={openAddCalendarEvent} style={buttonPrimary()}>
                     Add Event
@@ -1840,10 +2146,10 @@ function Dashboard({
                   ))}
                 </div>
               )}
-            </SectionCard>
+            </div>
 
             {selectedEvent ? (
-              <SectionCard>
+              <div style={cardStyle()}>
                 <div
                   style={{
                     display: "flex",
@@ -1959,10 +2265,11 @@ function Dashboard({
                     )
                   })}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
-            <SectionCard title="Training Templates">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
               <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
                 {allTrainingPlans.map((template) => (
                   <button
@@ -2029,9 +2336,9 @@ function Dashboard({
                   </div>
                 ))}
               </div>
-            </SectionCard>
+            </div>
 
-            <SectionCard>
+            <div style={cardStyle()}>
               <div
                 style={{
                   display: "flex",
@@ -2053,7 +2360,7 @@ function Dashboard({
                   Generate Session
                 </button>
               </div>
-            </SectionCard>
+            </div>
 
             <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
 
@@ -2082,7 +2389,10 @@ function Dashboard({
         {tab === "coaches" && (
           <div style={{ display: "grid", gap: 16 }}>
             {selectedDateCoachAvailability.length > 0 ? (
-              <SectionCard title="Coach Availability Snapshot" tone="#eff6ff">
+              <div style={cardStyle("#eff6ff")}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+                  Coach Availability Snapshot
+                </div>
                 <div style={{ color: "#475569", marginBottom: 10 }}>{formatFullDate(selectedDate)}</div>
                 <div style={{ display: "grid", gap: 8 }}>
                   {selectedDateCoachAvailability.map((item) => {
@@ -2105,7 +2415,7 @@ function Dashboard({
                     )
                   })}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
             <CoachesManager
@@ -2121,7 +2431,9 @@ function Dashboard({
 
         {tab === "match" && (
           <div style={{ display: "grid", gap: 16 }}>
-            <SectionCard title="Selected Match Event">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
+
               {events.filter((event) => event.type === "match").length === 0 ? (
                 <div style={{ color: "#64748b" }}>No match events created yet.</div>
               ) : (
@@ -2178,9 +2490,11 @@ function Dashboard({
                   )}
                 </div>
               )}
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Match Day Availability">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
+
               {activeMatchEvent ? (
                 <div style={{ display: "grid", gap: 10 }}>
                   <div style={{ fontWeight: 800 }}>
@@ -2225,9 +2539,11 @@ function Dashboard({
               ) : (
                 <div style={{ color: "#64748b" }}>No active match event selected.</div>
               )}
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Coaches for Match Day" tone="#eff6ff">
+            <div style={cardStyle("#eff6ff")}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Coaches for Match Day</div>
+
               <div style={{ color: "#475569", marginBottom: 10 }}>
                 Showing coach availability for <strong>{formatFullDate(matchDateForCoachView)}</strong>
               </div>
@@ -2302,7 +2618,7 @@ function Dashboard({
                   Warning: no Head Coach is marked as available.
                 </div>
               ) : null}
-            </SectionCard>
+            </div>
 
             <MatchCenter
               isAdmin={isAdmin}
@@ -2423,14 +2739,14 @@ function Dashboard({
             />
 
             {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
-              <SectionCard tone="#fef3c7">
+              <div style={cardStyle("#fef3c7")}>
                 <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
                   Auto Player of the Match
                 </div>
                 <div style={{ color: "#92400e", fontWeight: 800 }}>
                   {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
             {activeMatchEvent ? (
@@ -2453,11 +2769,152 @@ function Dashboard({
         )}
 
         {tab === "stats" && (
-          <StatsTab
-            teamName={TEAM.name}
-            results={leagueResults}
-            standings={leagueStandings}
-          />
+          <div style={{ display: "grid", gap: 16 }}>
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Club Stats</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ fontWeight: 800 }}>Total goals: {totalGoals}</div>
+                <div style={{ fontWeight: 800 }}>Total assists: {totalAssists}</div>
+                <div style={{ fontWeight: 800 }}>Players: {players.length}</div>
+                <div style={{ fontWeight: 800 }}>Main GK: {mainGk?.name || "Not set"}</div>
+                <div style={{ fontWeight: 800 }}>Backup GK: {backupGk?.name || "Not set"}</div>
+              </div>
+            </div>
+
+            <LeagueTable standings={leagueStandings} teamName={normalizedTeamName} />
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Head-to-Head</div>
+
+              <select
+                value={selectedOpponent}
+                onChange={(e) => setSelectedOpponent(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: 12,
+                  borderRadius: 10,
+                  border: "1px solid #e2e8f0",
+                  marginBottom: 16,
+                  fontSize: 16,
+                  background: "white",
+                }}
+              >
+                <option value="">Select opponent</option>
+                {opponents.map((team) => (
+                  <option key={team} value={team}>
+                    {team}
+                  </option>
+                ))}
+              </select>
+
+              {!selectedOpponent ? (
+                <div style={{ color: "#64748b" }}>Choose a team to view the record.</div>
+              ) : headToHead ? (
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, 1fr)",
+                      gap: 12,
+                      textAlign: "center",
+                    }}
+                  >
+                    <Stat label="Played" value={headToHead.played} />
+                    <Stat label="Won" value={headToHead.wins} />
+                    <Stat label="Drawn" value={headToHead.draws} />
+                    <Stat label="Lost" value={headToHead.losses} />
+                    <Stat label="GF" value={headToHead.goalsFor} />
+                    <Stat label="GA" value={headToHead.goalsAgainst} />
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700, marginBottom: 8 }}>
+                      Recent Form
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {headToHead.form.length > 0 ? (
+                        headToHead.form.map((item, index) => (
+                          <FormBadge key={`${item}-${index}`} value={item as "W" | "D" | "L"} />
+                        ))
+                      ) : (
+                        <div style={{ color: "#64748b" }}>No games yet.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {headToHead.lastResult ? (
+                      <InfoRow label="Last Result" value={headToHead.lastResult} />
+                    ) : null}
+                    {headToHead.biggestWin ? (
+                      <InfoRow label="Biggest Win" value={headToHead.biggestWin.score} />
+                    ) : null}
+                    {headToHead.heaviestLoss ? (
+                      <InfoRow label="Heaviest Loss" value={headToHead.heaviestLoss.score} />
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ color: "#64748b" }}>No record found.</div>
+              )}
+            </div>
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Saved Results</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {leagueResults.length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No saved results yet.</div>
+                ) : (
+                  leagueResults.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 14,
+                        border: "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>
+                        {normalizeTeamName(item.homeTeam)} {item.homeScore} - {item.awayScore}{" "}
+                        {normalizeTeamName(item.awayTeam)}
+                      </div>
+                      <div style={{ color: "#64748b", marginTop: 4 }}>
+                        {item.playedOn}
+                        {item.competition ? ` • ${item.competition}` : ""}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <PlayerFormTable rows={playerFormRows.filter((row) => row.ratingsCount > 0)} />
+
+            <SeasonAwards rows={playerAwardRows.filter((row) => row.ratingsCount > 0)} />
+
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Season Minutes</div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {players.map((player) => (
+                  <div
+                    key={player.id}
+                    style={{
+                      padding: 14,
+                      borderRadius: 16,
+                      background: "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900 }}>{player.name}</div>
+                    <div style={{ color: "#64748b", marginTop: 4 }}>
+                      {formatMinutes(player.seasonSeconds || 0)} min
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
