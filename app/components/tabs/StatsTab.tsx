@@ -31,7 +31,6 @@ type Props = {
   standings: StandingRow[]
 }
 
-// 🔹 Head-to-head calculator
 function getHeadToHead(teamName: string, opponent: string, results: Result[]) {
   const matches = results.filter(
     (m) =>
@@ -64,7 +63,6 @@ function getHeadToHead(teamName: string, opponent: string, results: Result[]) {
 export default function StatsTab({ teamName, results, standings }: Props) {
   const [selectedOpponent, setSelectedOpponent] = useState("")
 
-  // 🔹 Get unique opponents
   const opponents = useMemo(() => {
     return Array.from(
       new Set(results.flatMap((m) => [m.homeTeam, m.awayTeam]))
@@ -73,7 +71,6 @@ export default function StatsTab({ teamName, results, standings }: Props) {
       .sort()
   }, [results, teamName])
 
-  // 🔹 Calculate H2H
   const headToHead = useMemo(() => {
     if (!selectedOpponent) return null
     return getHeadToHead(teamName, selectedOpponent, results)
@@ -81,15 +78,14 @@ export default function StatsTab({ teamName, results, standings }: Props) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-
-      {/* 🏆 League Table */}
+      
+      {/* League Table */}
       <SectionCard title="League Table">
         <LeagueTable standings={standings} teamName={teamName} />
       </SectionCard>
 
-      {/* 🤝 Head-to-Head */}
+      {/* Head-to-Head */}
       <SectionCard title="Head-to-Head">
-
         <select
           value={selectedOpponent}
           onChange={(e) => setSelectedOpponent(e.target.value)}
@@ -110,7 +106,7 @@ export default function StatsTab({ teamName, results, standings }: Props) {
         </select>
 
         {!selectedOpponent ? (
-          <EmptyState text="Select a team to view stats" />
+          <EmptyState text="Select a team" />
         ) : headToHead ? (
           <div style={{ display: "flex", gap: 12 }}>
             <Stat label="Played" value={headToHead.played} />
@@ -127,7 +123,6 @@ export default function StatsTab({ teamName, results, standings }: Props) {
   )
 }
 
-// 🔹 Small stat card
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div
@@ -137,7 +132,6 @@ function Stat({ label, value }: { label: string; value: number }) {
         borderRadius: 12,
         background: "#f8fafc",
         textAlign: "center",
-        border: "1px solid #e2e8f0",
       }}
     >
       <div style={{ fontSize: 20, fontWeight: 900 }}>{value}</div>
