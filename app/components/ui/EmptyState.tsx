@@ -1,23 +1,26 @@
 "use client"
 
 type Props = {
-  title: string
-  description?: string
+  text: string
+  subtext?: string
 }
 
-export default function EmptyState({ title, description }: Props) {
+export default function EmptyState({ text, subtext }: Props) {
   return (
     <div
       style={{
         padding: 20,
-        borderRadius: 16,
-        border: "1px dashed #cbd5e1",
-        background: "#f8fafc",
-        color: "#475569",
+        textAlign: "center",
+        color: "#64748b",
       }}
     >
-      <div style={{ fontWeight: 900 }}>{title}</div>
-      {description ? <div style={{ marginTop: 6 }}>{description}</div> : null}
+      <div style={{ fontSize: 16, fontWeight: 600 }}>{text}</div>
+
+      {subtext && (
+        <div style={{ fontSize: 13, marginTop: 6, opacity: 0.8 }}>
+          {subtext}
+        </div>
+      )}
     </div>
   )
 }
