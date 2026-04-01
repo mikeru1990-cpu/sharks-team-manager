@@ -1,7 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { cardStyle, formatMinutes, type LeagueResult, type Player, type PlayerMatchRating, type TimelineItem } from "../../lib/types"
+import { useMemo, useState, type ReactNode } from "react"
+import {
+  cardStyle,
+  formatMinutes,
+  type LeagueResult,
+  type Player,
+  type PlayerMatchRating,
+  type TimelineItem,
+} from "../../lib/types"
 
 type StandingRow = {
   team: string
@@ -46,11 +53,18 @@ function normalizeTeamName(name: string) {
 
     "Tewkesbury Town Colts Youth U10": "Tewkesbury Town Colts",
     "Tewkesbury Town Colts Youth": "Tewkesbury Town Colts",
+    "Tewkesbury Town Colts Youth U10 ": "Tewkesbury Town Colts",
+
     "Stonehouse TownYouth U10": "Stonehouse Town",
     "Stonehouse Town Youth U10": "Stonehouse Town",
     "Stonehouse Town Youth": "Stonehouse Town",
+
     "Rodborough Youth U10 Lioness": "Rodborough Lionesses",
     "Rodborough Youth U10 Lionesses": "Rodborough Lionesses",
+    "Rodborough Youth U10 Lionesses ": "Rodborough Lionesses",
+
+    "Leonard Stanley U10 Lionesses": "Leonard Stanley U10 Lioness",
+    "Leonard Stanley U10 Lioness ": "Leonard Stanley U10 Lioness",
   }
 
   return map[value] || value
@@ -188,66 +202,6 @@ function getHeadToHeadDetails(teamName: string, opponentName: string, results: L
   return { matches, wins, draws, losses }
 }
 
-function formBadgeStyle(value: "W" | "D" | "L") {
-  if (value === "W") {
-    return {
-      background: "#dcfce7",
-      color: "#166534",
-      border: "1px solid #86efac",
-    }
-  }
-
-  if (value === "D") {
-    return {
-      background: "#fef3c7",
-      color: "#92400e",
-      border: "1px solid #fcd34d",
-    }
-  }
-
-  return {
-    background: "#fee2e2",
-    color: "#991b1b",
-    border: "1px solid #fca5a5",
-  }
-}
-
-function FormBadge({ value }: { value: "W" | "D" | "L" }) {
-  return (
-    <div
-      style={{
-        ...formBadgeStyle(value),
-        width: 28,
-        height: 28,
-        borderRadius: 999,
-        display: "grid",
-        placeItems: "center",
-        fontSize: 12,
-        fontWeight: 900,
-      }}
-    >
-      {value}
-    </div>
-  )
-}
-
-function StatCard({ label, value, subtext }: { label: string; value: string | number; subtext?: string }) {
-  return (
-    <div
-      style={{
-        padding: 14,
-        borderRadius: 16,
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-      }}
-    >
-      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, marginTop: 6 }}>{value}</div>
-      {subtext ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{subtext}</div> : null}
-    </div>
-  )
-}
-
 function buildPlayerStats(
   players: Player[],
   ratings: PlayerMatchRating[],
@@ -335,6 +289,246 @@ function buildPlayerStats(
     })
 }
 
+function formBadgeStyle(value: "W" | "D" | "L") {
+  if (value === "W") {
+    return {
+      background: "#dcfce7",
+      color: "#166534",
+      border: "1px solid #86efac",
+    }
+  }
+
+  if (value === "D") {
+    return {
+      background: "#fef3c7",
+      color: "#92400e",
+      border: "1px solid #fcd34d",
+    }
+  }
+
+  return {
+    background: "#fee2e2",
+    color: "#991b1b",
+    border: "1px solid #fca5a5",
+  }
+}
+
+function FormBadge({ value }: { value: "W" | "D" | "L" }) {
+  return (
+    <div
+      style={{
+        ...formBadgeStyle(value),
+        width: 28,
+        height: 28,
+        borderRadius: 999,
+        display: "grid",
+        placeItems: "center",
+        fontSize: 12,
+        fontWeight: 900,
+      }}
+    >
+      {value}
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  subtext,
+}: {
+  label: string
+  value: string | number
+  subtext?: string
+}) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 16,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, marginTop: 6, lineHeight: 1.15 }}>{value}</div>
+      {subtext ? <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{subtext}</div> : null}
+    </div>
+  )
+}
+
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div style={cardStyle()}>
+      <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>{title}</div>
+      {children}
+    </div>
+  )
+}
+
+function EmptyChart({ text }: { text: string }) {
+  return <div style={{ color: "#64748b" }}>{text}</div>
+}
+
+function BarsChart({
+  data,
+  color = "#1d4ed8",
+  height = 220,
+}: {
+  data: { label: string; value: number }[]
+  color?: string
+  height?: number
+}) {
+  const max = Math.max(...data.map((item) => item.value), 1)
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`,
+        gap: 10,
+        alignItems: "end",
+        height,
+      }}
+    >
+      {data.map((item) => {
+        const barHeight = Math.max((item.value / max) * (height - 40), 8)
+
+        return (
+          <div
+            key={item.label}
+            style={{
+              display: "grid",
+              gap: 8,
+              justifyItems: "center",
+              alignItems: "end",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800 }}>{item.value}</div>
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 42,
+                height: barHeight,
+                borderRadius: 10,
+                background: color,
+              }}
+            />
+            <div
+              style={{
+                fontSize: 11,
+                color: "#64748b",
+                textAlign: "center",
+                lineHeight: 1.2,
+                wordBreak: "break-word",
+              }}
+            >
+              {item.label}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function LineChart({
+  data,
+  stroke = "#1d4ed8",
+  height = 220,
+}: {
+  data: { label: string; value: number }[]
+  stroke?: string
+  height?: number
+}) {
+  const width = 640
+  const padding = 24
+  const max = Math.max(...data.map((item) => item.value), 1)
+  const min = Math.min(...data.map((item) => item.value), 0)
+  const range = Math.max(max - min, 1)
+
+  const points = data.map((item, index) => {
+    const x =
+      data.length === 1
+        ? width / 2
+        : padding + (index * (width - padding * 2)) / (data.length - 1)
+
+    const y =
+      height - padding - ((item.value - min) / range) * (height - padding * 2)
+
+    return { ...item, x, y }
+  })
+
+  const polyline = points.map((p) => `${p.x},${p.y}`).join(" ")
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        style={{
+          width: "100%",
+          height,
+          overflow: "visible",
+        }}
+      >
+        <line
+          x1={padding}
+          y1={height - padding}
+          x2={width - padding}
+          y2={height - padding}
+          stroke="#cbd5e1"
+          strokeWidth="1"
+        />
+        <line
+          x1={padding}
+          y1={padding}
+          x2={padding}
+          y2={height - padding}
+          stroke="#cbd5e1"
+          strokeWidth="1"
+        />
+        <polyline
+          fill="none"
+          stroke={stroke}
+          strokeWidth="3"
+          points={polyline}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {points.map((p) => (
+          <g key={p.label}>
+            <circle cx={p.x} cy={p.y} r="4" fill={stroke} />
+          </g>
+        ))}
+      </svg>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))`,
+          gap: 8,
+        }}
+      >
+        {data.map((item) => (
+          <div key={item.label} style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 12, fontWeight: 800 }}>{item.value}</div>
+            <div style={{ fontSize: 11, color: "#64748b", wordBreak: "break-word" }}>
+              {item.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function StatsTab({ teamName, results, players, ratings, timeline }: Props) {
   const [selectedOpponent, setSelectedOpponent] = useState("")
 
@@ -374,6 +568,103 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
     .filter((p) => p.ratingsCount > 0)
     .slice()
     .sort((a, b) => b.averageRating - a.averageRating)[0]
+
+  const goalsChartData = useMemo(() => {
+    return playerStats
+      .filter((item) => item.goals > 0)
+      .slice()
+      .sort((a, b) => b.goals - a.goals)
+      .slice(0, 8)
+      .map((item) => ({
+        label: item.name.split(" ")[0],
+        value: item.goals,
+      }))
+  }, [playerStats])
+
+  const assistsChartData = useMemo(() => {
+    return playerStats
+      .filter((item) => item.assists > 0)
+      .slice()
+      .sort((a, b) => b.assists - a.assists)
+      .slice(0, 8)
+      .map((item) => ({
+        label: item.name.split(" ")[0],
+        value: item.assists,
+      }))
+  }, [playerStats])
+
+  const ratingsChartData = useMemo(() => {
+    return playerStats
+      .filter((item) => item.ratingsCount > 0)
+      .slice()
+      .sort((a, b) => b.averageRating - a.averageRating)
+      .slice(0, 8)
+      .map((item) => ({
+        label: item.name.split(" ")[0],
+        value: Number(item.averageRating.toFixed(1)),
+      }))
+  }, [playerStats])
+
+  const minutesChartData = useMemo(() => {
+    return playerStats
+      .filter((item) => item.minutes > 0)
+      .slice()
+      .sort((a, b) => b.minutes - a.minutes)
+      .slice(0, 8)
+      .map((item) => ({
+        label: item.name.split(" ")[0],
+        value: Math.round(item.minutes / 60),
+      }))
+  }, [playerStats])
+
+  const formTrendData = useMemo(() => {
+    const lastResults = cleanResults
+      .filter((match) => {
+        const home = normalizeTeamName(match.homeTeam)
+        const away = normalizeTeamName(match.awayTeam)
+        const team = normalizeTeamName(teamName)
+        return home === team || away === team
+      })
+      .slice()
+      .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
+      .slice(-8)
+
+    return lastResults.map((match) => {
+      const isHome = normalizeTeamName(match.homeTeam) === normalizeTeamName(teamName)
+      const gf = isHome ? match.homeScore : match.awayScore
+      const ga = isHome ? match.awayScore : match.homeScore
+
+      let points = 0
+      if (gf > ga) points = 3
+      else if (gf === ga) points = 1
+
+      return {
+        label: match.playedOn.slice(5),
+        value: points,
+      }
+    })
+  }, [cleanResults, teamName])
+
+  const goalsTrendData = useMemo(() => {
+    const lastResults = cleanResults
+      .filter((match) => {
+        const home = normalizeTeamName(match.homeTeam)
+        const away = normalizeTeamName(match.awayTeam)
+        const team = normalizeTeamName(teamName)
+        return home === team || away === team
+      })
+      .slice()
+      .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
+      .slice(-8)
+
+    return lastResults.map((match) => {
+      const isHome = normalizeTeamName(match.homeTeam) === normalizeTeamName(teamName)
+      return {
+        label: match.playedOn.slice(5),
+        value: isHome ? match.homeScore : match.awayScore,
+      }
+    })
+  }, [cleanResults, teamName])
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -430,6 +721,70 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
             subtext={topMinutes ? `${formatMinutes(topMinutes.minutes)}` : "No minutes yet"}
           />
         </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <ChartCard title="Top Scorers Chart">
+          {goalsChartData.length === 0 ? (
+            <EmptyChart text="No goals logged yet." />
+          ) : (
+            <BarsChart data={goalsChartData} color="#2563eb" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Top Assists Chart">
+          {assistsChartData.length === 0 ? (
+            <EmptyChart text="No assists logged yet." />
+          ) : (
+            <BarsChart data={assistsChartData} color="#16a34a" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Average Ratings">
+          {ratingsChartData.length === 0 ? (
+            <EmptyChart text="No ratings saved yet." />
+          ) : (
+            <BarsChart data={ratingsChartData} color="#7c3aed" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Minutes Leaderboard">
+          {minutesChartData.length === 0 ? (
+            <EmptyChart text="No minutes saved yet." />
+          ) : (
+            <BarsChart data={minutesChartData} color="#ea580c" />
+          )}
+        </ChartCard>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <ChartCard title="Recent Form Trend">
+          {formTrendData.length === 0 ? (
+            <EmptyChart text="No recent results yet." />
+          ) : (
+            <LineChart data={formTrendData} stroke="#1d4ed8" />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Goals Per Game Trend">
+          {goalsTrendData.length === 0 ? (
+            <EmptyChart text="No goals trend yet." />
+          ) : (
+            <LineChart data={goalsTrendData} stroke="#16a34a" />
+          )}
+        </ChartCard>
       </div>
 
       <div style={cardStyle()}>
