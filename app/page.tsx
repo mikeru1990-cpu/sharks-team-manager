@@ -16,6 +16,7 @@ import SessionTimer from "./components/SessionTimer"
 import SessionHistory from "./components/SessionHistory"
 import MatchRatingsManager from "./components/MatchRatingsManager"
 import MatchReportGenerator from "./components/MatchReportGenerator"
+import HomeTab from "./components/tabs/HomeTab"
 import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
@@ -23,7 +24,6 @@ import {
   buttonPrimary,
   buttonSecondary,
   cardStyle,
-  formatMinutes,
   initialPlayers,
   initialTrainingTemplates,
   makeId,
@@ -1738,26 +1738,17 @@ function Dashboard({
         </div>
 
         {tab === "home" && (
-          <div style={{ display: "grid", gap: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-              <div style={cardStyle()}>
-                <div style={{ color: "#64748b", fontWeight: 800 }}>Players</div>
-                <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{players.length}</div>
-              </div>
-              <div style={cardStyle()}>
-                <div style={{ color: "#64748b", fontWeight: 800 }}>Goals Logged</div>
-                <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{totalGoals}</div>
-              </div>
-              <div style={cardStyle()}>
-                <div style={{ color: "#64748b", fontWeight: 800 }}>Main GK</div>
-                <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{mainGk?.name || "Not set"}</div>
-              </div>
-              <div style={cardStyle()}>
-                <div style={{ color: "#64748b", fontWeight: 800 }}>Backup GK</div>
-                <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{backupGk?.name || "Not set"}</div>
-              </div>
-            </div>
-          </div>
+          <HomeTab
+            teamName={TEAM.name}
+            players={players}
+            events={events}
+            attendance={attendance}
+            results={leagueResults}
+            ratings={playerRatings}
+            activeMatchEventId={activeMatchEventId}
+            selectedDate={selectedDate}
+            onOpenTab={(nextTab) => setTab(nextTab)}
+          />
         )}
 
         {tab === "players" && (
