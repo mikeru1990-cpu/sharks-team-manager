@@ -10,17 +10,16 @@ import {
   type TimelineItem,
 } from "../../lib/types"
 
-type StandingRow = {
-  team: string
+type HeadToHeadRow = {
+  opponent: string
   played: number
-  wins: number
-  draws: number
-  losses: number
-  goals_for: number
-  goals_against: number
-  goal_difference: number
-  points: number
-  form: ("W" | "D" | "L")[]
+  won: number
+  drawn: number
+  lost: number
+  gf: number
+  ga: number
+  gd: number
+  last: string
 }
 
 type PlayerStatRow = {
@@ -89,83 +88,70 @@ function dedupeResults(results: LeagueResult[]) {
   })
 }
 
-function buildStandings(results: LeagueResult[]) {
-  const table: Record<string, StandingRow> = {}
+function getTeamMatches(teamName: string, results: LeagueResult[]) {
+  const normalizedTeam = normalizeTeamName(teamName)
 
-  function getTeam(name: string) {
-    const normalized = normalizeTeamName(name)
+  return results
+    .filter((match) => {
+      const home = normalizeTeamName(match.homeTeam)
+      const away = normalizeTeamName(match.awayTeam)
+      return home === normalizedTeam || away === normalizedTeam
+    })
+    .slice()
+    .sort((a, b) => b.playedOn.localeCompare(a.playedOn))
+}
 
-    if (!table[normalized]) {
-      table[normalized] = {
-        team: normalized,
+function buildHeadToHead(teamName: string, results: LeagueResult[]) {
+  const normalizedTeam = normalizeTeamName(teamName)
+  const map: Record<string, HeadToHeadRow> = {}
+
+  const sorted = results.slice().sort((a, b) => a.playedOn.localeCompare(b.playedOn))
+
+  for (const match of sorted) {
+    const home = normalizeTeamName(match.homeTeam)
+    const away = normalizeTeamName(match.awayTeam)
+
+    if (home !== normalizedTeam && away !== normalizedTeam) continue
+
+    const isHome = home === normalizedTeam
+    const opponent = isHome ? away : home
+    const gf = isHome ? match.homeScore : match.awayScore
+    const ga = isHome ? match.awayScore : match.homeScore
+    const result = gf > ga ? "W" : gf < ga ? "L" : "D"
+
+    if (!map[opponent]) {
+      map[opponent] = {
+        opponent,
         played: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goals_for: 0,
-        goals_against: 0,
-        goal_difference: 0,
-        points: 0,
-        form: [],
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        gf: 0,
+        ga: 0,
+        gd: 0,
+        last: "-",
       }
     }
 
-    return table[normalized]
+    const row = map[opponent]
+    row.played += 1
+    row.gf += gf
+    row.ga += ga
+
+    if (result === "W") row.won += 1
+    else if (result === "D") row.drawn += 1
+    else row.lost += 1
+
+    row.gd = row.gf - row.ga
+    row.last = `${result} ${gf}-${ga}`
   }
 
-  const sorted = [...results].sort((a, b) => a.playedOn.localeCompare(b.playedOn))
-
-  for (const match of sorted) {
-    const homeName = normalizeTeamName(match.homeTeam)
-    const awayName = normalizeTeamName(match.awayTeam)
-
-    if (homeName === awayName) continue
-
-    const home = getTeam(homeName)
-    const away = getTeam(awayName)
-
-    home.played += 1
-    away.played += 1
-
-    home.goals_for += match.homeScore
-    home.goals_against += match.awayScore
-    away.goals_for += match.awayScore
-    away.goals_against += match.homeScore
-
-    if (match.homeScore > match.awayScore) {
-      home.wins += 1
-      home.points += 3
-      away.losses += 1
-      home.form.push("W")
-      away.form.push("L")
-    } else if (match.homeScore < match.awayScore) {
-      away.wins += 1
-      away.points += 3
-      home.losses += 1
-      away.form.push("W")
-      home.form.push("L")
-    } else {
-      home.draws += 1
-      away.draws += 1
-      home.points += 1
-      away.points += 1
-      home.form.push("D")
-      away.form.push("D")
-    }
-  }
-
-  return Object.values(table)
-    .map((team) => ({
-      ...team,
-      goal_difference: team.goals_for - team.goals_against,
-      form: team.form.slice(-5).reverse(),
-    }))
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points
-      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference
-      if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for
-      return a.team.localeCompare(b.team)
-    })
+  return Object.values(map).sort((a, b) => {
+    if (b.won !== a.won) return b.won - a.won
+    if (b.gd !== a.gd) return b.gd - a.gd
+    if (b.gf !== a.gf) return b.gf - a.gf
+    return a.opponent.localeCompare(b.opponent)
+  })
 }
 
 function getHeadToHeadDetails(teamName: string, opponentName: string, results: LeagueResult[]) {
@@ -188,18 +174,31 @@ function getHeadToHeadDetails(teamName: string, opponentName: string, results: L
   let wins = 0
   let draws = 0
   let losses = 0
+  let goalsFor = 0
+  let goalsAgainst = 0
 
   for (const m of matches) {
     const isHome = normalizeTeamName(m.homeTeam) === normalizedTeam
     const gf = isHome ? m.homeScore : m.awayScore
     const ga = isHome ? m.awayScore : m.homeScore
 
+    goalsFor += gf
+    goalsAgainst += ga
+
     if (gf > ga) wins += 1
     else if (gf < ga) losses += 1
     else draws += 1
   }
 
-  return { matches, wins, draws, losses }
+  return {
+    matches,
+    wins,
+    draws,
+    losses,
+    goalsFor,
+    goalsAgainst,
+    goalDifference: goalsFor - goalsAgainst,
+  }
 }
 
 function buildPlayerStats(
@@ -460,8 +459,7 @@ function LineChart({
         ? width / 2
         : padding + (index * (width - padding * 2)) / (data.length - 1)
 
-    const y =
-      height - padding - ((item.value - min) / range) * (height - padding * 2)
+    const y = height - padding - ((item.value - min) / range) * (height - padding * 2)
 
     return { ...item, x, y }
   })
@@ -529,32 +527,81 @@ function LineChart({
   )
 }
 
+function SectionTabs({
+  value,
+  onChange,
+}: {
+  value: "players" | "trends" | "h2h" | "history"
+  onChange: (value: "players" | "trends" | "h2h" | "history") => void
+}) {
+  const tabs: Array<"players" | "trends" | "h2h" | "history"> = ["players", "trends", "h2h", "history"]
+
+  return (
+    <div style={cardStyle()}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 8,
+        }}
+      >
+        {tabs.map((tab) => {
+          const active = value === tab
+          const label =
+            tab === "players"
+              ? "Players"
+              : tab === "trends"
+              ? "Trends"
+              : tab === "h2h"
+              ? "Head-to-Head"
+              : "History"
+
+          return (
+            <button
+              key={tab}
+              onClick={() => onChange(tab)}
+              style={{
+                border: active ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                background: active ? "#dbeafe" : "white",
+                color: active ? "#1d4ed8" : "#334155",
+                borderRadius: 14,
+                padding: "12px 8px",
+                fontWeight: 800,
+                fontSize: 13,
+                minWidth: 0,
+              }}
+            >
+              {label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function StatsTab({ teamName, results, players, ratings, timeline }: Props) {
+  const [section, setSection] = useState<"players" | "trends" | "h2h" | "history">("players")
   const [selectedOpponent, setSelectedOpponent] = useState("")
 
   const cleanResults = useMemo(() => dedupeResults(results), [results])
-  const standings = useMemo(() => buildStandings(cleanResults), [cleanResults])
   const playerStats = useMemo(() => buildPlayerStats(players, ratings, timeline), [players, ratings, timeline])
 
+  const teamMatches = useMemo(() => getTeamMatches(teamName, cleanResults), [teamName, cleanResults])
+
+  const headToHeadRows = useMemo(() => buildHeadToHead(teamName, cleanResults), [teamName, cleanResults])
+
   const opponents = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          cleanResults.flatMap((m) => [
-            normalizeTeamName(m.homeTeam),
-            normalizeTeamName(m.awayTeam),
-          ])
-        )
-      )
-        .filter((team) => team !== normalizeTeamName(teamName))
-        .sort(),
-    [cleanResults, teamName]
+    () => headToHeadRows.map((row) => row.opponent),
+    [headToHeadRows]
   )
 
+  const selectedOpponentSafe = selectedOpponent || headToHeadRows[0]?.opponent || ""
+
   const headToHead = useMemo(() => {
-    if (!selectedOpponent) return null
-    return getHeadToHeadDetails(teamName, selectedOpponent, cleanResults)
-  }, [teamName, selectedOpponent, cleanResults])
+    if (!selectedOpponentSafe) return null
+    return getHeadToHeadDetails(teamName, selectedOpponentSafe, cleanResults)
+  }, [teamName, selectedOpponentSafe, cleanResults])
 
   const totalGoals = playerStats.reduce((sum, p) => sum + p.goals, 0)
   const totalAssists = playerStats.reduce((sum, p) => sum + p.assists, 0)
@@ -618,13 +665,7 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
   }, [playerStats])
 
   const formTrendData = useMemo(() => {
-    const lastResults = cleanResults
-      .filter((match) => {
-        const home = normalizeTeamName(match.homeTeam)
-        const away = normalizeTeamName(match.awayTeam)
-        const team = normalizeTeamName(teamName)
-        return home === team || away === team
-      })
+    const lastResults = teamMatches
       .slice()
       .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
       .slice(-8)
@@ -643,16 +684,10 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
         value: points,
       }
     })
-  }, [cleanResults, teamName])
+  }, [teamMatches, teamName])
 
   const goalsTrendData = useMemo(() => {
-    const lastResults = cleanResults
-      .filter((match) => {
-        const home = normalizeTeamName(match.homeTeam)
-        const away = normalizeTeamName(match.awayTeam)
-        const team = normalizeTeamName(teamName)
-        return home === team || away === team
-      })
+    const lastResults = teamMatches
       .slice()
       .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
       .slice(-8)
@@ -664,12 +699,14 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
         value: isHome ? match.homeScore : match.awayScore,
       }
     })
-  }, [cleanResults, teamName])
+  }, [teamMatches, teamName])
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
+      <SectionTabs value={section} onChange={setSection} />
+
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Player Stats Overview</div>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Stats Overview</div>
 
         <div
           style={{
@@ -681,272 +718,344 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
           <StatCard label="Total Goals" value={totalGoals} />
           <StatCard label="Total Assists" value={totalAssists} />
           <StatCard label="Total Minutes" value={formatMinutes(totalMinutes)} subtext="season total" />
-          <StatCard label="Players Rated" value={playerStats.filter((p) => p.ratingsCount > 0).length} />
+          <StatCard label="Matches Logged" value={teamMatches.length} />
         </div>
       </div>
 
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Team Leaders</div>
+      {section === "players" && (
+        <>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Team Leaders</div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-          }}
-        >
-          <StatCard
-            label="Top Scorer"
-            value={topScorer ? topScorer.name : "—"}
-            subtext={topScorer ? `${topScorer.goals} goals` : "No goals yet"}
-          />
-          <StatCard
-            label="Top Assists"
-            value={topAssist ? topAssist.name : "—"}
-            subtext={topAssist ? `${topAssist.assists} assists` : "No assists yet"}
-          />
-          <StatCard
-            label="Player of the Match"
-            value={topPotm ? topPotm.name : "—"}
-            subtext={topPotm ? `${topPotm.potm} awards` : "No awards yet"}
-          />
-          <StatCard
-            label="Best Avg Rating"
-            value={bestRated ? bestRated.name : "—"}
-            subtext={bestRated ? `${bestRated.averageRating.toFixed(1)} avg` : "No ratings yet"}
-          />
-          <StatCard
-            label="Most Minutes"
-            value={topMinutes ? topMinutes.name : "—"}
-            subtext={topMinutes ? `${formatMinutes(topMinutes.minutes)}` : "No minutes yet"}
-          />
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: 16,
-        }}
-      >
-        <ChartCard title="Top Scorers Chart">
-          {goalsChartData.length === 0 ? (
-            <EmptyChart text="No goals logged yet." />
-          ) : (
-            <BarsChart data={goalsChartData} color="#2563eb" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Top Assists Chart">
-          {assistsChartData.length === 0 ? (
-            <EmptyChart text="No assists logged yet." />
-          ) : (
-            <BarsChart data={assistsChartData} color="#16a34a" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Average Ratings">
-          {ratingsChartData.length === 0 ? (
-            <EmptyChart text="No ratings saved yet." />
-          ) : (
-            <BarsChart data={ratingsChartData} color="#7c3aed" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Minutes Leaderboard">
-          {minutesChartData.length === 0 ? (
-            <EmptyChart text="No minutes saved yet." />
-          ) : (
-            <BarsChart data={minutesChartData} color="#ea580c" />
-          )}
-        </ChartCard>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: 16,
-        }}
-      >
-        <ChartCard title="Recent Form Trend">
-          {formTrendData.length === 0 ? (
-            <EmptyChart text="No recent results yet." />
-          ) : (
-            <LineChart data={formTrendData} stroke="#1d4ed8" />
-          )}
-        </ChartCard>
-
-        <ChartCard title="Goals Per Game Trend">
-          {goalsTrendData.length === 0 ? (
-            <EmptyChart text="No goals trend yet." />
-          ) : (
-            <LineChart data={goalsTrendData} stroke="#16a34a" />
-          )}
-        </ChartCard>
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Player Leaderboard</div>
-
-        {playerStats.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No player stats yet.</div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
+            <div
               style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: 860,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 12,
               }}
             >
-              <thead>
-                <tr style={{ borderBottom: "2px solid #e2e8f0", color: "#94a3b8" }}>
-                  <th style={{ textAlign: "left", padding: "10px 8px" }}>Player</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Goals</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Assists</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>POTM</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Avg Rating</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Ratings</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Minutes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {playerStats.map((row) => (
-                  <tr key={row.playerId} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "12px 8px", fontWeight: 900 }}>{row.name}</td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.goals}</td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.assists}</td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.potm}</td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>
-                      {row.ratingsCount > 0 ? row.averageRating.toFixed(1) : "—"}
-                    </td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.ratingsCount}</td>
-                    <td style={{ padding: "12px 8px", textAlign: "center" }}>{formatMinutes(row.minutes)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>League Table</div>
-
-        {standings.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No league results saved yet.</div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                minWidth: 760,
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: "2px solid #e2e8f0", color: "#94a3b8" }}>
-                  <th style={{ textAlign: "left", padding: "10px 8px" }}>#</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px" }}>Team</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>P</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>W</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>D</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>L</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>GF</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>GA</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>GD</th>
-                  <th style={{ textAlign: "center", padding: "10px 8px" }}>Pts</th>
-                  <th style={{ textAlign: "left", padding: "10px 8px" }}>Form</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {standings.map((row, index) => {
-                  const isOurTeam =
-                    normalizeTeamName(row.team) === normalizeTeamName(teamName)
-
-                  return (
-                    <tr
-                      key={row.team}
-                      style={{
-                        borderBottom: "1px solid #e2e8f0",
-                        background: isOurTeam ? "#dbeafe" : "transparent",
-                      }}
-                    >
-                      <td style={{ padding: "12px 8px", fontWeight: 800 }}>{index + 1}</td>
-                      <td style={{ padding: "12px 8px", fontWeight: 900 }}>{row.team}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.played}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.wins}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.draws}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.losses}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.goals_for}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.goals_against}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>
-                        {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
-                      </td>
-                      <td style={{ padding: "12px 8px", textAlign: "center", fontWeight: 900 }}>
-                        {row.points}
-                      </td>
-                      <td style={{ padding: "12px 8px" }}>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {row.form.map((item, itemIndex) => (
-                            <FormBadge key={`${row.team}-${itemIndex}`} value={item} />
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Head-to-Head</div>
-
-        <select
-          value={selectedOpponent}
-          onChange={(e) => setSelectedOpponent(e.target.value)}
-          style={{
-            width: "100%",
-            padding: 12,
-            borderRadius: 10,
-            border: "1px solid #e2e8f0",
-            marginBottom: 16,
-            fontSize: 16,
-            background: "white",
-          }}
-        >
-          <option value="">Select opponent</option>
-          {opponents.map((team) => (
-            <option key={team} value={team}>
-              {team}
-            </option>
-          ))}
-        </select>
-
-        {!selectedOpponent ? (
-          <div style={{ color: "#64748b" }}>Choose a team to view the record.</div>
-        ) : headToHead ? (
-          <div style={{ display: "grid", gap: 12 }}>
-            <div style={{ fontWeight: 800 }}>
-              W: {headToHead.wins} • D: {headToHead.draws} • L: {headToHead.losses}
+              <StatCard
+                label="Top Scorer"
+                value={topScorer ? topScorer.name : "—"}
+                subtext={topScorer ? `${topScorer.goals} goals` : "No goals yet"}
+              />
+              <StatCard
+                label="Top Assists"
+                value={topAssist ? topAssist.name : "—"}
+                subtext={topAssist ? `${topAssist.assists} assists` : "No assists yet"}
+              />
+              <StatCard
+                label="Player of the Match"
+                value={topPotm ? topPotm.name : "—"}
+                subtext={topPotm ? `${topPotm.potm} awards` : "No awards yet"}
+              />
+              <StatCard
+                label="Best Avg Rating"
+                value={bestRated ? bestRated.name : "—"}
+                subtext={bestRated ? `${bestRated.averageRating.toFixed(1)} avg` : "No ratings yet"}
+              />
+              <StatCard
+                label="Most Minutes"
+                value={topMinutes ? topMinutes.name : "—"}
+                subtext={topMinutes ? `${formatMinutes(topMinutes.minutes)}` : "No minutes yet"}
+              />
             </div>
+          </div>
 
-            {headToHead.matches.length === 0 ? (
-              <div style={{ color: "#64748b" }}>No games found.</div>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Player Leaderboard</div>
+
+            {playerStats.length === 0 ? (
+              <div style={{ color: "#64748b" }}>No player stats yet.</div>
             ) : (
-              headToHead.matches.map((match) => {
-                const isHome =
-                  normalizeTeamName(match.homeTeam) === normalizeTeamName(teamName)
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    minWidth: 820,
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #e2e8f0", color: "#94a3b8" }}>
+                      <th style={{ textAlign: "left", padding: "10px 8px" }}>Player</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Goals</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Assists</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>POTM</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Avg Rating</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Ratings</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Minutes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {playerStats.map((row) => (
+                      <tr key={row.playerId} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                        <td style={{ padding: "12px 8px", fontWeight: 900 }}>{row.name}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.goals}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.assists}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.potm}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>
+                          {row.ratingsCount > 0 ? row.averageRating.toFixed(1) : "—"}
+                        </td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.ratingsCount}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{formatMinutes(row.minutes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
+      {section === "trends" && (
+        <>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16,
+            }}
+          >
+            <ChartCard title="Top Scorers Chart">
+              {goalsChartData.length === 0 ? (
+                <EmptyChart text="No goals logged yet." />
+              ) : (
+                <BarsChart data={goalsChartData} color="#2563eb" />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Top Assists Chart">
+              {assistsChartData.length === 0 ? (
+                <EmptyChart text="No assists logged yet." />
+              ) : (
+                <BarsChart data={assistsChartData} color="#16a34a" />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Average Ratings">
+              {ratingsChartData.length === 0 ? (
+                <EmptyChart text="No ratings saved yet." />
+              ) : (
+                <BarsChart data={ratingsChartData} color="#7c3aed" />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Minutes Leaderboard">
+              {minutesChartData.length === 0 ? (
+                <EmptyChart text="No minutes saved yet." />
+              ) : (
+                <BarsChart data={minutesChartData} color="#ea580c" />
+              )}
+            </ChartCard>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: 16,
+            }}
+          >
+            <ChartCard title="Recent Form Trend">
+              {formTrendData.length === 0 ? (
+                <EmptyChart text="No recent results yet." />
+              ) : (
+                <LineChart data={formTrendData} stroke="#1d4ed8" />
+              )}
+            </ChartCard>
+
+            <ChartCard title="Goals Per Game Trend">
+              {goalsTrendData.length === 0 ? (
+                <EmptyChart text="No goals trend yet." />
+              ) : (
+                <LineChart data={goalsTrendData} stroke="#16a34a" />
+              )}
+            </ChartCard>
+          </div>
+        </>
+      )}
+
+      {section === "h2h" && (
+        <>
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Head-to-Head Table</div>
+
+            {headToHeadRows.length === 0 ? (
+              <div style={{ color: "#64748b" }}>No match results saved yet.</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    minWidth: 760,
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #e2e8f0", color: "#94a3b8" }}>
+                      <th style={{ textAlign: "left", padding: "10px 8px" }}>Opponent</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>P</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>W</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>D</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>L</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>GF</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>GA</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>GD</th>
+                      <th style={{ textAlign: "center", padding: "10px 8px" }}>Last</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {headToHeadRows.map((row) => (
+                      <tr
+                        key={row.opponent}
+                        onClick={() => setSelectedOpponent(row.opponent)}
+                        style={{
+                          borderBottom: "1px solid #e2e8f0",
+                          background:
+                            selectedOpponentSafe === row.opponent ? "#dbeafe" : "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <td style={{ padding: "12px 8px", fontWeight: 900 }}>{row.opponent}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.played}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.won}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.drawn}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.lost}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.gf}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.ga}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center", fontWeight: 900 }}>
+                          {row.gd > 0 ? `+${row.gd}` : row.gd}
+                        </td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>{row.last}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div style={cardStyle()}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Opponent Detail</div>
+
+            <select
+              value={selectedOpponentSafe}
+              onChange={(e) => setSelectedOpponent(e.target.value)}
+              style={{
+                width: "100%",
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+                marginBottom: 16,
+                fontSize: 16,
+                background: "white",
+              }}
+            >
+              <option value="">Select opponent</option>
+              {opponents.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
+
+            {!selectedOpponentSafe ? (
+              <div style={{ color: "#64748b" }}>Choose a team to view the record.</div>
+            ) : headToHead ? (
+              <div style={{ display: "grid", gap: 12 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  <StatCard label="Won" value={headToHead.wins} />
+                  <StatCard label="Drawn" value={headToHead.draws} />
+                  <StatCard label="Lost" value={headToHead.losses} />
+                  <StatCard label="GF" value={headToHead.goalsFor} />
+                  <StatCard label="GA" value={headToHead.goalsAgainst} />
+                  <StatCard
+                    label="GD"
+                    value={
+                      headToHead.goalDifference > 0
+                        ? `+${headToHead.goalDifference}`
+                        : headToHead.goalDifference
+                    }
+                  />
+                </div>
+
+                {headToHead.matches.length === 0 ? (
+                  <div style={{ color: "#64748b" }}>No games found.</div>
+                ) : (
+                  headToHead.matches.map((match) => {
+                    const isHome = normalizeTeamName(match.homeTeam) === normalizeTeamName(teamName)
+                    const ourScore = isHome ? match.homeScore : match.awayScore
+                    const oppScore = isHome ? match.awayScore : match.homeScore
+                    const result: "W" | "D" | "L" =
+                      ourScore > oppScore ? "W" : ourScore < oppScore ? "L" : "D"
+
+                    return (
+                      <div
+                        key={match.id}
+                        style={{
+                          padding: 12,
+                          borderRadius: 14,
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                          display: "grid",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 10,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ fontWeight: 900 }}>
+                            {normalizeTeamName(match.homeTeam)} {match.homeScore} - {match.awayScore}{" "}
+                            {normalizeTeamName(match.awayTeam)}
+                          </div>
+                          <FormBadge value={result} />
+                        </div>
+
+                        <div style={{ color: "#64748b", fontSize: 14 }}>
+                          {match.playedOn}
+                          {match.competition ? ` • ${match.competition}` : ""}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            ) : (
+              <div style={{ color: "#64748b" }}>No record found.</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {section === "history" && (
+        <div style={cardStyle()}>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Results History</div>
+
+          {teamMatches.length === 0 ? (
+            <div style={{ color: "#64748b" }}>No results saved yet.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {teamMatches.map((match) => {
+                const isHome = normalizeTeamName(match.homeTeam) === normalizeTeamName(teamName)
                 const ourScore = isHome ? match.homeScore : match.awayScore
                 const oppScore = isHome ? match.awayScore : match.homeScore
-
+                const opponent = isHome
+                  ? normalizeTeamName(match.awayTeam)
+                  : normalizeTeamName(match.homeTeam)
                 const result: "W" | "D" | "L" =
                   ourScore > oppScore ? "W" : ourScore < oppScore ? "L" : "D"
 
@@ -954,8 +1063,8 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
                   <div
                     key={match.id}
                     style={{
-                      padding: 12,
-                      borderRadius: 14,
+                      padding: 14,
+                      borderRadius: 16,
                       background: "#f8fafc",
                       border: "1px solid #e2e8f0",
                       display: "grid",
@@ -972,8 +1081,7 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
                       }}
                     >
                       <div style={{ fontWeight: 900 }}>
-                        {normalizeTeamName(match.homeTeam)} {match.homeScore} - {match.awayScore}{" "}
-                        {normalizeTeamName(match.awayTeam)}
+                        vs {opponent} • {ourScore}-{oppScore}
                       </div>
                       <FormBadge value={result} />
                     </div>
@@ -984,13 +1092,11 @@ export default function StatsTab({ teamName, results, players, ratings, timeline
                     </div>
                   </div>
                 )
-              })
-            )}
-          </div>
-        ) : (
-          <div style={{ color: "#64748b" }}>No record found.</div>
-        )}
-      </div>
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
