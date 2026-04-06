@@ -16,7 +16,6 @@ import SessionTimer from "./components/SessionTimer"
 import SessionHistory from "./components/SessionHistory"
 import MatchRatingsManager from "./components/MatchRatingsManager"
 import MatchReportGenerator from "./components/MatchReportGenerator"
-import SectionCard from "./components/ui/SectionCard"
 import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
@@ -75,19 +74,6 @@ type DbTrainingPlanRow = {
   notes: string | null
 }
 
-type StandingRow = {
-  team: string
-  played: number
-  wins: number
-  draws: number
-  losses: number
-  goals_for: number
-  goals_against: number
-  goal_difference: number
-  points: number
-  form?: ("W" | "D" | "L")[]
-}
-
 function formatFullDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
     weekday: "long",
@@ -129,6 +115,7 @@ function normalizeTeamName(name: string) {
     "U10 Lionesses": "Leonard Stanley U10 Lioness",
     "Sharks Lioness": "Leonard Stanley U10 Lioness",
     "Sharks Lionesses": "Leonard Stanley U10 Lioness",
+    "Leonard Stanley U10 Lioness 25/26": "Leonard Stanley U10 Lioness",
 
     "Tewkesbury Town Colts Youth U10": "Tewkesbury Town Colts",
     "Tewkesbury Town Colts Youth": "Tewkesbury Town Colts",
@@ -136,93 +123,13 @@ function normalizeTeamName(name: string) {
 
     "Stonehouse TownYouth U10": "Stonehouse Town",
     "Stonehouse Town Youth U10": "Stonehouse Town",
+    "Stonehouse Town Youth": "Stonehouse Town",
 
     "Rodborough Youth U10 Lioness": "Rodborough Lionesses",
     "Rodborough Youth U10 Lionesses": "Rodborough Lionesses",
   }
 
   return map[value] || value
-}
-
-function buildStandings(results: LeagueResult[]): StandingRow[] {
-  const table: Record<
-    string,
-    StandingRow & {
-      form: ("W" | "D" | "L")[]
-    }
-  > = {}
-
-  function getTeam(name: string) {
-    const normalized = normalizeTeamName(name)
-
-    if (!table[normalized]) {
-      table[normalized] = {
-        team: normalized,
-        played: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goals_for: 0,
-        goals_against: 0,
-        goal_difference: 0,
-        points: 0,
-        form: [],
-      }
-    }
-
-    return table[normalized]
-  }
-
-  const sortedResults = results
-    .slice()
-    .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
-
-  for (const match of sortedResults) {
-    const home = getTeam(match.homeTeam)
-    const away = getTeam(match.awayTeam)
-
-    home.played += 1
-    away.played += 1
-
-    home.goals_for += match.homeScore
-    home.goals_against += match.awayScore
-    away.goals_for += match.awayScore
-    away.goals_against += match.homeScore
-
-    if (match.homeScore > match.awayScore) {
-      home.wins += 1
-      home.points += 3
-      away.losses += 1
-      home.form.push("W")
-      away.form.push("L")
-    } else if (match.homeScore < match.awayScore) {
-      away.wins += 1
-      away.points += 3
-      home.losses += 1
-      away.form.push("W")
-      home.form.push("L")
-    } else {
-      home.draws += 1
-      away.draws += 1
-      home.points += 1
-      away.points += 1
-      home.form.push("D")
-      away.form.push("D")
-    }
-  }
-
-  return Object.values(table)
-    .map((team) => ({
-      ...team,
-      goal_difference: team.goals_for - team.goals_against,
-      form: team.form.slice(-5).reverse(),
-    }))
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points
-      if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference
-      if (b.goals_for !== a.goals_for) return b.goals_for - a.goals_for
-      return a.team.localeCompare(b.team)
-    })
 }
 
 function Dashboard({
@@ -241,7 +148,6 @@ function Dashboard({
   const [events, setEvents] = useState<EventWithPlan[]>([])
   const [attendance, setAttendance] = useState<EventAttendance[]>([])
   const [leagueResults, setLeagueResults] = useState<LeagueResult[]>([])
-  const [leagueStandings, setLeagueStandings] = useState<StandingRow[]>([])
   const [playerRatings, setPlayerRatings] = useState<PlayerMatchRating[]>([])
   const [matchReports, setMatchReports] = useState<MatchReport[]>([])
 
@@ -310,7 +216,6 @@ function Dashboard({
 
   const [activeSession, setActiveSession] = useState<TrainingSession | null>(null)
   const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
-
   const [loading, setLoading] = useState(true)
 
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
@@ -483,20 +388,19 @@ function Dashboard({
       return
     }
 
-    const results: LeagueResult[] = (data || []).map((row: any) => ({
-      id: row.id,
-      playedOn: row.played_on,
-      eventId: row.event_id || null,
-      opponent: row.opponent || "",
-      homeTeam: normalizeTeamName(row.home_team),
-      awayTeam: normalizeTeamName(row.away_team),
-      homeScore: row.home_score,
-      awayScore: row.away_score,
-      competition: row.competition || "",
-    }))
-
-    setLeagueResults(results)
-    setLeagueStandings(buildStandings(results))
+    setLeagueResults(
+      (data || []).map((row: any) => ({
+        id: row.id,
+        playedOn: row.played_on,
+        eventId: row.event_id || null,
+        opponent: row.opponent || "",
+        homeTeam: normalizeTeamName(row.home_team),
+        awayTeam: normalizeTeamName(row.away_team),
+        homeScore: row.home_score,
+        awayScore: row.away_score,
+        competition: row.competition || "",
+      }))
+    )
   }
 
   async function loadAll() {
@@ -534,17 +438,18 @@ function Dashboard({
     ])
 
     if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
-      const nextPlayers: Player[] = playersRes.data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        positions: JSON.parse(row.positions_json || "[]"),
-        mainGK: !!row.main_gk,
-        backupGK: !!row.backup_gk,
-        captain: !!row.captain,
-        viceCaptain: !!row.vice_captain,
-        seasonSeconds: row.season_seconds || 0,
-      }))
-      setPlayers(nextPlayers)
+      setPlayers(
+        playersRes.data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          positions: JSON.parse(row.positions_json || "[]"),
+          mainGK: !!row.main_gk,
+          backupGK: !!row.backup_gk,
+          captain: !!row.captain,
+          viceCaptain: !!row.vice_captain,
+          seasonSeconds: row.season_seconds || 0,
+        }))
+      )
     } else {
       setPlayers(initialPlayers)
     }
@@ -1622,9 +1527,7 @@ function Dashboard({
 
     setRunning(false)
     await persistMatchState({ running: false })
-
     await loadLeagueResults()
-
     alert("Game result saved")
   }
 
@@ -1696,7 +1599,6 @@ function Dashboard({
   }
 
   const totalGoals = timeline.filter((t) => t.type === "goal").length
-  const totalAssists = timeline.filter((t) => t.type === "assist").length
   const mainGk = players.find((p) => p.mainGK)
   const backupGk = players.find((p) => p.backupGK)
   const availableCount = selectedEvent ? countAttendance(selectedEvent.id, "available") : 0
@@ -1838,25 +1740,22 @@ function Dashboard({
         {tab === "home" && (
           <div style={{ display: "grid", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-              <SectionCard>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Players</div>
                 <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{players.length}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Goals Logged</div>
                 <div style={{ fontSize: 40, fontWeight: 900, marginTop: 8 }}>{totalGoals}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Main GK</div>
                 <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{mainGk?.name || "Not set"}</div>
-              </SectionCard>
-
-              <SectionCard>
+              </div>
+              <div style={cardStyle()}>
                 <div style={{ color: "#64748b", fontWeight: 800 }}>Backup GK</div>
                 <div style={{ fontSize: 20, fontWeight: 900, marginTop: 8 }}>{backupGk?.name || "Not set"}</div>
-              </SectionCard>
+              </div>
             </div>
           </div>
         )}
@@ -1876,7 +1775,7 @@ function Dashboard({
               events={events}
             />
 
-            <SectionCard title="Calendar Events">
+            <div style={cardStyle()}>
               <div
                 style={{
                   display: "flex",
@@ -1887,7 +1786,7 @@ function Dashboard({
                   marginBottom: 12,
                 }}
               >
-                <div />
+                <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar Events</div>
                 {isAdmin ? (
                   <button onClick={openAddCalendarEvent} style={buttonPrimary()}>
                     Add Event
@@ -1934,10 +1833,10 @@ function Dashboard({
                   ))}
                 </div>
               )}
-            </SectionCard>
+            </div>
 
             {selectedEvent ? (
-              <SectionCard>
+              <div style={cardStyle()}>
                 <div
                   style={{
                     display: "flex",
@@ -2053,10 +1952,11 @@ function Dashboard({
                     )
                   })}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
-            <SectionCard title="Training Templates">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
               <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
                 {allTrainingPlans.map((template) => (
                   <button
@@ -2123,9 +2023,9 @@ function Dashboard({
                   </div>
                 ))}
               </div>
-            </SectionCard>
+            </div>
 
-            <SectionCard>
+            <div style={cardStyle()}>
               <div
                 style={{
                   display: "flex",
@@ -2147,7 +2047,7 @@ function Dashboard({
                   Generate Session
                 </button>
               </div>
-            </SectionCard>
+            </div>
 
             <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
 
@@ -2176,7 +2076,10 @@ function Dashboard({
         {tab === "coaches" && (
           <div style={{ display: "grid", gap: 16 }}>
             {selectedDateCoachAvailability.length > 0 ? (
-              <SectionCard title="Coach Availability Snapshot" tone="#eff6ff">
+              <div style={cardStyle("#eff6ff")}>
+                <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
+                  Coach Availability Snapshot
+                </div>
                 <div style={{ color: "#475569", marginBottom: 10 }}>{formatFullDate(selectedDate)}</div>
                 <div style={{ display: "grid", gap: 8 }}>
                   {selectedDateCoachAvailability.map((item) => {
@@ -2199,7 +2102,7 @@ function Dashboard({
                     )
                   })}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
             <CoachesManager
@@ -2215,7 +2118,9 @@ function Dashboard({
 
         {tab === "match" && (
           <div style={{ display: "grid", gap: 16 }}>
-            <SectionCard title="Selected Match Event">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
+
               {events.filter((event) => event.type === "match").length === 0 ? (
                 <div style={{ color: "#64748b" }}>No match events created yet.</div>
               ) : (
@@ -2272,9 +2177,11 @@ function Dashboard({
                   )}
                 </div>
               )}
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Match Day Availability">
+            <div style={cardStyle()}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
+
               {activeMatchEvent ? (
                 <div style={{ display: "grid", gap: 10 }}>
                   <div style={{ fontWeight: 800 }}>
@@ -2319,9 +2226,11 @@ function Dashboard({
               ) : (
                 <div style={{ color: "#64748b" }}>No active match event selected.</div>
               )}
-            </SectionCard>
+            </div>
 
-            <SectionCard title="Coaches for Match Day" tone="#eff6ff">
+            <div style={cardStyle("#eff6ff")}>
+              <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Coaches for Match Day</div>
+
               <div style={{ color: "#475569", marginBottom: 10 }}>
                 Showing coach availability for <strong>{formatFullDate(matchDateForCoachView)}</strong>
               </div>
@@ -2396,7 +2305,7 @@ function Dashboard({
                   Warning: no Head Coach is marked as available.
                 </div>
               ) : null}
-            </SectionCard>
+            </div>
 
             <MatchCenter
               isAdmin={isAdmin}
@@ -2517,14 +2426,14 @@ function Dashboard({
             />
 
             {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
-              <SectionCard tone="#fef3c7">
+              <div style={cardStyle("#fef3c7")}>
                 <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
                   Auto Player of the Match
                 </div>
                 <div style={{ color: "#92400e", fontWeight: 800 }}>
                   {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
                 </div>
-              </SectionCard>
+              </div>
             ) : null}
 
             {activeMatchEvent ? (
@@ -2550,7 +2459,9 @@ function Dashboard({
           <StatsTab
             teamName={normalizeTeamName(TEAM.name)}
             results={leagueResults}
-            standings={leagueStandings}
+            players={players}
+            ratings={playerRatings}
+            timeline={timeline}
           />
         )}
       </div>
