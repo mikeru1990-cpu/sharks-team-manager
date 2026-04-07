@@ -190,13 +190,13 @@ type Props = {
   persistSettings: any
   persistMatchState: any
 
-  savePlayers?: any
-  saveCoaches?: any
-  saveCoachAvailability?: any
-  saveTrainingPlans?: any
-  saveSessionRecord?: any
-  savePlayerRating?: any
-  saveAttendance?: any
+  savePlayers: any
+  saveCoaches: any
+  saveCoachAvailability: any
+  saveTrainingPlans: any
+  saveSessionRecord: any
+  savePlayerRating: any
+  saveAttendance: any
 
   addEvent: () => Promise<void>
   openAddCalendarEvent: () => void
