@@ -173,6 +173,7 @@ type Props = {
   activeTopPerformers: string[]
   activeGoalsSummary: string[]
   latestActiveMatchReport: MatchReport | null
+  totalGoals: number
 
   formatFullDate: (date: string) => string
   statusStyle: (status: AttendanceStatus) => any
