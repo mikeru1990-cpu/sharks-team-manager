@@ -11,17 +11,15 @@ import {
   cardStyle,
   type AttendanceStatus,
   type EventAttendance,
-  type EventItem,
   type Player,
   type TrainingSession,
   type TrainingSessionRecord,
   type TrainingTemplate,
 } from "../../lib/types"
-
-type EventWithPlan = EventItem & {
-  trainingPlanId?: string
-  trainingPlanName?: string
-}
+import type {
+  EventWithPlan,
+  TrainingPlanState,
+} from "../../lib/dashboardTypes"
 
 type Props = {
   isAdmin: boolean
@@ -39,22 +37,8 @@ type Props = {
   allTrainingPlans: TrainingTemplate[]
   selectedTemplateId: string
   setSelectedTemplateId: (value: string) => void
-  trainingPlan: {
-    title: string
-    warmUp: string
-    drill1: string
-    drill2: string
-    game: string
-    notes: string
-  }
-  setTrainingPlan: (value: {
-    title: string
-    warmUp: string
-    drill1: string
-    drill2: string
-    game: string
-    notes: string
-  }) => void
+  trainingPlan: TrainingPlanState
+  setTrainingPlan: (value: TrainingPlanState) => void
   selectedDbTrainingPlanId: string
   setSelectedDbTrainingPlanId: (value: string) => void
   activeSession: TrainingSession | null
@@ -180,8 +164,8 @@ export default function EventsTabContent(props: Props) {
                   </div>
                 ) : null}
                 <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                  Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} •
-                  {" "}Unavail {countAttendance(event.id, "unavailable")}
+                  Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail{" "}
+                  {countAttendance(event.id, "unavailable")}
                 </div>
               </button>
             ))}
