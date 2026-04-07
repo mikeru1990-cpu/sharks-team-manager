@@ -8,9 +8,10 @@ import EventsTabContent from "./tabs/EventsTabContent"
 import MatchTabContent from "./tabs/MatchTabContent"
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
+import DashboardHeader from "./layout/DashboardHeader"
+import BottomNav from "./layout/BottomNav"
 import {
   TEAM,
-  buttonSecondary,
   cardStyle,
   type AttendanceStatus,
   type Coach,
@@ -221,7 +222,7 @@ type Props = {
 }
 
 export default function DashboardShell(props: Props) {
-  const { loading, tab, setTab, isAdmin, signOut } = props
+  const { loading, tab } = props
 
   if (loading) {
     return (
@@ -243,42 +244,20 @@ export default function DashboardShell(props: Props) {
       }}
     >
       <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
-        <div style={cardStyle()}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
-            <div>
-              <div style={{ fontSize: 28, fontWeight: 900 }}>{TEAM.name}</div>
-              <div style={{ color: "#475569", marginTop: 4 }}>Club Hub</div>
-            </div>
-            <button onClick={() => void signOut()} style={buttonSecondary()}>
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {["home", "players", "events", "coaches", "match", "stats"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t as MainTab)}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 999,
-                border: "1px solid #cbd5e1",
-                background: tab === t ? TEAM.primary : "white",
-                color: tab === t ? "white" : "#334155",
-                fontWeight: 800,
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <DashboardHeader isAdmin={props.isAdmin} onSignOut={props.signOut} />
 
         {tab === "home" && <HomeTab {...props} />}
+
         {tab === "players" && (
-          <PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} />
+          <PlayersManager
+            players={props.players}
+            isAdmin={props.isAdmin}
+            onSavePlayers={props.savePlayers}
+          />
         )}
+
         {tab === "events" && <EventsTabContent {...props} />}
+
         {tab === "coaches" && (
           <CoachesManager
             isAdmin={props.isAdmin}
@@ -289,7 +268,9 @@ export default function DashboardShell(props: Props) {
             onSaveCoachAvailability={props.saveCoachAvailability}
           />
         )}
+
         {tab === "match" && <MatchTabContent {...props} />}
+
         {tab === "stats" && (
           <StatsTab
             teamName={props.normalizeTeamName(TEAM.name)}
@@ -300,6 +281,8 @@ export default function DashboardShell(props: Props) {
           />
         )}
       </div>
+
+      <BottomNav tab={props.tab} setTab={props.setTab} />
 
       <EventFormModal
         open={props.showEventForm}
