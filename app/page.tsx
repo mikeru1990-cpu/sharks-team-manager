@@ -1720,6 +1720,7 @@ function Dashboard({
       saveTrainingPlans={saveTrainingPlans}
       saveSessionRecord={saveSessionRecord}
       savePlayerRating={savePlayerRating}
+      saveAttendance={saveAttendance}
       addEvent={addEvent}
       openAddCalendarEvent={openAddCalendarEvent}
       openEditCalendarEvent={openEditCalendarEvent}
