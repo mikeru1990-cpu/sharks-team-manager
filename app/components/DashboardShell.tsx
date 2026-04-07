@@ -2,20 +2,14 @@
 
 import nextDynamic from "next/dynamic"
 import PlayersManager from "./PlayersManager"
-import QuarterPlanner from "./QuarterPlanner"
-import MatchCenter from "./MatchCenter"
 import CoachesManager from "./CoachesManager"
-import MatchRatingsManager from "./MatchRatingsManager"
-import MatchReportGenerator from "./MatchReportGenerator"
 import HomeTab from "./tabs/HomeTab"
 import EventsTabContent from "./tabs/EventsTabContent"
+import MatchTabContent from "./tabs/MatchTabContent"
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
-import { buildSessionFromTemplate } from "../lib/sessionBuilder"
-
 import {
   TEAM,
-  buttonPrimary,
   buttonSecondary,
   cardStyle,
   type AttendanceStatus,
@@ -249,13 +243,11 @@ export default function DashboardShell(props: Props) {
       }}
     >
       <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
-        
-        {/* HEADER */}
         <div style={cardStyle()}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}>
             <div>
               <div style={{ fontSize: 28, fontWeight: 900 }}>{TEAM.name}</div>
-              <div>Club Hub</div>
+              <div style={{ color: "#475569", marginTop: 4 }}>Club Hub</div>
             </div>
             <button onClick={() => void signOut()} style={buttonSecondary()}>
               Sign Out
@@ -263,27 +255,97 @@ export default function DashboardShell(props: Props) {
           </div>
         </div>
 
-        {/* NAV */}
-        <div style={{ display: "flex", gap: 8 }}>
-          {["home","players","events","coaches","match","stats"].map(t => (
-            <button key={t} onClick={()=>setTab(t as MainTab)}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {["home", "players", "events", "coaches", "match", "stats"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t as MainTab)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 999,
+                border: "1px solid #cbd5e1",
+                background: tab === t ? TEAM.primary : "white",
+                color: tab === t ? "white" : "#334155",
+                fontWeight: 800,
+              }}
+            >
               {t}
             </button>
           ))}
         </div>
 
-        {/* TABS */}
         {tab === "home" && <HomeTab {...props} />}
-        {tab === "players" && <PlayersManager {...props} />}
+        {tab === "players" && (
+          <PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} />
+        )}
         {tab === "events" && <EventsTabContent {...props} />}
-        {tab === "coaches" && <CoachesManager {...props} />}
-        {tab === "match" && <MatchCenter {...props} />}
-        {tab === "stats" && <StatsTab {...props} />}
-
+        {tab === "coaches" && (
+          <CoachesManager
+            isAdmin={props.isAdmin}
+            selectedDate={props.selectedDate}
+            coaches={props.coaches}
+            coachAvailability={props.coachAvailability}
+            onSaveCoaches={props.saveCoaches}
+            onSaveCoachAvailability={props.saveCoachAvailability}
+          />
+        )}
+        {tab === "match" && <MatchTabContent {...props} />}
+        {tab === "stats" && (
+          <StatsTab
+            teamName={props.normalizeTeamName(TEAM.name)}
+            results={props.leagueResults}
+            players={props.players}
+            ratings={props.playerRatings}
+            timeline={props.timeline}
+          />
+        )}
       </div>
 
-      <EventFormModal {...props} />
-      <MatchEventModal {...props} />
+      <EventFormModal
+        open={props.showEventForm}
+        editingCalendarEventId={props.editingCalendarEventId}
+        eventTitle={props.eventTitle}
+        setEventTitle={props.setEventTitle}
+        eventType={props.eventType}
+        setEventType={props.setEventType}
+        selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
+        setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
+        allTrainingPlans={props.allTrainingPlans}
+        eventStartTime={props.eventStartTime}
+        setEventStartTime={props.setEventStartTime}
+        eventLocation={props.eventLocation}
+        setEventLocation={props.setEventLocation}
+        eventOpponent={props.eventOpponent}
+        setEventOpponent={props.setEventOpponent}
+        eventNotes={props.eventNotes}
+        setEventNotes={props.setEventNotes}
+        selectedDate={props.selectedDate}
+        onSave={props.addEvent}
+        onClose={() => {
+          props.setShowEventForm(false)
+          props.setEditingCalendarEventId(null)
+          props.setEventTitle("")
+          props.setEventType("training")
+          props.setEventStartTime("")
+          props.setEventLocation("")
+          props.setEventOpponent("")
+          props.setEventNotes("")
+          props.setSelectedDbTrainingPlanId("")
+        }}
+      />
+
+      <MatchEventModal
+        open={props.showMatchEventModal}
+        editingTimelineId={props.editingTimelineId}
+        eventDraft={props.eventDraft}
+        setEventDraft={props.setEventDraft}
+        matchPlayers={props.matchPlayers}
+        onSave={props.saveMatchEvent}
+        onClose={() => {
+          props.setShowMatchEventModal(false)
+          props.setEditingTimelineId(null)
+        }}
+      />
     </main>
   )
 }
