@@ -16,7 +16,6 @@ import {
   type AttendanceStatus,
   type Coach,
   type CoachAvailability,
-  type CoachAvailabilityStatus,
   type EventAttendance,
   type LeagueResult,
   type MainTab,
@@ -191,13 +190,13 @@ type Props = {
   persistSettings: any
   persistMatchState: any
 
-  savePlayers: any
-  saveCoaches: any
-  saveCoachAvailability: any
-  saveTrainingPlans: any
-  saveSessionRecord: any
-  savePlayerRating: any
-  saveAttendance: any
+  savePlayers?: any
+  saveCoaches?: any
+  saveCoachAvailability?: any
+  saveTrainingPlans?: any
+  saveSessionRecord?: any
+  savePlayerRating?: any
+  saveAttendance?: any
 
   addEvent: () => Promise<void>
   openAddCalendarEvent: () => void
