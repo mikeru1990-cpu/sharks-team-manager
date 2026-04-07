@@ -2,21 +2,19 @@
 
 import nextDynamic from "next/dynamic"
 import PlayersManager from "./PlayersManager"
-import CoachesManager from "./CoachesManager"
 import HomeTab from "./tabs/HomeTab"
 import EventsTabContent from "./tabs/EventsTabContent"
 import MatchTabContent from "./tabs/MatchTabContent"
+import CoachesTabContent from "./tabs/CoachesTabContent"
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
 import {
   TEAM,
-  cardStyle,
   type AttendanceStatus,
   type Coach,
   type CoachAvailability,
-  type CoachAvailabilityStatus,
   type EventAttendance,
   type EventItem,
   type LeagueResult,
@@ -34,6 +32,7 @@ import {
   type TrainingSession,
   type TrainingSessionRecord,
   type TrainingTemplate,
+  cardStyle,
 } from "../lib/types"
 
 const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
@@ -222,7 +221,7 @@ type Props = {
 }
 
 export default function DashboardShell(props: Props) {
-  const { loading, tab } = props
+  const { loading, tab, setTab, isAdmin, signOut } = props
 
   if (loading) {
     return (
@@ -244,7 +243,7 @@ export default function DashboardShell(props: Props) {
       }}
     >
       <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
-        <DashboardHeader isAdmin={props.isAdmin} onSignOut={props.signOut} />
+        <DashboardHeader isAdmin={isAdmin} onSignOut={signOut} />
 
         {tab === "home" && <HomeTab {...props} />}
 
@@ -259,13 +258,15 @@ export default function DashboardShell(props: Props) {
         {tab === "events" && <EventsTabContent {...props} />}
 
         {tab === "coaches" && (
-          <CoachesManager
+          <CoachesTabContent
             isAdmin={props.isAdmin}
             selectedDate={props.selectedDate}
             coaches={props.coaches}
             coachAvailability={props.coachAvailability}
-            onSaveCoaches={props.saveCoaches}
-            onSaveCoachAvailability={props.saveCoachAvailability}
+            selectedDateCoachAvailability={props.selectedDateCoachAvailability}
+            formatFullDate={props.formatFullDate}
+            saveCoaches={props.saveCoaches}
+            saveCoachAvailability={props.saveCoachAvailability}
           />
         )}
 
