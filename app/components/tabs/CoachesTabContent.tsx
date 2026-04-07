@@ -1,7 +1,7 @@
 "use client"
 
 import CoachesManager from "../CoachesManager"
-import { cardStyle, type Coach, type CoachAvailability } from "../../lib/types"
+import { cardStyle, type Coach, type CoachAvailability, type CoachAvailabilityStatus } from "../../lib/types"
 
 type Props = {
   isAdmin: boolean
@@ -14,7 +14,7 @@ type Props = {
   saveCoachAvailability: (
     coachId: string,
     day: string,
-    status: "available" | "unavailable" | "holiday",
+    status: CoachAvailabilityStatus,
     notes?: string
   ) => Promise<void>
 }
