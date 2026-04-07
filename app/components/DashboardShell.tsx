@@ -154,6 +154,8 @@ type Props = {
   selectedEvent: EventWithPlan | null
   activeMatchEvent: EventWithPlan | null
 
+  activeMatchAvailableIds: string[]
+  activeMatchMaybeIds: string[]
   matchPlayers: Player[]
   maybePlayers: Player[]
   unavailablePlayers: Player[]
@@ -233,7 +235,6 @@ export default function DashboardShell(props: Props) {
   return (
     <main style={{ minHeight: "100vh", padding: 16 }}>
       <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
-        
         <DashboardHeader isAdmin={isAdmin} onSignOut={signOut} />
 
         {tab === "home" && (
