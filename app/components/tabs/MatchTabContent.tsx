@@ -4,14 +4,25 @@ import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
 import MatchRatingsManager from "../MatchRatingsManager"
 import MatchReportGenerator from "../MatchReportGenerator"
-import { buttonPrimary, buttonSecondary, cardStyle, type Coach, type EventItem, type MatchFormat, type MatchReport, type MatchTab, type PitchSlot, type Player, type PlayerMatchRating, type QuarterPlan, type SavedLineup, type TimelineItem } from "../../lib/types"
-
-type PeriodMode = "quarters" | "halves"
-
-type EventWithPlan = EventItem & {
-  trainingPlanId?: string
-  trainingPlanName?: string
-}
+import {
+  buttonPrimary,
+  buttonSecondary,
+  cardStyle,
+  type Coach,
+  type MatchFormat,
+  type MatchReport,
+  type MatchTab,
+  type PitchSlot,
+  type Player,
+  type PlayerMatchRating,
+  type QuarterPlan,
+  type SavedLineup,
+  type TimelineItem,
+} from "../../lib/types"
+import type {
+  EventWithPlan,
+  PeriodMode,
+} from "../../lib/dashboardTypes"
 
 type Props = {
   isAdmin: boolean
@@ -89,8 +100,8 @@ type Props = {
   handleSaveLineup: () => Promise<void>
   handleLoadSavedLineup: (id: string) => Promise<void>
   handleDeleteSavedLineup: (id: string) => Promise<void>
-  handleDragStart: any
-  handleDragEnd: any
+  handleDragStart: (event: any) => void
+  handleDragEnd: (event: any) => void
   openCreateEvent: () => void
   openEditEvent: (item: TimelineItem) => void
   handleDeleteTimelineItem: (id: string) => Promise<void>
