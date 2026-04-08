@@ -2,11 +2,9 @@
 
 import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
-import MatchRatingsManager from "../MatchRatingsManager"
 import MatchReportGenerator from "../MatchReportGenerator"
+import PlayerFeedbackCard from "../PlayerFeedbackCard"
 import {
-  buttonPrimary,
-  buttonSecondary,
   cardStyle,
   type Coach,
   type MatchFormat,
@@ -23,6 +21,8 @@ import type {
   EventWithPlan,
   PeriodMode,
 } from "../../lib/dashboardTypes"
+
+type OverallStatus = "developing" | "improving" | "strong"
 
 type Props = {
   isAdmin: boolean
@@ -128,6 +128,33 @@ type Props = {
   activeGoalsSummary: string[]
   latestActiveMatchReport: MatchReport | null
   saveMatchReport: (coachNotes: string) => Promise<void>
+}
+
+function mapRatingToOverall(rating?: number): OverallStatus | null {
+  if (typeof rating !== "number") return null
+  if (rating <= 5) return "developing"
+  if (rating <= 7) return "improving"
+  return "strong"
+}
+
+function mapOverallToRating(status: OverallStatus | null): number {
+  if (status === "developing") return 4
+  if (status === "improving") return 7
+  return 9
+}
+
+function parseExistingFeedback(notes?: string) {
+  const text = notes || ""
+
+  const strengthMatch = text.match(/Strength:\s*(.*)/i)
+  const focusMatch = text.match(/Focus:\s*(.*)/i)
+  const coachNoteMatch = text.match(/Coach note:\s*([\s\S]*)/i)
+
+  return {
+    strengthArea: strengthMatch?.[1]?.trim() || "",
+    focusArea: focusMatch?.[1]?.trim() || "",
+    coachNote: coachNoteMatch?.[1]?.trim() || "",
+  }
 }
 
 export default function MatchTabContent(props: Props) {
@@ -510,13 +537,67 @@ export default function MatchTabContent(props: Props) {
         />
       ) : null}
 
-      <MatchRatingsManager
-        isAdmin={isAdmin}
-        players={matchPlayers}
-        activeEventId={activeMatchEventId}
-        ratings={playerRatings}
-        onSaveRating={savePlayerRating}
-      />
+      <div style={cardStyle()}>
+        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
+          Player Feedback
+        </div>
+        <div style={{ color: "#475569", marginBottom: 16 }}>
+          Use short development-focused notes instead of match ratings.
+        </div>
+
+        {!activeMatchEvent ? (
+          <div style={{ color: "#64748b" }}>
+            Choose an active match event to record player feedback.
+          </div>
+        ) : matchPlayers.length === 0 ? (
+          <div style={{ color: "#64748b" }}>
+            No available players for the selected match.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 14 }}>
+            {matchPlayers.map((player) => {
+              const existing = playerRatings.find(
+                (item) =>
+                  item.eventId === activeMatchEventId &&
+                  item.playerId === player.id
+              )
+
+              const parsed = parseExistingFeedback(existing?.notes)
+
+              return (
+                <PlayerFeedbackCard
+                  key={player.id}
+                  playerName={player.name}
+                  initialValue={{
+                    overallStatus: mapRatingToOverall(existing?.rating),
+                    strengthArea: parsed.strengthArea,
+                    focusArea: parsed.focusArea,
+                    coachNote: parsed.coachNote,
+                  }}
+                  onSave={async (value) => {
+                    if (!value.overallStatus) {
+                      window.alert("Please choose Overall today before saving.")
+                      return
+                    }
+
+                    const noteLines = [
+                      `Strength: ${value.strengthArea || ""}`,
+                      `Focus: ${value.focusArea || ""}`,
+                      `Coach note: ${value.coachNote || ""}`,
+                    ]
+
+                    await savePlayerRating(
+                      player.id,
+                      mapOverallToRating(value.overallStatus),
+                      noteLines.join("\n")
+                    )
+                  }}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
         <div style={cardStyle("#fef3c7")}>
