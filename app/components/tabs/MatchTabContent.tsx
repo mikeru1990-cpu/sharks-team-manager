@@ -130,6 +130,105 @@ type Props = {
   saveMatchReport: (coachNotes: string) => Promise<void>
 }
 
+function SectionTitle({
+  title,
+  subtitle,
+}: {
+  title: string
+  subtitle?: string
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 22, fontWeight: 900 }}>{title}</div>
+      {subtitle ? (
+        <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div>
+      ) : null}
+    </div>
+  )
+}
+
+function StatPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string | number
+  tone?: "default" | "success" | "warning" | "danger"
+}) {
+  const toneStyle =
+    tone === "success"
+      ? {
+          background: "#dcfce7",
+          border: "1px solid #86efac",
+          color: "#166534",
+        }
+      : tone === "warning"
+      ? {
+          background: "#fef3c7",
+          border: "1px solid #fcd34d",
+          color: "#92400e",
+        }
+      : tone === "danger"
+      ? {
+          background: "#fee2e2",
+          border: "1px solid #fecaca",
+          color: "#991b1b",
+        }
+      : {
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          color: "#334155",
+        }
+
+  return (
+    <div
+      style={{
+        ...toneStyle,
+        padding: "10px 12px",
+        borderRadius: 14,
+        fontWeight: 800,
+      }}
+    >
+      {label} {value}
+    </div>
+  )
+}
+
+function InfoBanner({
+  tone,
+  text,
+}: {
+  tone: "warning" | "danger"
+  text: string
+}) {
+  const style =
+    tone === "danger"
+      ? {
+          background: "#fee2e2",
+          border: "1px solid #fecaca",
+          color: "#991b1b",
+        }
+      : {
+          background: "#fff7ed",
+          border: "1px solid #fdba74",
+          color: "#9a3412",
+        }
+
+  return (
+    <div
+      style={{
+        ...style,
+        padding: 12,
+        borderRadius: 12,
+        fontWeight: 800,
+      }}
+    >
+      {text}
+    </div>
+  )
+}
+
 function mapRatingToOverall(rating?: number): OverallStatus | null {
   if (typeof rating !== "number") return null
   if (rating <= 5) return "developing"
@@ -239,7 +338,10 @@ export default function MatchTabContent(props: Props) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Selected Match Event</div>
+        <SectionTitle
+          title="Match Hub"
+          subtitle="Select a match, manage the day, and record feedback and reports."
+        />
 
         {events.filter((event) => event.type === "match").length === 0 ? (
           <div style={{ color: "#64748b" }}>No match events created yet.</div>
@@ -281,16 +383,22 @@ export default function MatchTabContent(props: Props) {
             {activeMatchEvent ? (
               <div
                 style={{
-                  padding: 12,
-                  borderRadius: 12,
+                  padding: 14,
+                  borderRadius: 16,
                   background: "#f8fafc",
                   border: "1px solid #e2e8f0",
-                  color: "#475569",
+                  display: "grid",
+                  gap: 6,
                 }}
               >
-                Using: <strong>{activeMatchEvent.title}</strong>
-                {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
-                {activeMatchEvent.opponent ? ` • vs ${activeMatchEvent.opponent}` : ""}
+                <div style={{ fontWeight: 900 }}>{activeMatchEvent.title}</div>
+                <div style={{ color: "#475569" }}>
+                  {formatFullDate(activeMatchEvent.date)}
+                  {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
+                </div>
+                <div style={{ color: "#64748b" }}>
+                  {activeMatchEvent.opponent ? `vs ${activeMatchEvent.opponent}` : "Opponent not set"}
+                </div>
               </div>
             ) : (
               <div style={{ color: "#64748b" }}>Choose which match event this screen is tracking.</div>
@@ -300,33 +408,44 @@ export default function MatchTabContent(props: Props) {
       </div>
 
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Match Day Availability</div>
+        <SectionTitle title="Matchday Snapshot" />
 
-        {activeMatchEvent ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ fontWeight: 800 }}>
-              Active event: {activeMatchEvent.title} ({activeMatchEvent.date})
-            </div>
-
-            <div style={{ color: "#475569" }}>
-              Available: {matchPlayers.length}
-              {maybePlayers.length ? ` • Maybe: ${maybePlayers.length}` : ""}
-              {unavailablePlayers.length ? ` • Unavailable: ${unavailablePlayers.length}` : ""}
+        {!activeMatchEvent ? (
+          <div style={{ color: "#64748b" }}>No active match event selected.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <StatPill label="Available" value={matchPlayers.length} tone="success" />
+              <StatPill label="Maybe" value={maybePlayers.length} tone="warning" />
+              <StatPill label="Unavailable" value={unavailablePlayers.length} tone="danger" />
+              <StatPill label="Coaches" value={availableCoaches.length} />
             </div>
 
             {noAvailableKeeper ? (
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  background: "#fee2e2",
-                  border: "1px solid #fecaca",
-                  color: "#991b1b",
-                  fontWeight: 800,
-                }}
-              >
-                Warning: no available goalkeeper is marked for this match.
-              </div>
+              <InfoBanner
+                tone="danger"
+                text="Warning: no available goalkeeper is marked for this match."
+              />
+            ) : null}
+
+            {noAvailableCoaches ? (
+              <InfoBanner
+                tone="danger"
+                text="Warning: no coaches are available for this day."
+              />
+            ) : null}
+
+            {!headCoachAvailable ? (
+              <InfoBanner
+                tone="warning"
+                text="Warning: no Head Coach is marked as available."
+              />
             ) : null}
 
             {unavailablePlayers.length > 0 ? (
@@ -343,88 +462,20 @@ export default function MatchTabContent(props: Props) {
               </div>
             ) : null}
           </div>
-        ) : (
-          <div style={{ color: "#64748b" }}>No active match event selected.</div>
         )}
       </div>
 
       <div style={cardStyle("#eff6ff")}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>Coaches for Match Day</div>
+        <SectionTitle
+          title="Coach Availability"
+          subtitle={`Showing coach availability for ${formatFullDate(matchDateForCoachView)}`}
+        />
 
-        <div style={{ color: "#475569", marginBottom: 10 }}>
-          Showing coach availability for <strong>{formatFullDate(matchDateForCoachView)}</strong>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <StatPill label="Available" value={availableCoaches.length} tone="success" />
+          <StatPill label="Unavailable" value={unavailableCoachesList.length} tone="danger" />
+          <StatPill label="Holiday" value={holidayCoachesList.length} tone="warning" />
         </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#dcfce7",
-              border: "1px solid #86efac",
-              color: "#166534",
-              fontWeight: 800,
-            }}
-          >
-            Available {availableCoaches.length}
-          </div>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#fee2e2",
-              border: "1px solid #fecaca",
-              color: "#991b1b",
-              fontWeight: 800,
-            }}
-          >
-            Unavailable {unavailableCoachesList.length}
-          </div>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "#fef3c7",
-              border: "1px solid #fcd34d",
-              color: "#92400e",
-              fontWeight: 800,
-            }}
-          >
-            Holiday {holidayCoachesList.length}
-          </div>
-        </div>
-
-        {noAvailableCoaches ? (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              background: "#fee2e2",
-              border: "1px solid #fecaca",
-              color: "#991b1b",
-              fontWeight: 800,
-              marginBottom: 10,
-            }}
-          >
-            Warning: no coaches are available for this day.
-          </div>
-        ) : null}
-
-        {!headCoachAvailable ? (
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              background: "#fff7ed",
-              border: "1px solid #fdba74",
-              color: "#9a3412",
-              fontWeight: 800,
-              marginBottom: 10,
-            }}
-          >
-            Warning: no Head Coach is marked as available.
-          </div>
-        ) : null}
       </div>
 
       <MatchCenter
@@ -538,12 +589,10 @@ export default function MatchTabContent(props: Props) {
       ) : null}
 
       <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
-          Player Feedback
-        </div>
-        <div style={{ color: "#475569", marginBottom: 16 }}>
-          Use short development-focused notes instead of match ratings.
-        </div>
+        <SectionTitle
+          title="Player Feedback"
+          subtitle="Development-focused notes instead of match ratings."
+        />
 
         {!activeMatchEvent ? (
           <div style={{ color: "#64748b" }}>
@@ -601,9 +650,7 @@ export default function MatchTabContent(props: Props) {
 
       {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
         <div style={cardStyle("#fef3c7")}>
-          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
-            Auto Player of the Match
-          </div>
+          <SectionTitle title="Player of the Match" />
           <div style={{ color: "#92400e", fontWeight: 800 }}>
             {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
           </div>
