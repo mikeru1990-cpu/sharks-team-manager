@@ -6,9 +6,6 @@ import SessionTimer from "../SessionTimer"
 import SessionHistory from "../SessionHistory"
 import { buildSessionFromTemplate } from "../../lib/sessionBuilder"
 import {
-  buttonPrimary,
-  buttonSecondary,
-  cardStyle,
   type AttendanceStatus,
   type EventAttendance,
   type Player,
@@ -20,6 +17,13 @@ import type {
   EventWithPlan,
   TrainingPlanState,
 } from "../../lib/dashboardTypes"
+import {
+  DangerButton,
+  PageCard,
+  PrimaryButton,
+  SecondaryButton,
+  SectionHeader,
+} from "../ui"
 
 type Props = {
   isAdmin: boolean
@@ -60,6 +64,54 @@ type Props = {
   openAddCalendarEvent: () => void
   openEditCalendarEvent: (event: EventWithPlan) => void
   deleteCalendarEvent: (id: string) => Promise<void>
+}
+
+function typeBadgeStyle(type: EventWithPlan["type"]) {
+  if (type === "match") {
+    return {
+      background: "#eff6ff",
+      border: "1px solid #bfdbfe",
+      color: "#1e3a8a",
+    }
+  }
+
+  if (type === "training") {
+    return {
+      background: "#ecfdf5",
+      border: "1px solid #a7f3d0",
+      color: "#065f46",
+    }
+  }
+
+  return {
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    color: "#475569",
+  }
+}
+
+function statusButtonStyle(
+  active: boolean,
+  status: AttendanceStatus,
+  statusStyle: Props["statusStyle"]
+) {
+  if (active) {
+    return {
+      ...statusStyle(status),
+      padding: "10px 12px",
+      borderRadius: 999,
+      fontWeight: 800,
+    }
+  }
+
+  return {
+    padding: "10px 12px",
+    borderRadius: 999,
+    fontWeight: 800,
+    border: "1px solid #cbd5e1",
+    background: "white",
+    color: "#334155",
+  }
 }
 
 export default function EventsTabContent(props: Props) {
@@ -104,143 +156,266 @@ export default function EventsTabContent(props: Props) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <RollingCalendar
-        selectedDate={selectedDate}
-        onSelectDate={(date) => {
-          setSelectedDate(date)
-          void persistSettings({ selectedDate: date })
-        }}
-        events={events}
-      />
+      <PageCard>
+        <SectionHeader
+          title="Events"
+          subtitle="Calendar, attendance, training plans and session tools."
+          action={isAdmin ? <PrimaryButton onClick={openAddCalendarEvent}>Add Event</PrimaryButton> : undefined}
+        />
 
-      <div style={cardStyle()}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            marginBottom: 12,
+        <RollingCalendar
+          selectedDate={selectedDate}
+          onSelectDate={(date) => {
+            setSelectedDate(date)
+            void persistSettings({ selectedDate: date })
           }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar Events</div>
-          {isAdmin ? (
-            <button onClick={openAddCalendarEvent} style={buttonPrimary()}>
-              Add Event
-            </button>
-          ) : null}
-        </div>
+          events={events}
+        />
+      </PageCard>
+
+      <PageCard>
+        <SectionHeader
+          title="Events on Selected Day"
+          subtitle={formatFullDate(selectedDate)}
+        />
 
         {selectedDateEvents.length === 0 ? (
           <div style={{ color: "#64748b" }}>No calendar events on this day.</div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {selectedDateEvents.map((event) => (
-              <button
-                key={event.id}
-                onClick={() => {
-                  setSelectedEventId(event.id)
-                  if (event.type === "training") loadTrainingPlanFromEvent(event)
-                }}
-                style={{
-                  padding: 12,
-                  borderRadius: 16,
-                  border:
-                    selectedEventId === event.id ? "2px solid #06245c" : "1px solid #e2e8f0",
-                  background: "#f8fafc",
-                  textAlign: "left",
-                }}
-              >
-                <div style={{ fontWeight: 900 }}>{event.title}</div>
-                <div style={{ color: "#64748b", marginTop: 4 }}>
-                  {event.type}
-                  {event.startTime ? ` • ${event.startTime}` : ""}
-                  {event.location ? ` • ${event.location}` : ""}
-                </div>
-                {event.trainingPlanName ? (
-                  <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>
-                    Training plan: {event.trainingPlanName}
+            {selectedDateEvents.map((event) => {
+              const isSelected = selectedEventId === event.id
+              const isActiveMatch = activeMatchEventId === event.id
+
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => {
+                    setSelectedEventId(event.id)
+                    if (event.type === "training") loadTrainingPlanFromEvent(event)
+                  }}
+                  style={{
+                    padding: 14,
+                    borderRadius: 18,
+                    border: isSelected ? "2px solid #0f2c73" : "1px solid #e2e8f0",
+                    background: isSelected ? "#eff6ff" : "#f8fafc",
+                    textAlign: "left",
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, color: "#0f172a" }}>{event.title}</div>
+
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          ...typeBadgeStyle(event.type),
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {event.type}
+                      </div>
+
+                      {isActiveMatch ? (
+                        <div
+                          style={{
+                            background: "#dbeafe",
+                            border: "1px solid #93c5fd",
+                            color: "#1d4ed8",
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Active Match
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                ) : null}
-                <div style={{ marginTop: 8, fontSize: 12, color: "#475569" }}>
-                  Avail {countAttendance(event.id, "available")} • Maybe {countAttendance(event.id, "maybe")} • Unavail{" "}
-                  {countAttendance(event.id, "unavailable")}
-                </div>
-              </button>
-            ))}
+
+                  <div style={{ color: "#64748b" }}>
+                    {event.startTime ? `${event.startTime}` : "00:00"}
+                    {event.location ? ` • ${event.location}` : ""}
+                    {event.opponent ? ` • vs ${event.opponent}` : ""}
+                  </div>
+
+                  {event.trainingPlanName ? (
+                    <div style={{ color: "#475569", fontSize: 13 }}>
+                      Training plan: <strong>{event.trainingPlanName}</strong>
+                    </div>
+                  ) : null}
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div
+                      style={{
+                        ...statusStyle("available"),
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      Available {countAttendance(event.id, "available")}
+                    </div>
+                    <div
+                      style={{
+                        ...statusStyle("maybe"),
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      Maybe {countAttendance(event.id, "maybe")}
+                    </div>
+                    <div
+                      style={{
+                        ...statusStyle("unavailable"),
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      Unavailable {countAttendance(event.id, "unavailable")}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
-      </div>
+      </PageCard>
 
       {selectedEvent ? (
-        <div style={cardStyle()}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-              marginBottom: 12,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{formatFullDate(selectedEvent.date)}</div>
-              <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6 }}>{selectedEvent.title}</div>
-              <div style={{ color: "#64748b", marginTop: 6 }}>
+        <PageCard>
+          <SectionHeader
+            title={selectedEvent.title}
+            subtitle={formatFullDate(selectedEvent.date)}
+            action={
+              isAdmin ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {selectedEvent.type === "match" ? (
+                    activeMatchEventId === selectedEvent.id ? (
+                      <PrimaryButton
+                        onClick={() => {
+                          setActiveMatchEventId(selectedEvent.id)
+                          void persistSettings({ activeMatchEventId: selectedEvent.id })
+                        }}
+                      >
+                        Active Match
+                      </PrimaryButton>
+                    ) : (
+                      <SecondaryButton
+                        onClick={() => {
+                          setActiveMatchEventId(selectedEvent.id)
+                          void persistSettings({ activeMatchEventId: selectedEvent.id })
+                        }}
+                      >
+                        Set Active Match
+                      </SecondaryButton>
+                    )
+                  ) : null}
+
+                  <SecondaryButton onClick={() => openEditCalendarEvent(selectedEvent)}>
+                    Edit
+                  </SecondaryButton>
+
+                  <DangerButton onClick={() => void deleteCalendarEvent(selectedEvent.id)}>
+                    Delete
+                  </DangerButton>
+                </div>
+              ) : undefined
+            }
+          />
+
+          <div style={{ display: "grid", gap: 12 }}>
+            <div
+              style={{
+                padding: 14,
+                borderRadius: 16,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ color: "#475569" }}>
                 {selectedEvent.type}
                 {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
                 {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
               </div>
+
               {selectedEvent.trainingPlanName ? (
-                <div style={{ color: "#475569", marginTop: 8 }}>
+                <div style={{ color: "#475569" }}>
                   Training plan: <strong>{selectedEvent.trainingPlanName}</strong>
                 </div>
               ) : null}
+
               {selectedEvent.opponent ? (
-                <div style={{ color: "#64748b", marginTop: 6 }}>Opponent: {selectedEvent.opponent}</div>
+                <div style={{ color: "#475569" }}>Opponent: {selectedEvent.opponent}</div>
               ) : null}
+
               {selectedEvent.notes ? (
-                <div style={{ color: "#475569", marginTop: 8 }}>{selectedEvent.notes}</div>
+                <div style={{ color: "#475569" }}>{selectedEvent.notes}</div>
               ) : null}
             </div>
 
-            {isAdmin ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {selectedEvent.type === "match" ? (
-                  <button
-                    onClick={() => {
-                      setActiveMatchEventId(selectedEvent.id)
-                      void persistSettings({ activeMatchEventId: selectedEvent.id })
-                    }}
-                    style={activeMatchEventId === selectedEvent.id ? buttonPrimary() : buttonSecondary()}
-                  >
-                    {activeMatchEventId === selectedEvent.id ? "Active Match Day" : "Use for Match Day"}
-                  </button>
-                ) : null}
-
-                <button onClick={() => openEditCalendarEvent(selectedEvent)} style={buttonSecondary()}>
-                  Edit
-                </button>
-                <button onClick={() => void deleteCalendarEvent(selectedEvent.id)} style={buttonSecondary()}>
-                  Delete
-                </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  ...statusStyle("available"),
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  fontWeight: 800,
+                }}
+              >
+                Available {availableCount}
               </div>
-            ) : null}
+              <div
+                style={{
+                  ...statusStyle("maybe"),
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  fontWeight: 800,
+                }}
+              >
+                Maybe {maybeCount}
+              </div>
+              <div
+                style={{
+                  ...statusStyle("unavailable"),
+                  padding: "8px 12px",
+                  borderRadius: 999,
+                  fontWeight: 800,
+                }}
+              >
+                Unavailable {unavailableCount}
+              </div>
+            </div>
           </div>
+        </PageCard>
+      ) : null}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-            <div style={{ ...statusStyle("available"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
-              Available {availableCount}
-            </div>
-            <div style={{ ...statusStyle("maybe"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
-              Maybe {maybeCount}
-            </div>
-            <div style={{ ...statusStyle("unavailable"), padding: "8px 12px", borderRadius: 999, fontWeight: 800 }}>
-              Unavailable {unavailableCount}
-            </div>
-          </div>
+      {selectedEvent ? (
+        <PageCard>
+          <SectionHeader
+            title="Attendance"
+            subtitle="Tap a status for each player."
+          />
 
           <div style={{ display: "grid", gap: 10 }}>
             {players.map((player) => {
@@ -250,13 +425,15 @@ export default function EventsTabContent(props: Props) {
                 <div
                   key={player.id}
                   style={{
-                    padding: 12,
+                    padding: 14,
                     borderRadius: 16,
                     border: "1px solid #e2e8f0",
-                    background: "#f8fafc",
+                    background: "white",
+                    display: "grid",
+                    gap: 10,
                   }}
                 >
-                  <div style={{ fontWeight: 900, marginBottom: 8 }}>{player.name}</div>
+                  <div style={{ fontWeight: 900 }}>{player.name}</div>
 
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {(["available", "maybe", "unavailable"] as AttendanceStatus[]).map((status) => {
@@ -266,18 +443,7 @@ export default function EventsTabContent(props: Props) {
                         <button
                           key={status}
                           onClick={() => void saveAttendance(selectedEvent.id, player.id, status)}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 999,
-                            fontWeight: 800,
-                            ...(active
-                              ? statusStyle(status)
-                              : {
-                                  border: "1px solid #cbd5e1",
-                                  background: "white",
-                                  color: "#334155",
-                                }),
-                          }}
+                          style={statusButtonStyle(active, status, statusStyle)}
                         >
                           {status}
                         </button>
@@ -288,53 +454,62 @@ export default function EventsTabContent(props: Props) {
               )
             })}
           </div>
-        </div>
+        </PageCard>
       ) : null}
 
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
-        <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
-          {allTrainingPlans.map((template) => (
-            <button
-              key={template.id}
-              onClick={() => {
-                setSelectedTemplateId(template.id)
-                setTrainingPlan({
-                  title: template.name,
-                  warmUp: template.warmUp,
-                  drill1: template.drill1,
-                  drill2: template.drill2,
-                  game: template.game,
-                  notes: template.notes,
-                })
-              }}
-              style={{
-                textAlign: "left",
-                padding: 14,
-                borderRadius: 16,
-                border: selectedTemplateId === template.id ? "2px solid #06245c" : "1px solid #dbe3ef",
-                background: selectedTemplateId === template.id ? "#dbeafe" : "#f8fafc",
-                width: "100%",
-                boxSizing: "border-box",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ fontWeight: 900 }}>{template.name}</div>
-              <div
+      <PageCard>
+        <SectionHeader
+          title="Training Plans"
+          subtitle="Choose a plan and review the selected session."
+        />
+
+        <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+          {allTrainingPlans.map((template) => {
+            const active = selectedTemplateId === template.id
+
+            return (
+              <button
+                key={template.id}
+                onClick={() => {
+                  setSelectedTemplateId(template.id)
+                  setTrainingPlan({
+                    title: template.name,
+                    warmUp: template.warmUp,
+                    drill1: template.drill1,
+                    drill2: template.drill2,
+                    game: template.game,
+                    notes: template.notes,
+                  })
+                }}
                 style={{
-                  color: "#64748b",
-                  marginTop: 4,
-                  overflowWrap: "anywhere",
-                  wordBreak: "break-word",
+                  textAlign: "left",
+                  padding: 14,
+                  borderRadius: 16,
+                  border: active ? "2px solid #0f2c73" : "1px solid #dbe3ef",
+                  background: active ? "#dbeafe" : "#f8fafc",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  overflow: "hidden",
                 }}
               >
-                {template.notes}
-              </div>
-            </button>
-          ))}
+                <div style={{ fontWeight: 900 }}>{template.name}</div>
+                <div
+                  style={{
+                    color: "#64748b",
+                    marginTop: 4,
+                    overflowWrap: "anywhere",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {template.notes}
+                </div>
+              </button>
+            )
+          })}
         </div>
 
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Plan</div>
+        <SectionHeader title="Selected Plan" />
+
         <div style={{ display: "grid", gap: 10 }}>
           {[
             ["Session Title", trainingPlan.title],
@@ -359,31 +534,25 @@ export default function EventsTabContent(props: Props) {
             </div>
           ))}
         </div>
-      </div>
+      </PageCard>
 
-      <div style={cardStyle()}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 10,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ fontSize: 22, fontWeight: 900 }}>Live Session Builder</div>
-          <button
-            onClick={() => {
-              const template = allTrainingPlans.find((plan) => plan.id === selectedTemplateId)
-              if (!template) return
-              setActiveSession(buildSessionFromTemplate(template))
-            }}
-            style={buttonPrimary()}
-          >
-            Generate Session
-          </button>
-        </div>
-      </div>
+      <PageCard>
+        <SectionHeader
+          title="Session Builder"
+          subtitle="Generate a live session from the selected training plan."
+          action={
+            <PrimaryButton
+              onClick={() => {
+                const template = allTrainingPlans.find((plan) => plan.id === selectedTemplateId)
+                if (!template) return
+                setActiveSession(buildSessionFromTemplate(template))
+              }}
+            >
+              Generate Session
+            </PrimaryButton>
+          }
+        />
+      </PageCard>
 
       <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
 
