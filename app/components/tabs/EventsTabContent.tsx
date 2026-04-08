@@ -90,6 +90,12 @@ function typeBadgeStyle(type: EventWithPlan["type"]) {
   }
 }
 
+function typeLabel(type: EventWithPlan["type"]) {
+  if (type === "training") return "Training"
+  if (type === "match") return "Match"
+  return "Other"
+}
+
 function statusButtonStyle(
   active: boolean,
   status: AttendanceStatus,
@@ -175,8 +181,8 @@ export default function EventsTabContent(props: Props) {
 
       <PageCard>
         <SectionHeader
-          title="Events on Selected Day"
-          subtitle={formatFullDate(selectedDate)}
+          title={`Events on ${formatFullDate(selectedDate)}`}
+          subtitle="Select an event to view details, attendance and actions."
         />
 
         {selectedDateEvents.length === 0 ? (
@@ -225,7 +231,7 @@ export default function EventsTabContent(props: Props) {
                           fontWeight: 800,
                         }}
                       >
-                        {event.type}
+                        {typeLabel(event.type)}
                       </div>
 
                       {isActiveMatch ? (
@@ -354,7 +360,7 @@ export default function EventsTabContent(props: Props) {
               }}
             >
               <div style={{ color: "#475569" }}>
-                {selectedEvent.type}
+                {typeLabel(selectedEvent.type)}
                 {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
                 {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
               </div>
