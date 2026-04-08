@@ -1,327 +1,384 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import {
-  TEAM,
-  buttonSecondary,
-  cardStyle,
-  type EventItem,
-} from "../lib/types"
+import type { EventItem } from "../lib/types"
 
-function toDateOnly(value: Date) {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, "0")
-  const day = String(value.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
+type CalendarView = "week" | "month"
+
+type Props = {
+  selectedDate: string
+  onSelectDate: (date: string) => void
+  events: EventItem[]
 }
 
-function fromDateOnly(value: string) {
+function pad(value: number) {
+  return String(value).padStart(2, "0")
+}
+
+function toDateString(date: Date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+function fromDateString(value: string) {
   const [year, month, day] = value.split("-").map(Number)
-  return new Date(year, (month || 1) - 1, day || 1, 12, 0, 0)
+  return new Date(year, month - 1, day, 12, 0, 0)
 }
 
-function monthLabel(value: Date) {
-  return value.toLocaleDateString("en-GB", {
+function startOfWeek(date: Date) {
+  const copy = new Date(date)
+  const day = copy.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  copy.setDate(copy.getDate() + diff)
+  return new Date(copy.getFullYear(), copy.getMonth(), copy.getDate(), 12, 0, 0)
+}
+
+function addDays(date: Date, amount: number) {
+  const copy = new Date(date)
+  copy.setDate(copy.getDate() + amount)
+  return new Date(copy.getFullYear(), copy.getMonth(), copy.getDate(), 12, 0, 0)
+}
+
+function addMonths(date: Date, amount: number) {
+  const copy = new Date(date)
+  copy.setMonth(copy.getMonth() + amount)
+  return new Date(copy.getFullYear(), copy.getMonth(), 1, 12, 0, 0)
+}
+
+function sameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
+function sameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+}
+
+function formatDisplayDate(date: Date) {
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function formatMonthTitle(date: Date) {
+  return date.toLocaleDateString("en-GB", {
     month: "long",
     year: "numeric",
   })
 }
 
-function weekdayShort(value: Date) {
-  return value.toLocaleDateString("en-GB", { weekday: "short" })
+function getMonthGrid(monthDate: Date) {
+  const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 12, 0, 0)
+  const gridStart = startOfWeek(firstDay)
+
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
 }
 
-function shortDateLabel(value: Date) {
-  const day = String(value.getDate()).padStart(2, "0")
-  const month = String(value.getMonth() + 1).padStart(2, "0")
-  return `${day}-${month}`
+function getWeekDays(selected: Date) {
+  const weekStart = startOfWeek(selected)
+  return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
+}
+
+function eventCountByDate(events: EventItem[]) {
+  const map: Record<string, number> = {}
+
+  for (const event of events) {
+    map[event.date] = (map[event.date] || 0) + 1
+  }
+
+  return map
+}
+
+function navButtonStyle() {
+  return {
+    border: "1px solid #cbd5e1",
+    background: "white",
+    color: "#0f172a",
+    borderRadius: 14,
+    padding: "10px 14px",
+    fontWeight: 800 as const,
+  }
+}
+
+function viewButtonStyle(active: boolean) {
+  return {
+    border: active ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+    background: active ? "#dbeafe" : "white",
+    color: active ? "#1e3a8a" : "#0f172a",
+    borderRadius: 999,
+    padding: "8px 12px",
+    fontWeight: 800 as const,
+  }
 }
 
 export default function RollingCalendar({
   selectedDate,
   onSelectDate,
   events,
-}: {
-  selectedDate: string
-  onSelectDate: (date: string) => void
-  events: EventItem[]
-}) {
-  const selected = useMemo(() => fromDateOnly(selectedDate), [selectedDate])
+}: Props) {
+  const selected = useMemo(() => fromDateString(selectedDate), [selectedDate])
+  const today = useMemo(() => fromDateString(toDateString(new Date())), [])
 
-  const [viewMonth, setViewMonth] = useState(
-    new Date(selected.getFullYear(), selected.getMonth(), 1, 12, 0, 0)
-  )
+  const [view, setView] = useState<CalendarView>("week")
+  const [cursorDate, setCursorDate] = useState<Date>(selected)
 
-  const eventMap = useMemo(() => {
-    const map = new Map<string, EventItem[]>()
+  const eventCounts = useMemo(() => eventCountByDate(events), [events])
 
-    for (const event of events) {
-      const existing = map.get(event.date) || []
-      existing.push(event)
-      map.set(event.date, existing)
-    }
+  const weekDays = useMemo(() => getWeekDays(cursorDate), [cursorDate])
+  const monthDays = useMemo(() => getMonthGrid(cursorDate), [cursorDate])
 
-    return map
-  }, [events])
+  const monthTitle = formatMonthTitle(cursorDate)
 
-  const selectedDayEvents = (eventMap.get(selectedDate) || []).slice().sort((a, b) => {
-    const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
-    if (timeCompare !== 0) return timeCompare
-    return a.title.localeCompare(b.title)
-  })
-
-  const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-  const monthGrid = useMemo(() => {
-    const firstOfMonth = new Date(
-      viewMonth.getFullYear(),
-      viewMonth.getMonth(),
-      1,
-      12,
-      0,
-      0
-    )
-
-    const startWeekday = (firstOfMonth.getDay() + 6) % 7
-    const gridStart = new Date(firstOfMonth)
-    gridStart.setDate(firstOfMonth.getDate() - startWeekday)
-
-    return Array.from({ length: 42 }, (_, index) => {
-      const d = new Date(gridStart)
-      d.setDate(gridStart.getDate() + index)
-      return d
-    })
-  }, [viewMonth])
-
-  function goPrevMonth() {
-    setViewMonth(
-      new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1, 12, 0, 0)
-    )
+  function goToday() {
+    const next = fromDateString(toDateString(new Date()))
+    setCursorDate(next)
+    onSelectDate(toDateString(next))
   }
 
-  function goNextMonth() {
-    setViewMonth(
-      new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1, 12, 0, 0)
-    )
+  function goPrev() {
+    setCursorDate((prev) => (view === "week" ? addDays(prev, -7) : addMonths(prev, -1)))
   }
 
-  function goToToday() {
-    const today = new Date()
-    const todayString = toDateOnly(today)
-    onSelectDate(todayString)
-    setViewMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12, 0, 0))
+  function goNext() {
+    setCursorDate((prev) => (view === "week" ? addDays(prev, 7) : addMonths(prev, 1)))
   }
 
-  function handleManualDateChange(value: string) {
-    if (!value) return
+  function selectDate(date: Date) {
+    const value = toDateString(date)
+    setCursorDate(date)
     onSelectDate(value)
-    const picked = fromDateOnly(value)
-    setViewMonth(new Date(picked.getFullYear(), picked.getMonth(), 1, 12, 0, 0))
   }
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div style={{ display: "grid", gap: 16 }}>
       <div
         style={{
-          ...cardStyle(),
-          padding: 14,
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 10,
-            flexWrap: "wrap",
-            marginBottom: 10,
-          }}
-        >
+        <div>
           <div style={{ fontSize: 22, fontWeight: 900 }}>Calendar</div>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={goPrevMonth}
-              style={{ ...buttonSecondary(), padding: "10px 14px" }}
-            >
-              ← Prev
-            </button>
-            <button
-              onClick={goNextMonth}
-              style={{ ...buttonSecondary(), padding: "10px 14px" }}
-            >
-              Next →
-            </button>
-            <button
-              onClick={goToToday}
-              style={{ ...buttonSecondary(), padding: "10px 14px" }}
-            >
-              Today
-            </button>
+          <div style={{ color: "#64748b", marginTop: 4 }}>
+            {view === "week" ? `Week of ${formatDisplayDate(startOfWeek(cursorDate))}` : monthTitle}
           </div>
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 10 }}>
-          {monthLabel(viewMonth)}
-        </div>
-
-        <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
-          <label style={{ fontWeight: 800, color: "#475569" }}>Jump to date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => handleManualDateChange(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              borderRadius: 16,
-              border: "1px solid #dbe3ef",
-              fontSize: 16,
-              background: "white",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-            gap: 8,
-            marginBottom: 8,
-          }}
-        >
-          {weekdayLabels.map((label) => (
-            <div
-              key={label}
-              style={{
-                textAlign: "center",
-                fontWeight: 900,
-                color: "#64748b",
-                padding: "6px 0",
-                fontSize: 14,
-              }}
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-            gap: 8,
-          }}
-        >
-          {monthGrid.map((date) => {
-            const dateKey = toDateOnly(date)
-            const inCurrentMonth = date.getMonth() === viewMonth.getMonth()
-            const isSelected = dateKey === selectedDate
-            const dayEvents = eventMap.get(dateKey) || []
-            const hasEvents = dayEvents.length > 0
-            const isToday = dateKey === toDateOnly(new Date())
-
-            return (
-              <button
-                key={dateKey}
-                onClick={() => onSelectDate(dateKey)}
-                style={{
-                  minWidth: 0,
-                  minHeight: 82,
-                  borderRadius: 18,
-                  padding: "8px 6px",
-                  border: isSelected
-                    ? `2px solid ${TEAM.primary}`
-                    : isToday
-                    ? "2px solid #cbd5e1"
-                    : "1px solid #dbe3ef",
-                  background: isSelected ? "#dbeafe" : "white",
-                  color: inCurrentMonth ? "#0f172a" : "#94a3b8",
-                  fontWeight: 800,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 4,
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ fontSize: 16, lineHeight: 1 }}>{date.getDate()}</div>
-
-                {hasEvents ? (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: TEAM.primary,
-                      fontWeight: 900,
-                      textAlign: "center",
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    {dayEvents.length} event{dayEvents.length === 1 ? "" : "s"}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "transparent",
-                      lineHeight: 1.1,
-                    }}
-                  >
-                    empty
-                  </div>
-                )}
-              </button>
-            )
-          })}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => setView("week")} style={viewButtonStyle(view === "week")}>
+            Week
+          </button>
+          <button onClick={() => setView("month")} style={viewButtonStyle(view === "month")}>
+            Month
+          </button>
         </div>
       </div>
 
       <div
         style={{
-          ...cardStyle(),
-          padding: 14,
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
         }}
       >
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>
-          Events on {weekdayShort(selected)} {shortDateLabel(selected)}
-        </div>
+        <button onClick={goPrev} style={navButtonStyle()}>
+          ← Prev
+        </button>
+        <button onClick={goNext} style={navButtonStyle()}>
+          Next →
+        </button>
+        <button onClick={goToday} style={navButtonStyle()}>
+          Today
+        </button>
+      </div>
 
-        {selectedDayEvents.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No events on this day.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {selectedDayEvents.map((event) => (
-              <div
-                key={event.id}
+      {view === "week" ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            gap: 8,
+          }}
+        >
+          {weekDays.map((date) => {
+            const value = toDateString(date)
+            const selectedDay = sameDay(date, selected)
+            const isToday = sameDay(date, today)
+            const count = eventCounts[value] || 0
+
+            return (
+              <button
+                key={value}
+                onClick={() => selectDate(date)}
                 style={{
-                  padding: 12,
-                  borderRadius: 16,
-                  border: "1px solid #e2e8f0",
-                  background: "#f8fafc",
+                  border: selectedDay
+                    ? "2px solid #0f2c73"
+                    : isToday
+                    ? "2px solid #cbd5e1"
+                    : "1px solid #e2e8f0",
+                  background: selectedDay ? "#dbeafe" : "white",
+                  borderRadius: 18,
+                  padding: "12px 6px",
+                  minHeight: 104,
+                  display: "grid",
+                  alignContent: "space-between",
+                  textAlign: "center",
                 }}
               >
-                <div style={{ fontWeight: 900 }}>{event.title}</div>
-                <div style={{ color: "#64748b", marginTop: 4 }}>
-                  {event.type}
-                  {event.startTime ? ` • ${event.startTime}` : ""}
-                  {event.location ? ` • ${event.location}` : ""}
+                <div style={{ color: "#64748b", fontSize: 12, fontWeight: 800 }}>
+                  {date.toLocaleDateString("en-GB", { weekday: "short" })}
                 </div>
-                {event.opponent ? (
-                  <div style={{ color: "#64748b", marginTop: 4 }}>
-                    Opponent: {event.opponent}
-                  </div>
-                ) : null}
-                {event.notes ? (
-                  <div style={{ color: "#475569", marginTop: 6 }}>
-                    {event.notes}
-                  </div>
-                ) : null}
+
+                <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a" }}>
+                  {date.getDate()}
+                </div>
+
+                <div style={{ minHeight: 18 }}>
+                  {count > 0 ? (
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 999,
+                        padding: "4px 8px",
+                        background: selectedDay ? "#bfdbfe" : "#eff6ff",
+                        color: "#1d4ed8",
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {count} event{count > 1 ? "s" : ""}
+                    </div>
+                  ) : isToday ? (
+                    <div
+                      style={{
+                        color: "#94a3b8",
+                        fontSize: 12,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Today
+                    </div>
+                  ) : null}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+              gap: 8,
+            }}
+          >
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+              <div
+                key={day}
+                style={{
+                  textAlign: "center",
+                  color: "#64748b",
+                  fontWeight: 800,
+                  paddingBottom: 4,
+                }}
+              >
+                {day}
               </div>
             ))}
           </div>
-        )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+              gap: 8,
+            }}
+          >
+            {monthDays.map((date) => {
+              const value = toDateString(date)
+              const selectedDay = sameDay(date, selected)
+              const isToday = sameDay(date, today)
+              const inCurrentMonth = sameMonth(date, cursorDate)
+              const count = eventCounts[value] || 0
+
+              return (
+                <button
+                  key={value}
+                  onClick={() => selectDate(date)}
+                  style={{
+                    border: selectedDay
+                      ? "2px solid #0f2c73"
+                      : isToday
+                      ? "2px solid #cbd5e1"
+                      : "1px solid #e2e8f0",
+                    background: selectedDay ? "#dbeafe" : "white",
+                    borderRadius: 18,
+                    padding: "10px 4px",
+                    minHeight: 92,
+                    display: "grid",
+                    alignContent: "space-between",
+                    justifyItems: "center",
+                    opacity: inCurrentMonth ? 1 : 0.45,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 900,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {date.getDate()}
+                  </div>
+
+                  <div style={{ minHeight: 16 }}>
+                    {count > 0 ? (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: 999,
+                          padding: "3px 7px",
+                          background: selectedDay ? "#bfdbfe" : "#eff6ff",
+                          color: "#1d4ed8",
+                          fontSize: 11,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {count}
+                      </div>
+                    ) : null}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div
+        style={{
+          padding: 14,
+          borderRadius: 16,
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          textAlign: "center",
+          fontWeight: 800,
+          color: "#0f172a",
+        }}
+      >
+        Selected: {formatDisplayDate(selected)}
       </div>
     </div>
   )
