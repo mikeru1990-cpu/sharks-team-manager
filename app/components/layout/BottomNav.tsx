@@ -32,11 +32,11 @@ export default function BottomNav({ tab, setTab }: Props) {
           gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
           gap: 8,
           padding: 8,
-          borderRadius: 20,
+          borderRadius: 22,
           border: "1px solid #e2e8f0",
           background: "rgba(255,255,255,0.96)",
-          backdropFilter: "blur(8px)",
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)",
+          backdropFilter: "blur(10px)",
+          boxShadow: "0 10px 28px rgba(15, 23, 42, 0.08)",
         }}
       >
         {items.map((item) => {
@@ -48,15 +48,16 @@ export default function BottomNav({ tab, setTab }: Props) {
               onClick={() => setTab(item.id)}
               style={{
                 border: active ? "1px solid #bfdbfe" : "1px solid transparent",
-                background: active ? "#dbeafe" : "transparent",
+                background: active ? "linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)" : "transparent",
                 color: active ? "#1e3a8a" : "#475569",
-                borderRadius: 14,
+                borderRadius: 16,
                 padding: "10px 6px",
                 display: "grid",
                 gap: 4,
                 placeItems: "center",
                 fontWeight: 800,
                 fontSize: 12,
+                boxShadow: active ? "0 4px 12px rgba(29, 78, 216, 0.10)" : "none",
               }}
             >
               <span style={{ fontSize: 18, lineHeight: 1 }}>{item.icon}</span>
