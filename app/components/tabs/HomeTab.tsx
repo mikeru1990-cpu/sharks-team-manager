@@ -3,7 +3,6 @@
 import { useMemo } from "react"
 import {
   TEAM,
-  cardStyle,
   formatMinutes,
   type EventAttendance,
   type EventItem,
@@ -11,6 +10,12 @@ import {
   type Player,
   type PlayerMatchRating,
 } from "../../lib/types"
+import {
+  PageCard,
+  PrimaryButton,
+  SecondaryButton,
+  SectionHeader,
+} from "../ui"
 
 type Props = {
   teamName: string
@@ -105,30 +110,6 @@ function resultBadgeStyle(value: "W" | "D" | "L") {
   }
 }
 
-function SectionTitle({
-  title,
-  action,
-}: {
-  title: string
-  action?: React.ReactNode
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 12,
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ fontSize: 22, fontWeight: 900 }}>{title}</div>
-      {action}
-    </div>
-  )
-}
-
 function StatTile({
   label,
   value,
@@ -148,8 +129,12 @@ function StatTile({
       }}
     >
       <div style={{ color: "#64748b", fontWeight: 800, fontSize: 12 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 900, marginTop: 6, lineHeight: 1.1 }}>{value}</div>
-      {subtext ? <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{subtext}</div> : null}
+      <div style={{ fontSize: 28, fontWeight: 900, marginTop: 6, lineHeight: 1.1 }}>
+        {value}
+      </div>
+      {subtext ? (
+        <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{subtext}</div>
+      ) : null}
     </div>
   )
 }
@@ -310,7 +295,7 @@ export default function HomeTab({
       items.push({
         id: "ratings-missing",
         level: "warning",
-        text: `${ratingsMissing} ratings still missing for the active match squad.`,
+        text: `${ratingsMissing} feedback entries still missing for the active match squad.`,
       })
     }
 
@@ -345,59 +330,34 @@ export default function HomeTab({
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div
-        style={{
-          ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
-          color: "white",
-        }}
-      >
+      <PageCard tone="blue">
+        <SectionHeader
+          title={teamName}
+          subtitle="Matchday snapshot, team summary and quick access."
+          light
+          action={
+            <PrimaryButton onClick={() => onOpenTab(activeMatchEvent ? "match" : "events")}>
+              {activeMatchEvent ? "Open Match" : "Open Events"}
+            </PrimaryButton>
+          }
+        />
+      </PageCard>
+
+      <PageCard>
+        <SectionHeader title="Club Snapshot" />
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
             gap: 12,
-            alignItems: "start",
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>HOME DASHBOARD</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 8, lineHeight: 1.1 }}>
-              {teamName}
-            </div>
-            <div style={{ marginTop: 8, opacity: 0.9 }}>
-              Matchday snapshot, alerts, form and quick access.
-            </div>
-          </div>
-
-          <button
-            onClick={() => onOpenTab(activeMatchEvent ? "match" : "events")}
-            style={{
-              border: "1px solid rgba(255,255,255,0.22)",
-              background: "rgba(255,255,255,0.12)",
-              color: "white",
-              borderRadius: 16,
-              padding: "12px 14px",
-              fontWeight: 800,
-              minWidth: 110,
-            }}
-          >
-            {activeMatchEvent ? "Open Match" : "Open Events"}
-          </button>
+          <StatTile label="Players" value={players.length} />
+          <StatTile label="Main GK" value={mainGk?.name || "Not set"} />
+          <StatTile label="Backup GK" value={backupGk?.name || "Not set"} />
+          <StatTile label="Recent Results" value={recentResults.length} subtext="last 5 loaded" />
         </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: 12,
-        }}
-      >
-        <StatTile label="Players" value={players.length} />
-        <StatTile label="Main GK" value={mainGk?.name || "Not set"} />
-        <StatTile label="Backup GK" value={backupGk?.name || "Not set"} />
-        <StatTile label="Recent Results" value={recentResults.length} subtext="last 5 loaded" />
-      </div>
+      </PageCard>
 
       <div
         style={{
@@ -406,24 +366,10 @@ export default function HomeTab({
           gap: 16,
         }}
       >
-        <div style={cardStyle()}>
-          <SectionTitle
+        <PageCard>
+          <SectionHeader
             title="Next Event"
-            action={
-              <button
-                onClick={() => onOpenTab("events")}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  color: "#0f172a",
-                  borderRadius: 12,
-                  padding: "10px 12px",
-                  fontWeight: 800,
-                }}
-              >
-                View Events
-              </button>
-            }
+            action={<SecondaryButton onClick={() => onOpenTab("events")}>View Events</SecondaryButton>}
           />
 
           {!nextEvent ? (
@@ -454,25 +400,15 @@ export default function HomeTab({
               </div>
             </div>
           )}
-        </div>
+        </PageCard>
 
-        <div style={cardStyle()}>
-          <SectionTitle
+        <PageCard tone="softBlue">
+          <SectionHeader
             title="Active Match"
             action={
-              <button
-                onClick={() => onOpenTab(activeMatchEvent ? "match" : "events")}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  color: "#0f172a",
-                  borderRadius: 12,
-                  padding: "10px 12px",
-                  fontWeight: 800,
-                }}
-              >
+              <SecondaryButton onClick={() => onOpenTab(activeMatchEvent ? "match" : "events")}>
                 {activeMatchEvent ? "Open Match" : "Choose Match"}
-              </button>
+              </SecondaryButton>
             }
           />
 
@@ -483,15 +419,13 @@ export default function HomeTab({
               style={{
                 padding: 14,
                 borderRadius: 18,
-                background: "#eff6ff",
+                background: "white",
                 border: "1px solid #bfdbfe",
                 display: "grid",
                 gap: 8,
               }}
             >
-              <div style={{ fontSize: 18, fontWeight: 900 }}>
-                {activeMatchEvent.title}
-              </div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{activeMatchEvent.title}</div>
               <div style={{ color: "#475569" }}>
                 {activeMatchEvent.date}
                 {activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}
@@ -501,7 +435,7 @@ export default function HomeTab({
               </div>
             </div>
           )}
-        </div>
+        </PageCard>
       </div>
 
       <div
@@ -511,8 +445,8 @@ export default function HomeTab({
           gap: 16,
         }}
       >
-        <div style={cardStyle()}>
-          <SectionTitle title="Attendance Snapshot" />
+        <PageCard>
+          <SectionHeader title="Attendance Snapshot" />
           {!activeMatchEvent ? (
             <div style={{ color: "#64748b" }}>Pick an active match to show attendance.</div>
           ) : (
@@ -528,10 +462,10 @@ export default function HomeTab({
               <StatTile label="Unavailable" value={unavailableCount} />
             </div>
           )}
-        </div>
+        </PageCard>
 
-        <div style={cardStyle()}>
-          <SectionTitle title="Recent Form" />
+        <PageCard>
+          <SectionHeader title="Recent Form" />
           {recentForm.length === 0 ? (
             <div style={{ color: "#64748b" }}>No recent results yet.</div>
           ) : (
@@ -554,11 +488,11 @@ export default function HomeTab({
               ))}
             </div>
           )}
-        </div>
+        </PageCard>
       </div>
 
-      <div style={cardStyle()}>
-        <SectionTitle title="Quick Actions" />
+      <PageCard>
+        <SectionHeader title="Quick Actions" />
         <div
           style={{
             display: "grid",
@@ -566,56 +500,12 @@ export default function HomeTab({
             gap: 10,
           }}
         >
-          <button
-            onClick={() => onOpenTab("events")}
-            style={{
-              padding: "14px 12px",
-              borderRadius: 16,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              fontWeight: 800,
-            }}
-          >
-            Open Events
-          </button>
-          <button
-            onClick={() => onOpenTab("match")}
-            style={{
-              padding: "14px 12px",
-              borderRadius: 16,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              fontWeight: 800,
-            }}
-          >
-            Open Match
-          </button>
-          <button
-            onClick={() => onOpenTab("players")}
-            style={{
-              padding: "14px 12px",
-              borderRadius: 16,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              fontWeight: 800,
-            }}
-          >
-            Manage Players
-          </button>
-          <button
-            onClick={() => onOpenTab("stats")}
-            style={{
-              padding: "14px 12px",
-              borderRadius: 16,
-              border: "1px solid #cbd5e1",
-              background: "white",
-              fontWeight: 800,
-            }}
-          >
-            View Stats
-          </button>
+          <SecondaryButton onClick={() => onOpenTab("events")}>Open Events</SecondaryButton>
+          <SecondaryButton onClick={() => onOpenTab("match")}>Open Match</SecondaryButton>
+          <SecondaryButton onClick={() => onOpenTab("players")}>Manage Players</SecondaryButton>
+          <SecondaryButton onClick={() => onOpenTab("stats")}>View Stats</SecondaryButton>
         </div>
-      </div>
+      </PageCard>
 
       <div
         style={{
@@ -624,8 +514,8 @@ export default function HomeTab({
           gap: 16,
         }}
       >
-        <div style={cardStyle()}>
-          <SectionTitle title="Alerts" />
+        <PageCard>
+          <SectionHeader title="Alerts" />
           {alerts.length === 0 ? (
             <div style={{ color: "#166534", fontWeight: 800 }}>No alerts right now.</div>
           ) : (
@@ -645,22 +535,13 @@ export default function HomeTab({
               ))}
             </div>
           )}
-        </div>
+        </PageCard>
 
-        <div style={cardStyle()}>
-          <SectionTitle title="Top 3 Players" action={<button
-            onClick={() => onOpenTab("stats")}
-            style={{
-              border: "1px solid #cbd5e1",
-              background: "white",
-              color: "#0f172a",
-              borderRadius: 12,
-              padding: "10px 12px",
-              fontWeight: 800,
-            }}
-          >
-            Full Stats
-          </button>} />
+        <PageCard>
+          <SectionHeader
+            title="Top 3 Players"
+            action={<SecondaryButton onClick={() => onOpenTab("stats")}>Full Stats</SecondaryButton>}
+          />
 
           {topPlayers.length === 0 ? (
             <div style={{ color: "#64748b" }}>No ratings saved yet.</div>
@@ -707,23 +588,14 @@ export default function HomeTab({
               ))}
             </div>
           )}
-        </div>
+        </PageCard>
       </div>
 
-      <div style={cardStyle()}>
-        <SectionTitle title="Recent Results" action={<button
-          onClick={() => onOpenTab("stats")}
-          style={{
-            border: "1px solid #cbd5e1",
-            background: "white",
-            color: "#0f172a",
-            borderRadius: 12,
-            padding: "10px 12px",
-            fontWeight: 800,
-          }}
-        >
-          Open Stats
-        </button>} />
+      <PageCard>
+        <SectionHeader
+          title="Recent Results"
+          action={<SecondaryButton onClick={() => onOpenTab("stats")}>Open Stats</SecondaryButton>}
+        />
 
         {recentResults.length === 0 ? (
           <div style={{ color: "#64748b" }}>No results saved yet.</div>
@@ -773,7 +645,7 @@ export default function HomeTab({
             ))}
           </div>
         )}
-      </div>
+      </PageCard>
     </div>
   )
 }
