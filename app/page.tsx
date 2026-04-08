@@ -1070,52 +1070,65 @@ function Dashboard({
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase) return
-
-    const { data: existingRow, error: fetchError } = await supabase
-      .from("event_attendance")
-      .select("id, event_id, player_id, status")
-      .eq("event_id", eventId)
-      .eq("player_id", playerId)
-      .maybeSingle()
-
-    if (fetchError) {
-      alert(fetchError.message)
+    if (!supabase) {
+      window.alert("Supabase is not configured")
       return
     }
 
-    if (existingRow) {
-      const { error: updateError } = await supabase
+    console.log("saveAttendance start", { eventId, playerId, status })
+
+    const existing = attendance.find(
+      (item) => item.eventId === eventId && item.playerId === playerId
+    )
+
+    if (existing) {
+      const { error } = await supabase
         .from("event_attendance")
         .update({ status })
-        .eq("id", existingRow.id)
+        .eq("id", existing.id)
 
-      if (updateError) {
-        alert(updateError.message)
+      if (error) {
+        console.error("saveAttendance update error", error)
+        window.alert(error.message)
         return
       }
 
       setAttendance((prev) =>
-        prev.map((item) => (item.id === existingRow.id ? { ...item, status } : item))
+        prev.map((item) =>
+          item.id === existing.id ? { ...item, status } : item
+        )
       )
+
+      console.log("saveAttendance updated", { eventId, playerId, status })
       return
     }
 
     const newId = crypto.randomUUID?.() || makeId()
 
-    const { error: insertError } = await supabase.from("event_attendance").insert({
+    const { error } = await supabase.from("event_attendance").insert({
       id: newId,
       event_id: eventId,
       player_id: playerId,
       status,
     })
 
-    if (insertError) {
-      alert(insertError.message)
+    if (error) {
+      console.error("saveAttendance insert error", error)
+      window.alert(error.message)
       return
     }
 
-    setAttendance((prev) => [...prev, { id: newId, eventId, playerId, status }])
+    setAttendance((prev) => [
+      ...prev,
+      {
+        id: newId,
+        eventId,
+        playerId,
+        status,
+      },
+    ])
+
+    console.log("saveAttendance inserted", { eventId, playerId, status })
   }
 
   async function addEvent() {
