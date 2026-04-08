@@ -6,11 +6,9 @@ import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
 import DashboardShell from "./components/DashboardShell"
-import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
-  cardStyle,
   initialPlayers,
   initialTrainingTemplates,
   makeId,
@@ -1081,54 +1079,47 @@ function Dashboard({
       (item) => item.eventId === eventId && item.playerId === playerId
     )
 
-    if (existing) {
-      const { error } = await supabase
-        .from("event_attendance")
-        .update({ status })
-        .eq("id", existing.id)
+    const rowId = existing?.id || crypto.randomUUID?.() || makeId()
 
-      if (error) {
-        console.error("saveAttendance update error", error)
-        window.alert(error.message)
-        return
-      }
-
-      setAttendance((prev) =>
-        prev.map((item) =>
-          item.id === existing.id ? { ...item, status } : item
-        )
+    const { data, error } = await supabase
+      .from("event_attendance")
+      .upsert(
+        {
+          id: rowId,
+          event_id: eventId,
+          player_id: playerId,
+          status,
+        },
+        {
+          onConflict: "event_id,player_id",
+        }
       )
-
-      console.log("saveAttendance updated", { eventId, playerId, status })
-      return
-    }
-
-    const newId = crypto.randomUUID?.() || makeId()
-
-    const { error } = await supabase.from("event_attendance").insert({
-      id: newId,
-      event_id: eventId,
-      player_id: playerId,
-      status,
-    })
+      .select("id, event_id, player_id, status")
+      .single()
 
     if (error) {
-      console.error("saveAttendance insert error", error)
+      console.error("saveAttendance upsert error", error)
       window.alert(error.message)
       return
     }
 
-    setAttendance((prev) => [
-      ...prev,
-      {
-        id: newId,
-        eventId,
-        playerId,
-        status,
-      },
-    ])
+    setAttendance((prev) => {
+      const filtered = prev.filter(
+        (item) => !(item.eventId === eventId && item.playerId === playerId)
+      )
 
-    console.log("saveAttendance inserted", { eventId, playerId, status })
+      return [
+        ...filtered,
+        {
+          id: data.id,
+          eventId: data.event_id,
+          playerId: data.player_id,
+          status: data.status as AttendanceStatus,
+        },
+      ]
+    })
+
+    console.log("saveAttendance saved", { eventId, playerId, status })
   }
 
   async function addEvent() {
@@ -1761,7 +1752,9 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
+      {({ user, isAdmin, signOut }) => (
+        <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />
+      )}
     </AuthGate>
   )
 }
