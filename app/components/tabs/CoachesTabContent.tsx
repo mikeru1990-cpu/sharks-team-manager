@@ -1,7 +1,8 @@
 "use client"
 
 import CoachesManager from "../CoachesManager"
-import { cardStyle, type Coach, type CoachAvailability, type CoachAvailabilityStatus } from "../../lib/types"
+import { type Coach, type CoachAvailability, type CoachAvailabilityStatus } from "../../lib/types"
+import { Badge, PageCard, SectionHeader } from "../ui"
 
 type Props = {
   isAdmin: boolean
@@ -19,6 +20,18 @@ type Props = {
   ) => Promise<void>
 }
 
+function statusTone(status: CoachAvailabilityStatus): "green" | "yellow" | "red" {
+  if (status === "available") return "green"
+  if (status === "holiday") return "yellow"
+  return "red"
+}
+
+function statusLabel(status: CoachAvailabilityStatus) {
+  if (status === "available") return "Available"
+  if (status === "holiday") return "Holiday"
+  return "Unavailable"
+}
+
 export default function CoachesTabContent({
   isAdmin,
   selectedDate,
@@ -29,17 +42,26 @@ export default function CoachesTabContent({
   saveCoaches,
   saveCoachAvailability,
 }: Props) {
+  const availableCount = selectedDateCoachAvailability.filter((item) => item.status === "available").length
+  const unavailableCount = selectedDateCoachAvailability.filter((item) => item.status === "unavailable").length
+  const holidayCount = selectedDateCoachAvailability.filter((item) => item.status === "holiday").length
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {selectedDateCoachAvailability.length > 0 ? (
-        <div style={cardStyle("#eff6ff")}>
-          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 10 }}>
-            Coach Availability Snapshot
-          </div>
-          <div style={{ color: "#475569", marginBottom: 10 }}>
-            {formatFullDate(selectedDate)}
-          </div>
-          <div style={{ display: "grid", gap: 8 }}>
+      <PageCard tone="softBlue">
+        <SectionHeader
+          title="Coach Availability"
+          subtitle={`Snapshot for ${formatFullDate(selectedDate)}`}
+        />
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          <Badge tone="green">Available {availableCount}</Badge>
+          <Badge tone="red">Unavailable {unavailableCount}</Badge>
+          <Badge tone="yellow">Holiday {holidayCount}</Badge>
+        </div>
+
+        {selectedDateCoachAvailability.length > 0 ? (
+          <div style={{ display: "grid", gap: 10 }}>
             {selectedDateCoachAvailability.map((item) => {
               const coach = coaches.find((c) => c.id === item.coachId)
 
@@ -47,20 +69,44 @@ export default function CoachesTabContent({
                 <div
                   key={item.id}
                   style={{
-                    padding: 12,
-                    borderRadius: 14,
+                    padding: 14,
+                    borderRadius: 16,
                     background: "white",
                     border: "1px solid #dbe3ef",
+                    display: "grid",
+                    gap: 8,
                   }}
                 >
-                  <div style={{ fontWeight: 900 }}>
-                    {coach?.name || "Unknown coach"}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "flex-start",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: 16 }}>
+                        {coach?.name || "Unknown coach"}
+                      </div>
+                      <div style={{ color: "#475569", marginTop: 4 }}>
+                        {coach?.role || "No role"}
+                      </div>
+                    </div>
+
+                    <Badge tone={statusTone(item.status)}>{statusLabel(item.status)}</Badge>
                   </div>
-                  <div style={{ color: "#475569", marginTop: 4 }}>
-                    {coach?.role || "No role"} • {item.status}
-                  </div>
+
                   {item.notes ? (
-                    <div style={{ color: "#64748b", marginTop: 6, fontSize: 14 }}>
+                    <div
+                      style={{
+                        color: "#64748b",
+                        fontSize: 14,
+                        lineHeight: 1.45,
+                        paddingTop: 2,
+                      }}
+                    >
                       {item.notes}
                     </div>
                   ) : null}
@@ -68,8 +114,12 @@ export default function CoachesTabContent({
               )
             })}
           </div>
-        </div>
-      ) : null}
+        ) : (
+          <div style={{ color: "#64748b" }}>
+            No coach availability recorded for this day yet.
+          </div>
+        )}
+      </PageCard>
 
       <CoachesManager
         isAdmin={isAdmin}
