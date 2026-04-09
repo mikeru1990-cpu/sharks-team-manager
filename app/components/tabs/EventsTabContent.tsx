@@ -155,7 +155,16 @@ export default function EventsTabContent(props: Props) {
         <div style={{ ...cardStyle(), padding: 14 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b" }}>SELECTED DAY</div>
           <div style={{ fontSize: 18, fontWeight: 900, marginTop: 6 }}>{formatFullDate(selectedDate)}</div>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, color: "#64748b", fontSize: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 14,
+              flexWrap: "wrap",
+              marginTop: 10,
+              color: "#64748b",
+              fontSize: 14,
+            }}
+          >
             <span>🔵 Match</span>
             <span>🟢 Training</span>
             <span>⚪ Other</span>
