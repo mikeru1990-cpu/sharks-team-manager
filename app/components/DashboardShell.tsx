@@ -32,7 +32,6 @@ import {
   type TrainingSession,
   type TrainingSessionRecord,
   type TrainingTemplate,
-  cardStyle,
 } from "../lib/types"
 
 import type {
@@ -41,6 +40,8 @@ import type {
   PeriodMode,
   TrainingPlanState,
 } from "../lib/dashboardTypes"
+
+import { PageCard } from "./ui"
 
 const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
 
@@ -229,17 +230,43 @@ export default function DashboardShell(props: Props) {
 
   if (loading) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 840, margin: "0 auto" }}>
-          Loading club data...
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 16,
+          background: "#f8fafc",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1080,
+            margin: "0 auto",
+          }}
+        >
+          <PageCard>
+            <div style={{ fontWeight: 800, color: "#475569" }}>Loading club data...</div>
+          </PageCard>
         </div>
       </main>
     )
   }
 
   return (
-    <main style={{ minHeight: "100vh", padding: 16 }}>
-      <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
+    <main
+      style={{
+        minHeight: "100vh",
+        padding: 16,
+        background: "#f8fafc",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1080,
+          margin: "0 auto",
+          display: "grid",
+          gap: 16,
+        }}
+      >
         <DashboardHeader isAdmin={isAdmin} onSignOut={signOut} />
 
         {tab === "home" && (
@@ -277,9 +304,9 @@ export default function DashboardShell(props: Props) {
             timeline={props.timeline}
           />
         )}
-      </div>
 
-      <BottomNav tab={props.tab} setTab={props.setTab} />
+        <BottomNav tab={props.tab} setTab={props.setTab} />
+      </div>
 
       <EventFormModal
         open={props.showEventForm}
