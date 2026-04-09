@@ -6,6 +6,9 @@ import SessionTimer from "../SessionTimer"
 import SessionHistory from "../SessionHistory"
 import { buildSessionFromTemplate } from "../../lib/sessionBuilder"
 import {
+  buttonPrimary,
+  buttonSecondary,
+  cardStyle,
   type AttendanceStatus,
   type EventAttendance,
   type Player,
@@ -13,111 +16,63 @@ import {
   type TrainingSessionRecord,
   type TrainingTemplate,
 } from "../../lib/types"
-import type {
-  EventWithPlan,
-  TrainingPlanState,
-} from "../../lib/dashboardTypes"
-import {
-  DangerButton,
-  PageCard,
-  PrimaryButton,
-  SecondaryButton,
-  SectionHeader,
-} from "../ui"
+import type { EventWithPlan, TrainingPlanState } from "../../lib/dashboardTypes"
 
 type Props = {
   isAdmin: boolean
   selectedDate: string
   setSelectedDate: (date: string) => void
+
   events: EventWithPlan[]
   selectedDateEvents: EventWithPlan[]
   selectedEvent: EventWithPlan | null
   selectedEventId: string | null
   setSelectedEventId: (value: string | null) => void
+
   activeMatchEventId: string | null
   setActiveMatchEventId: (value: string | null) => void
+
   players: Player[]
   attendance: EventAttendance[]
+
   allTrainingPlans: TrainingTemplate[]
   selectedTemplateId: string
   setSelectedTemplateId: (value: string) => void
   trainingPlan: TrainingPlanState
   setTrainingPlan: (value: TrainingPlanState) => void
+
   selectedDbTrainingPlanId: string
   setSelectedDbTrainingPlanId: (value: string) => void
+
   activeSession: TrainingSession | null
   setActiveSession: (value: TrainingSession | null) => void
   sessionHistory: TrainingSessionRecord[]
+
   formatFullDate: (date: string) => string
   statusStyle: (status: AttendanceStatus) => {
     border: string
     background: string
     color: string
   }
+
   countAttendance: (eventId: string, status: AttendanceStatus) => number
   getPlayerStatus: (eventId: string, playerId: string) => AttendanceStatus | null
   loadTrainingPlanFromEvent: (event: EventWithPlan) => void
+
   persistSettings: (patch?: Partial<{ selectedDate: string; activeMatchEventId: string | null }>) => Promise<void>
   saveAttendance: (eventId: string, playerId: string, status: AttendanceStatus) => Promise<void>
   saveTrainingPlans: (nextPlans: TrainingTemplate[]) => Promise<void>
   saveSessionRecord: (record: TrainingSessionRecord) => Promise<void>
+
   openAddCalendarEvent: () => void
   openEditCalendarEvent: (event: EventWithPlan) => void
   deleteCalendarEvent: (id: string) => Promise<void>
 }
 
-function typeBadgeStyle(type: EventWithPlan["type"]) {
-  if (type === "match") {
-    return {
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
-      color: "#1e3a8a",
-    }
-  }
-
-  if (type === "training") {
-    return {
-      background: "#ecfdf5",
-      border: "1px solid #a7f3d0",
-      color: "#065f46",
-    }
-  }
-
-  return {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    color: "#475569",
-  }
-}
-
-function typeLabel(type: EventWithPlan["type"]) {
-  if (type === "training") return "Training"
-  if (type === "match") return "Match"
-  return "Other"
-}
-
-function statusButtonStyle(
-  active: boolean,
-  status: AttendanceStatus,
-  statusStyle: Props["statusStyle"]
-) {
-  if (active) {
-    return {
-      ...statusStyle(status),
-      padding: "10px 12px",
-      borderRadius: 999,
-      fontWeight: 800,
-    }
-  }
-
-  return {
-    padding: "10px 12px",
-    borderRadius: 999,
-    fontWeight: 800,
-    border: "1px solid #cbd5e1",
-    background: "white",
-    color: "#334155",
-  }
+function eventAccent(type: "training" | "match" | "other") {
+  if (type === "match") return "#2563eb"
+  if (type === "training") return "#16a34a"
+  return "#94a3b8"
 }
 
 export default function EventsTabContent(props: Props) {
@@ -138,7 +93,6 @@ export default function EventsTabContent(props: Props) {
     setSelectedTemplateId,
     trainingPlan,
     setTrainingPlan,
-    setSelectedDbTrainingPlanId,
     activeSession,
     setActiveSession,
     sessionHistory,
@@ -161,226 +115,197 @@ export default function EventsTabContent(props: Props) {
   const unavailableCount = selectedEvent ? countAttendance(selectedEvent.id, "unavailable") : 0
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <PageCard>
-        <SectionHeader
-          title="Events"
-          subtitle="Calendar, attendance, training plans and session tools."
-          action={isAdmin ? <PrimaryButton onClick={openAddCalendarEvent}>Add Event</PrimaryButton> : undefined}
-        />
-
-        <RollingCalendar
-          selectedDate={selectedDate}
-          onSelectDate={(date) => {
-            setSelectedDate(date)
-            void persistSettings({ selectedDate: date })
+    <>
+      <div style={{ display: "grid", gap: 12 }}>
+        <div
+          style={{
+            ...cardStyle(),
+            padding: 14,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
           }}
-          events={events}
-        />
-      </PageCard>
+        >
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Events</div>
+            <div style={{ fontSize: 14, color: "#64748b" }}>
+              Calendar, attendance, training plans and session tools.
+            </div>
+          </div>
 
-      <PageCard>
-        <SectionHeader
-          title={`Events on ${formatFullDate(selectedDate)}`}
-          subtitle="Select an event to view details, attendance and actions."
-        />
+          {isAdmin ? (
+            <button onClick={openAddCalendarEvent} style={buttonPrimary()}>
+              + Add
+            </button>
+          ) : null}
+        </div>
 
-        {selectedDateEvents.length === 0 ? (
-          <div style={{ color: "#64748b" }}>No calendar events on this day.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 10 }}>
-            {selectedDateEvents.map((event) => {
-              const isSelected = selectedEventId === event.id
-              const isActiveMatch = activeMatchEventId === event.id
+        <div style={{ ...cardStyle(), padding: 12 }}>
+          <RollingCalendar
+            selectedDate={selectedDate}
+            onSelectDate={(date) => {
+              setSelectedDate(date)
+              void persistSettings({ selectedDate: date })
+            }}
+            events={events}
+          />
+        </div>
 
-              return (
-                <button
-                  key={event.id}
-                  onClick={() => {
-                    setSelectedEventId(event.id)
-                    if (event.type === "training") loadTrainingPlanFromEvent(event)
-                  }}
-                  style={{
-                    padding: 14,
-                    borderRadius: 18,
-                    border: isSelected ? "2px solid #0f2c73" : "1px solid #e2e8f0",
-                    background: isSelected ? "#eff6ff" : "#f8fafc",
-                    textAlign: "left",
-                    display: "grid",
-                    gap: 8,
-                  }}
-                >
+        <div style={{ ...cardStyle(), padding: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b" }}>SELECTED DAY</div>
+          <div style={{ fontSize: 18, fontWeight: 900, marginTop: 6 }}>{formatFullDate(selectedDate)}</div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, color: "#64748b", fontSize: 14 }}>
+            <span>🔵 Match</span>
+            <span>🟢 Training</span>
+            <span>⚪ Other</span>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          {selectedDateEvents.length === 0 ? (
+            <div style={{ ...cardStyle(), color: "#64748b" }}>No calendar events on this day.</div>
+          ) : (
+            selectedDateEvents.map((event) => (
+              <button
+                key={event.id}
+                onClick={() => {
+                  setSelectedEventId(event.id)
+                  if (event.type === "training") loadTrainingPlanFromEvent(event)
+                }}
+                style={{
+                  ...cardStyle(),
+                  padding: 12,
+                  textAlign: "left",
+                  border:
+                    selectedEventId === event.id
+                      ? `2px solid ${eventAccent(event.type)}`
+                      : "1px solid #dbe3ef",
+                  borderLeft: `6px solid ${eventAccent(event.type)}`,
+                }}
+              >
+                <div style={{ fontWeight: 900, fontSize: 18 }}>{event.title}</div>
+
+                <div style={{ color: "#64748b", marginTop: 6, fontSize: 14 }}>
+                  {event.type}
+                  {event.startTime ? ` • ${event.startTime}` : ""}
+                  {event.location ? ` • ${event.location}` : ""}
+                </div>
+
+                {event.opponent ? (
+                  <div style={{ color: "#475569", marginTop: 6, fontSize: 14 }}>
+                    Opponent: {event.opponent}
+                  </div>
+                ) : null}
+
+                {event.trainingPlanName ? (
+                  <div style={{ color: "#475569", marginTop: 6, fontSize: 13 }}>
+                    Training plan: {event.trainingPlanName}
+                  </div>
+                ) : null}
+
+                <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      alignItems: "flex-start",
-                      flexWrap: "wrap",
+                      ...statusStyle("available"),
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
                     }}
                   >
-                    <div style={{ fontWeight: 900, color: "#0f172a" }}>{event.title}</div>
-
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <div
-                        style={{
-                          ...typeBadgeStyle(event.type),
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          fontSize: 12,
-                          fontWeight: 800,
-                        }}
-                      >
-                        {typeLabel(event.type)}
-                      </div>
-
-                      {isActiveMatch ? (
-                        <div
-                          style={{
-                            background: "#dbeafe",
-                            border: "1px solid #93c5fd",
-                            color: "#1d4ed8",
-                            padding: "6px 10px",
-                            borderRadius: 999,
-                            fontSize: 12,
-                            fontWeight: 800,
-                          }}
-                        >
-                          Active Match
-                        </div>
-                      ) : null}
-                    </div>
+                    Avail {countAttendance(event.id, "available")}
                   </div>
-
-                  <div style={{ color: "#64748b" }}>
-                    {event.startTime ? `${event.startTime}` : "00:00"}
-                    {event.location ? ` • ${event.location}` : ""}
-                    {event.opponent ? ` • vs ${event.opponent}` : ""}
+                  <div
+                    style={{
+                      ...statusStyle("maybe"),
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Maybe {countAttendance(event.id, "maybe")}
                   </div>
-
-                  {event.trainingPlanName ? (
-                    <div style={{ color: "#475569", fontSize: 13 }}>
-                      Training plan: <strong>{event.trainingPlanName}</strong>
-                    </div>
-                  ) : null}
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <div
-                      style={{
-                        ...statusStyle("available"),
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      Available {countAttendance(event.id, "available")}
-                    </div>
-                    <div
-                      style={{
-                        ...statusStyle("maybe"),
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      Maybe {countAttendance(event.id, "maybe")}
-                    </div>
-                    <div
-                      style={{
-                        ...statusStyle("unavailable"),
-                        padding: "6px 10px",
-                        borderRadius: 999,
-                        fontSize: 12,
-                        fontWeight: 800,
-                      }}
-                    >
-                      Unavailable {countAttendance(event.id, "unavailable")}
-                    </div>
+                  <div
+                    style={{
+                      ...statusStyle("unavailable"),
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                    }}
+                  >
+                    Unavail {countAttendance(event.id, "unavailable")}
                   </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </PageCard>
-
-      {selectedEvent ? (
-        <PageCard>
-          <SectionHeader
-            title={selectedEvent.title}
-            subtitle={formatFullDate(selectedEvent.date)}
-            action={
-              isAdmin ? (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {selectedEvent.type === "match" ? (
-                    activeMatchEventId === selectedEvent.id ? (
-                      <PrimaryButton
-                        onClick={() => {
-                          setActiveMatchEventId(selectedEvent.id)
-                          void persistSettings({ activeMatchEventId: selectedEvent.id })
-                        }}
-                      >
-                        Active Match
-                      </PrimaryButton>
-                    ) : (
-                      <SecondaryButton
-                        onClick={() => {
-                          setActiveMatchEventId(selectedEvent.id)
-                          void persistSettings({ activeMatchEventId: selectedEvent.id })
-                        }}
-                      >
-                        Set Active Match
-                      </SecondaryButton>
-                    )
-                  ) : null}
-
-                  <SecondaryButton onClick={() => openEditCalendarEvent(selectedEvent)}>
-                    Edit
-                  </SecondaryButton>
-
-                  <DangerButton onClick={() => void deleteCalendarEvent(selectedEvent.id)}>
-                    Delete
-                  </DangerButton>
                 </div>
-              ) : undefined
-            }
-          />
+              </button>
+            ))
+          )}
+        </div>
 
-          <div style={{ display: "grid", gap: 12 }}>
+        {selectedEvent ? (
+          <div style={cardStyle()}>
             <div
               style={{
-                padding: 14,
-                borderRadius: 16,
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                display: "grid",
-                gap: 8,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 10,
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginBottom: 12,
               }}
             >
-              <div style={{ color: "#475569" }}>
-                {typeLabel(selectedEvent.type)}
-                {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
-                {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900 }}>{formatFullDate(selectedEvent.date)}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, marginTop: 6 }}>{selectedEvent.title}</div>
+                <div style={{ color: "#64748b", marginTop: 6 }}>
+                  {selectedEvent.type}
+                  {selectedEvent.startTime ? ` • ${selectedEvent.startTime}` : ""}
+                  {selectedEvent.location ? ` • ${selectedEvent.location}` : ""}
+                </div>
+
+                {selectedEvent.trainingPlanName ? (
+                  <div style={{ color: "#475569", marginTop: 8 }}>
+                    Training plan: <strong>{selectedEvent.trainingPlanName}</strong>
+                  </div>
+                ) : null}
+
+                {selectedEvent.opponent ? (
+                  <div style={{ color: "#64748b", marginTop: 6 }}>Opponent: {selectedEvent.opponent}</div>
+                ) : null}
+
+                {selectedEvent.notes ? (
+                  <div style={{ color: "#475569", marginTop: 8 }}>{selectedEvent.notes}</div>
+                ) : null}
               </div>
 
-              {selectedEvent.trainingPlanName ? (
-                <div style={{ color: "#475569" }}>
-                  Training plan: <strong>{selectedEvent.trainingPlanName}</strong>
+              {isAdmin ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {selectedEvent.type === "match" ? (
+                    <button
+                      onClick={() => {
+                        setActiveMatchEventId(selectedEvent.id)
+                        void persistSettings({ activeMatchEventId: selectedEvent.id })
+                      }}
+                      style={activeMatchEventId === selectedEvent.id ? buttonPrimary() : buttonSecondary()}
+                    >
+                      {activeMatchEventId === selectedEvent.id ? "Active Match Day" : "Use for Match Day"}
+                    </button>
+                  ) : null}
+
+                  <button onClick={() => openEditCalendarEvent(selectedEvent)} style={buttonSecondary()}>
+                    Edit
+                  </button>
+
+                  <button onClick={() => void deleteCalendarEvent(selectedEvent.id)} style={buttonSecondary()}>
+                    Delete
+                  </button>
                 </div>
-              ) : null}
-
-              {selectedEvent.opponent ? (
-                <div style={{ color: "#475569" }}>Opponent: {selectedEvent.opponent}</div>
-              ) : null}
-
-              {selectedEvent.notes ? (
-                <div style={{ color: "#475569" }}>{selectedEvent.notes}</div>
               ) : null}
             </div>
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               <div
                 style={{
                   ...statusStyle("available"),
@@ -412,68 +337,61 @@ export default function EventsTabContent(props: Props) {
                 Unavailable {unavailableCount}
               </div>
             </div>
-          </div>
-        </PageCard>
-      ) : null}
 
-      {selectedEvent ? (
-        <PageCard>
-          <SectionHeader
-            title="Attendance"
-            subtitle="Tap a status for each player."
-          />
+            <div style={{ display: "grid", gap: 10 }}>
+              {players.map((player) => {
+                const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
 
-          <div style={{ display: "grid", gap: 10 }}>
-            {players.map((player) => {
-              const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
+                return (
+                  <div
+                    key={player.id}
+                    style={{
+                      padding: 12,
+                      borderRadius: 16,
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900, marginBottom: 8 }}>{player.name}</div>
 
-              return (
-                <div
-                  key={player.id}
-                  style={{
-                    padding: 14,
-                    borderRadius: 16,
-                    border: "1px solid #e2e8f0",
-                    background: "white",
-                    display: "grid",
-                    gap: 10,
-                  }}
-                >
-                  <div style={{ fontWeight: 900 }}>{player.name}</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(["available", "maybe", "unavailable"] as AttendanceStatus[]).map((status) => {
+                        const active = currentStatus === status
 
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {(["available", "maybe", "unavailable"] as AttendanceStatus[]).map((status) => {
-                      const active = currentStatus === status
-
-                      return (
-                        <button
-                          key={status}
-                          onClick={() => void saveAttendance(selectedEvent.id, player.id, status)}
-                          style={statusButtonStyle(active, status, statusStyle)}
-                        >
-                          {status}
-                        </button>
-                      )
-                    })}
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => void saveAttendance(selectedEvent.id, player.id, status)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              ...(active
+                                ? statusStyle(status)
+                                : {
+                                    border: "1px solid #cbd5e1",
+                                    background: "white",
+                                    color: "#334155",
+                                  }),
+                            }}
+                          >
+                            {status}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </PageCard>
-      ) : null}
+        ) : null}
 
-      <PageCard>
-        <SectionHeader
-          title="Training Plans"
-          subtitle="Choose a plan and review the selected session."
-        />
+        <div style={cardStyle()}>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Templates</div>
 
-        <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
-          {allTrainingPlans.map((template) => {
-            const active = selectedTemplateId === template.id
-
-            return (
+          <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+            {allTrainingPlans.map((template) => (
               <button
                 key={template.id}
                 onClick={() => {
@@ -491,8 +409,8 @@ export default function EventsTabContent(props: Props) {
                   textAlign: "left",
                   padding: 14,
                   borderRadius: 16,
-                  border: active ? "2px solid #0f2c73" : "1px solid #dbe3ef",
-                  background: active ? "#dbeafe" : "#f8fafc",
+                  border: selectedTemplateId === template.id ? "2px solid #1d4ed8" : "1px solid #dbe3ef",
+                  background: selectedTemplateId === template.id ? "#dbeafe" : "#f8fafc",
                   width: "100%",
                   boxSizing: "border-box",
                   overflow: "hidden",
@@ -510,77 +428,105 @@ export default function EventsTabContent(props: Props) {
                   {template.notes}
                 </div>
               </button>
-            )
-          })}
+            ))}
+          </div>
+
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Training Plan</div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {[
+              ["Session Title", trainingPlan.title],
+              ["Warm Up", trainingPlan.warmUp],
+              ["Drill 1", trainingPlan.drill1],
+              ["Drill 2", trainingPlan.drill2],
+              ["Game", trainingPlan.game],
+              ["Coach Notes", trainingPlan.notes],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                style={{
+                  padding: 12,
+                  borderRadius: 16,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 6 }}>{label}</div>
+                <div style={{ color: "#475569", overflowWrap: "anywhere" }}>{value}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <SectionHeader title="Selected Plan" />
-
-        <div style={{ display: "grid", gap: 10 }}>
-          {[
-            ["Session Title", trainingPlan.title],
-            ["Warm Up", trainingPlan.warmUp],
-            ["Drill 1", trainingPlan.drill1],
-            ["Drill 2", trainingPlan.drill2],
-            ["Game", trainingPlan.game],
-            ["Coach Notes", trainingPlan.notes],
-          ].map(([label, value]) => (
-            <div
-              key={label}
-              style={{
-                padding: 12,
-                borderRadius: 16,
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                minWidth: 0,
-              }}
-            >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>{label}</div>
-              <div style={{ color: "#475569", overflowWrap: "anywhere" }}>{value}</div>
-            </div>
-          ))}
-        </div>
-      </PageCard>
-
-      <PageCard>
-        <SectionHeader
-          title="Session Builder"
-          subtitle="Generate a live session from the selected training plan."
-          action={
-            <PrimaryButton
+        <div style={cardStyle()}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 900 }}>Live Session Builder</div>
+            <button
               onClick={() => {
                 const template = allTrainingPlans.find((plan) => plan.id === selectedTemplateId)
                 if (!template) return
                 setActiveSession(buildSessionFromTemplate(template))
               }}
+              style={buttonPrimary()}
             >
               Generate Session
-            </PrimaryButton>
-          }
+            </button>
+          </div>
+        </div>
+
+        <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
+
+        <TrainingPlansManager
+          isAdmin={isAdmin}
+          trainingPlans={allTrainingPlans}
+          onSaveTrainingPlans={saveTrainingPlans}
+          onUsePlan={(plan) => {
+            setSelectedTemplateId(plan.id)
+            setTrainingPlan({
+              title: plan.name,
+              warmUp: plan.warmUp,
+              drill1: plan.drill1,
+              drill2: plan.drill2,
+              game: plan.game,
+              notes: plan.notes,
+            })
+          }}
         />
-      </PageCard>
 
-      <SessionTimer session={activeSession} onSaveSession={saveSessionRecord} />
+        <SessionHistory sessions={sessionHistory} />
+      </div>
 
-      <TrainingPlansManager
-        isAdmin={isAdmin}
-        trainingPlans={allTrainingPlans}
-        onSaveTrainingPlans={saveTrainingPlans}
-        onUsePlan={(plan) => {
-          setSelectedTemplateId(plan.id)
-          setTrainingPlan({
-            title: plan.name,
-            warmUp: plan.warmUp,
-            drill1: plan.drill1,
-            drill2: plan.drill2,
-            game: plan.game,
-            notes: plan.notes,
-          })
-          setSelectedDbTrainingPlanId(plan.id)
-        }}
-      />
-
-      <SessionHistory sessions={sessionHistory} />
-    </div>
+      {isAdmin ? (
+        <button
+          onClick={openAddCalendarEvent}
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 96,
+            width: 56,
+            height: 56,
+            borderRadius: "50%",
+            border: "none",
+            background: "#1d4ed8",
+            color: "white",
+            fontSize: 28,
+            lineHeight: 1,
+            boxShadow: "0 10px 24px rgba(15,23,42,0.22)",
+            zIndex: 60,
+          }}
+          aria-label="Add event"
+        >
+          +
+        </button>
+      ) : null}
+    </>
   )
 }
