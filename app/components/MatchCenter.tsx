@@ -25,10 +25,8 @@ import {
 import { canPlaySlot } from "../lib/rotation"
 import {
   Badge,
-  DangerButton,
   PageCard,
   PrimaryButton,
-  SecondaryButton,
   SectionHeader,
 } from "./ui"
 
