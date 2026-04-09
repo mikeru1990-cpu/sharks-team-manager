@@ -18,15 +18,19 @@ import type {
 } from "../lib/types"
 import {
   TEAM,
-  buttonPrimary,
-  buttonSecondary,
-  cardStyle,
-  chipStyle,
   formatClock,
   formatMinutes,
   initials,
 } from "../lib/types"
 import { canPlaySlot } from "../lib/rotation"
+import {
+  Badge,
+  DangerButton,
+  PageCard,
+  PrimaryButton,
+  SecondaryButton,
+  SectionHeader,
+} from "./ui"
 
 type PeriodMode = "quarters" | "halves"
 
@@ -79,58 +83,52 @@ type Props = {
   setPeriodLength: (value: number) => Promise<void>
 }
 
-function SectionHeader({
-  title,
-  action,
-}: {
-  title: string
-  action?: React.ReactNode
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 10,
-        flexWrap: "wrap",
-        marginBottom: 12,
-      }}
-    >
-      <div style={{ fontSize: 20, fontWeight: 900 }}>{title}</div>
-      {action}
-    </div>
-  )
+function miniButtonStyle(primary = false, danger = false, disabled = false) {
+  return {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: primary ? "none" : danger ? "1px solid #fecaca" : "1px solid #cbd5e1",
+    background: disabled ? "#e2e8f0" : primary ? TEAM.primary : danger ? "#fff1f2" : "white",
+    color: disabled ? "#94a3b8" : primary ? "white" : danger ? "#b91c1c" : "#0f172a",
+    fontWeight: 800 as const,
+    fontSize: 14,
+  }
 }
 
 function MiniButton({
   children,
   onClick,
   primary = false,
+  danger = false,
   disabled = false,
 }: {
   children: React.ReactNode
   onClick?: () => void
   primary?: boolean
+  danger?: boolean
   disabled?: boolean
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: primary ? "none" : "1px solid #cbd5e1",
-        background: disabled ? "#e2e8f0" : primary ? TEAM.primary : "white",
-        color: disabled ? "#94a3b8" : primary ? "white" : "#0f172a",
-        fontWeight: 800,
-        fontSize: 14,
-      }}
-    >
+    <button onClick={onClick} disabled={disabled} style={miniButtonStyle(primary, danger, disabled)}>
       {children}
     </button>
   )
+}
+
+function tabButtonStyle(active: boolean) {
+  return {
+    border: active ? "1px solid #bfdbfe" : "1px solid #cbd5e1",
+    background: active ? "linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)" : "white",
+    color: active ? "#1e3a8a" : "#475569",
+    borderRadius: 14,
+    padding: "10px 8px",
+    fontWeight: 800 as const,
+    fontSize: 12,
+    boxShadow: active ? "0 4px 12px rgba(29, 78, 216, 0.10)" : "none",
+    width: "100%",
+    minWidth: 0,
+    whiteSpace: "nowrap" as const,
+  }
 }
 
 function ShirtMarker({
@@ -180,32 +178,12 @@ function ShirtMarker({
 }
 
 function PlayerBadges({ player }: { player: Player }) {
-  const badges = [
-    player.mainGK ? "MAIN GK" : null,
-    player.backupGK ? "BACKUP GK" : null,
-    player.captain ? "C" : null,
-    player.viceCaptain ? "VC" : null,
-  ].filter(Boolean) as string[]
-
-  if (badges.length === 0) return null
-
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      {badges.map((badge) => (
-        <span
-          key={badge}
-          style={{
-            fontSize: 10,
-            fontWeight: 900,
-            padding: "4px 6px",
-            borderRadius: 999,
-            background: "#e2e8f0",
-            color: "#334155",
-          }}
-        >
-          {badge}
-        </span>
-      ))}
+      {player.mainGK ? <Badge tone="blue">Main GK</Badge> : null}
+      {player.backupGK ? <Badge tone="blue">Backup GK</Badge> : null}
+      {player.captain ? <Badge tone="yellow">Captain</Badge> : null}
+      {player.viceCaptain ? <Badge tone="yellow">Vice-Captain</Badge> : null}
     </div>
   )
 }
@@ -418,43 +396,11 @@ function BenchDropZone({ children }: { children: React.ReactNode }) {
 }
 
 function TimelineBadge({ type }: { type: TimelineItem["type"] }) {
-  const bg =
-    type === "goal"
-      ? "#dcfce7"
-      : type === "assist"
-      ? "#dbeafe"
-      : type === "injury"
-      ? "#fee2e2"
-      : type === "sub"
-      ? "#fef3c7"
-      : "#e2e8f0"
-
-  const color =
-    type === "goal"
-      ? "#166534"
-      : type === "assist"
-      ? "#1d4ed8"
-      : type === "injury"
-      ? "#991b1b"
-      : type === "sub"
-      ? "#92400e"
-      : "#334155"
-
-  return (
-    <div
-      style={{
-        padding: "6px 8px",
-        borderRadius: 999,
-        background: bg,
-        color,
-        fontWeight: 900,
-        fontSize: 11,
-        textTransform: "capitalize",
-      }}
-    >
-      {type}
-    </div>
-  )
+  if (type === "goal") return <Badge tone="green">Goal</Badge>
+  if (type === "assist") return <Badge tone="blue">Assist</Badge>
+  if (type === "injury") return <Badge tone="red">Injury</Badge>
+  if (type === "sub") return <Badge tone="yellow">Sub</Badge>
+  return <Badge tone="default">{type}</Badge>
 }
 
 export default function MatchCenter(props: Props) {
@@ -532,15 +478,10 @@ export default function MatchCenter(props: Props) {
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div
-        style={{
-          ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
-          color: "white",
-          overflow: "hidden",
-          padding: 14,
-        }}
-      >
-        <div style={{ fontSize: 12, opacity: 0.82, fontWeight: 800 }}>MATCH CENTER</div>
+      <PageCard tone="blue">
+        <div style={{ color: "rgba(255,255,255,0.8)", fontWeight: 800, fontSize: 12 }}>
+          MATCH CENTER
+        </div>
 
         {trackingTitle ? (
           <div
@@ -548,7 +489,7 @@ export default function MatchCenter(props: Props) {
               marginTop: 8,
               fontSize: 13,
               fontWeight: 700,
-              opacity: 0.95,
+              color: "rgba(255,255,255,0.95)",
               overflowWrap: "anywhere",
             }}
           >
@@ -583,7 +524,7 @@ export default function MatchCenter(props: Props) {
             }}
           />
 
-          <div style={{ fontSize: 16, fontWeight: 900, opacity: 0.8 }}>vs</div>
+          <div style={{ fontSize: 16, fontWeight: 900, opacity: 0.8, color: "white" }}>vs</div>
 
           <input
             value={awayTeam}
@@ -614,7 +555,7 @@ export default function MatchCenter(props: Props) {
             marginTop: 14,
           }}
         >
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{homeScore}</div>
             {isAdmin ? (
               <div
@@ -632,7 +573,7 @@ export default function MatchCenter(props: Props) {
             ) : null}
           </div>
 
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 13, fontWeight: 900, opacity: 0.9 }}>{periodLabel}</div>
             <div style={{ fontSize: 30, fontWeight: 900, opacity: 0.95, lineHeight: 1.05 }}>
               {formatClock(seconds)}
@@ -642,7 +583,7 @@ export default function MatchCenter(props: Props) {
             </div>
           </div>
 
-          <div style={{ textAlign: "center" }}>
+          <div style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{awayScore}</div>
             {isAdmin ? (
               <div
@@ -675,10 +616,12 @@ export default function MatchCenter(props: Props) {
             </MiniButton>
             <MiniButton onClick={() => setRunning(false)}>Pause</MiniButton>
             <MiniButton onClick={resetClock}>Reset</MiniButton>
-            <MiniButton onClick={() => void onEndGame()}>End Game</MiniButton>
+            <MiniButton danger onClick={() => void onEndGame()}>
+              End Game
+            </MiniButton>
           </div>
         ) : null}
-      </div>
+      </PageCard>
 
       <div
         style={{
@@ -697,14 +640,7 @@ export default function MatchCenter(props: Props) {
           <button
             key={value}
             onClick={() => setMatchTab(value as MatchTab)}
-            style={{
-              ...chipStyle(matchTab === value),
-              whiteSpace: "nowrap",
-              minWidth: 0,
-              width: "100%",
-              fontSize: 11,
-              padding: "10px 6px",
-            }}
+            style={tabButtonStyle(matchTab === value)}
           >
             {label}
           </button>
@@ -713,7 +649,7 @@ export default function MatchCenter(props: Props) {
 
       {matchTab === "overview" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={cardStyle()}>
+          <PageCard>
             <SectionHeader title="Match Settings" />
             <div
               style={{
@@ -784,9 +720,9 @@ export default function MatchCenter(props: Props) {
                 </select>
               </div>
             </div>
-          </div>
+          </PageCard>
 
-          <div style={cardStyle("#ecfccb")}>
+          <PageCard tone="softGreen">
             <SectionHeader title="Clock & Minutes" />
             <div
               style={{
@@ -797,7 +733,7 @@ export default function MatchCenter(props: Props) {
               }}
             >
               <div>
-                <div style={{ color: "#4d7c0f", fontWeight: 900, fontSize: 13 }}>{periodLabel}</div>
+                <div style={{ color: "#065f46", fontWeight: 900, fontSize: 13 }}>{periodLabel}</div>
                 <div style={{ fontSize: 36, fontWeight: 900, marginTop: 6 }}>{formatClock(seconds)}</div>
                 <div style={{ marginTop: 4, fontWeight: 800, fontSize: 13 }}>
                   {periodLength} min {periodName.toLowerCase()}
@@ -815,7 +751,7 @@ export default function MatchCenter(props: Props) {
                 </div>
               ) : null}
             </div>
-          </div>
+          </PageCard>
 
           <div
             style={{
@@ -824,7 +760,7 @@ export default function MatchCenter(props: Props) {
               gap: 16,
             }}
           >
-            <div style={cardStyle()}>
+            <PageCard>
               <SectionHeader title="Starting Group" />
               <div style={{ display: "grid", gap: 8 }}>
                 {lineupPlayers.length === 0 ? (
@@ -835,9 +771,9 @@ export default function MatchCenter(props: Props) {
                   ))
                 )}
               </div>
-            </div>
+            </PageCard>
 
-            <div style={cardStyle()}>
+            <PageCard>
               <SectionHeader title="Bench" />
               <div style={{ display: "grid", gap: 8 }}>
                 {benchPlayers.length === 0 ? (
@@ -848,14 +784,14 @@ export default function MatchCenter(props: Props) {
                   ))
                 )}
               </div>
-            </div>
+            </PageCard>
           </div>
         </div>
       )}
 
       {matchTab === "lineup" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={cardStyle()}>
+          <PageCard>
             <SectionHeader title="Formation & Saved Lineups" />
 
             <div
@@ -910,15 +846,15 @@ export default function MatchCenter(props: Props) {
                   placeholder="Save lineup name"
                   style={{ padding: 12, borderRadius: 12, border: "1px solid #cbd5e1", fontSize: 15 }}
                 />
-                <button onClick={() => void onSaveLineup()} style={buttonPrimary()}>
+                <PrimaryButton onClick={() => void onSaveLineup()}>
                   Save
-                </button>
+                </PrimaryButton>
               </div>
             ) : null}
-          </div>
+          </PageCard>
 
           {savedLineups.length > 0 && (
-            <div style={cardStyle()}>
+            <PageCard>
               <SectionHeader title="Saved Lineups" />
               <div style={{ display: "grid", gap: 10 }}>
                 {savedLineups.map((item) => (
@@ -943,15 +879,17 @@ export default function MatchCenter(props: Props) {
                     </div>
                     <MiniButton onClick={() => void onLoadSavedLineup(item.id)}>Load</MiniButton>
                     {isAdmin ? (
-                      <MiniButton onClick={() => void onDeleteSavedLineup(item.id)}>Delete</MiniButton>
+                      <MiniButton danger onClick={() => void onDeleteSavedLineup(item.id)}>
+                        Delete
+                      </MiniButton>
                     ) : null}
                   </div>
                 ))}
               </div>
-            </div>
+            </PageCard>
           )}
 
-          <div style={cardStyle()}>
+          <PageCard>
             <SectionHeader title="Tactics Board" />
             <DndContext
               collisionDetection={closestCenter}
@@ -967,11 +905,13 @@ export default function MatchCenter(props: Props) {
             >
               <div
                 style={{
-                  ...cardStyle("linear-gradient(180deg, #1d8a3f 0%, #157435 100%)"),
+                  borderRadius: 22,
                   color: "white",
                   position: "relative",
                   overflow: "hidden",
                   padding: 12,
+                  background: "linear-gradient(180deg, #1d8a3f 0%, #157435 100%)",
+                  border: "1px solid rgba(255,255,255,0.08)",
                 }}
               >
                 <div
@@ -1058,20 +998,20 @@ export default function MatchCenter(props: Props) {
                 </BenchDropZone>
               </div>
             </DndContext>
-          </div>
+          </PageCard>
         </div>
       )}
 
       {matchTab === "live" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={cardStyle()}>
+          <PageCard>
             <SectionHeader
               title="Match Timeline"
               action={
                 isAdmin ? (
-                  <button onClick={onOpenCreateEvent} style={buttonPrimary()}>
+                  <PrimaryButton onClick={onOpenCreateEvent}>
                     Add Event
-                  </button>
+                  </PrimaryButton>
                 ) : null
               }
             />
@@ -1111,7 +1051,9 @@ export default function MatchCenter(props: Props) {
                         {isAdmin ? (
                           <div style={{ display: "flex", gap: 8 }}>
                             <MiniButton onClick={() => onOpenEditEvent(t)}>Edit</MiniButton>
-                            <MiniButton onClick={() => void onDeleteTimelineItem(t.id)}>Delete</MiniButton>
+                            <MiniButton danger onClick={() => void onDeleteTimelineItem(t.id)}>
+                              Delete
+                            </MiniButton>
                           </div>
                         ) : null}
                       </div>
@@ -1121,9 +1063,9 @@ export default function MatchCenter(props: Props) {
                   ))
               )}
             </div>
-          </div>
+          </PageCard>
 
-          <div style={cardStyle()}>
+          <PageCard>
             <SectionHeader title="Live Minutes" />
             <div style={{ display: "grid", gap: 8 }}>
               {players.map((player) => (
@@ -1136,22 +1078,22 @@ export default function MatchCenter(props: Props) {
                 />
               ))}
             </div>
-          </div>
+          </PageCard>
         </div>
       )}
 
       {matchTab === "quarters" && (
-        <div style={cardStyle()}>
+        <PageCard tone="softYellow">
           <SectionHeader title={periodMode === "quarters" ? "Quarter Summary" : "Half Summary"} />
           <div style={{ color: "#475569", fontSize: 14 }}>
             Use the planner section below this card to save, load, and auto-generate{" "}
             {periodMode === "quarters" ? "quarter" : "half"} plans.
           </div>
-        </div>
+        </PageCard>
       )}
 
       {matchTab === "stats" && (
-        <div style={cardStyle()}>
+        <PageCard>
           <SectionHeader title="Match Stats" />
           <div style={{ display: "grid", gap: 8 }}>
             {players.map((player) => (
@@ -1164,7 +1106,7 @@ export default function MatchCenter(props: Props) {
               />
             ))}
           </div>
-        </div>
+        </PageCard>
       )}
     </div>
   )
