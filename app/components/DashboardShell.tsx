@@ -224,7 +224,7 @@ type Props = {
   saveTrainingPlans: (nextPlans: TrainingTemplate[]) => Promise<void>
   saveSessionRecord: (record: TrainingSessionRecord) => Promise<void>
   savePlayerRating: (playerId: string, rating: number, notes: string) => Promise<void>
-  saveAttendance?: (eventId: string, playerId: string, status: AttendanceStatus) => Promise<void>
+  saveAttendance: (eventId: string, playerId: string, status: AttendanceStatus) => Promise<void>
 
   addEvent: () => Promise<void>
   openAddCalendarEvent: () => void
@@ -339,12 +339,7 @@ export default function DashboardShell(props: Props) {
             getPlayerStatus={props.getPlayerStatus}
             loadTrainingPlanFromEvent={props.loadTrainingPlanFromEvent}
             persistSettings={props.persistSettings}
-            saveAttendance={
-              props.saveAttendance ??
-              (async () => {
-                return
-              })
-            }
+            saveAttendance={props.saveAttendance}
             saveTrainingPlans={props.saveTrainingPlans}
             saveSessionRecord={props.saveSessionRecord}
             openAddCalendarEvent={props.openAddCalendarEvent}
@@ -375,8 +370,6 @@ export default function DashboardShell(props: Props) {
             activeMatchEventId={props.activeMatchEventId}
             setActiveMatchEventId={props.setActiveMatchEventId}
             activeMatchEvent={props.activeMatchEvent}
-            activeMatchAvailableIds={props.activeMatchAvailableIds}
-            activeMatchMaybeIds={props.activeMatchMaybeIds}
             matchPlayers={props.matchPlayers}
             maybePlayers={props.maybePlayers}
             unavailablePlayers={props.unavailablePlayers}
