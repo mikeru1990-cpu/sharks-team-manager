@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react"
 import type { Coach, CoachAvailability, CoachAvailabilityStatus } from "../lib/types"
-import { buttonPrimary, buttonSecondary, cardStyle, makeId } from "../lib/types"
+import { makeId } from "../lib/types"
+import {
+  Badge,
+  DangerButton,
+  PageCard,
+  PrimaryButton,
+  SecondaryButton,
+  SectionHeader,
+} from "./ui"
 
 type Props = {
   isAdmin: boolean
@@ -60,6 +68,30 @@ function statusStyle(status: CoachAvailabilityStatus, active: boolean) {
     color: "#991b1b",
     fontWeight: 800,
   } as const
+}
+
+function statusBadgeTone(status: CoachAvailabilityStatus): "green" | "yellow" | "red" {
+  if (status === "available") return "green"
+  if (status === "holiday") return "yellow"
+  return "red"
+}
+
+function statusLabel(status: CoachAvailabilityStatus) {
+  if (status === "available") return "Available"
+  if (status === "holiday") return "Holiday"
+  return "Unavailable"
+}
+
+function inputStyle() {
+  return {
+    width: "100%",
+    boxSizing: "border-box" as const,
+    padding: 14,
+    borderRadius: 14,
+    border: "1px solid #cbd5e1",
+    fontSize: 16,
+    background: "white",
+  }
 }
 
 export default function CoachesManager({
@@ -137,51 +169,64 @@ export default function CoachesManager({
     setCoachRole(coach.role)
   }
 
+  function resetForm() {
+    setEditingCoachId(null)
+    setCoachName("")
+    setCoachRole("")
+  }
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={cardStyle()}>
-        <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Coaches</div>
-        <div style={{ color: "#64748b", marginBottom: 14 }}>
-          Availability for{" "}
-          <strong>
-            {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-GB", {
-              weekday: "long",
-              day: "2-digit",
-              month: "long",
-              year: "numeric",
-            })}
-          </strong>
-        </div>
+      <PageCard>
+        <SectionHeader
+          title="Coaches"
+          subtitle={`Manage coach details and availability for ${new Date(
+            `${selectedDate}T12:00:00`
+          ).toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          })}`}
+        />
 
         {isAdmin ? (
-          <div style={{ display: "grid", gap: 10, marginBottom: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gap: 10,
+              marginBottom: 16,
+              padding: 14,
+              borderRadius: 16,
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <div style={{ fontWeight: 900, color: "#0f172a" }}>
+              {editingCoachId ? "Edit Coach" : "Add Coach"}
+            </div>
+
             <input
               value={coachName}
               onChange={(e) => setCoachName(e.target.value)}
               placeholder="Coach name"
-              style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              style={inputStyle()}
             />
+
             <input
               value={coachRole}
               onChange={(e) => setCoachRole(e.target.value)}
               placeholder="Coach role"
-              style={{ padding: 14, borderRadius: 14, border: "1px solid #cbd5e1", fontSize: 16 }}
+              style={inputStyle()}
             />
+
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => void handleAddOrUpdateCoach()} style={buttonPrimary()}>
+              <PrimaryButton onClick={() => void handleAddOrUpdateCoach()}>
                 {editingCoachId ? "Update Coach" : "Add Coach"}
-              </button>
+              </PrimaryButton>
+
               {editingCoachId ? (
-                <button
-                  onClick={() => {
-                    setEditingCoachId(null)
-                    setCoachName("")
-                    setCoachRole("")
-                  }}
-                  style={buttonSecondary()}
-                >
-                  Cancel
-                </button>
+                <SecondaryButton onClick={resetForm}>Cancel</SecondaryButton>
               ) : null}
             </div>
           </div>
@@ -200,8 +245,10 @@ export default function CoachesManager({
                   style={{
                     padding: 14,
                     borderRadius: 16,
-                    background: "#f8fafc",
+                    background: "white",
                     border: "1px solid #e2e8f0",
+                    display: "grid",
+                    gap: 12,
                   }}
                 >
                   <div
@@ -209,7 +256,7 @@ export default function CoachesManager({
                       display: "flex",
                       justifyContent: "space-between",
                       gap: 10,
-                      alignItems: "start",
+                      alignItems: "flex-start",
                       flexWrap: "wrap",
                     }}
                   >
@@ -218,19 +265,25 @@ export default function CoachesManager({
                       <div style={{ color: "#64748b", marginTop: 4 }}>{coach.role}</div>
                     </div>
 
-                    {isAdmin ? (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button onClick={() => handleEditCoach(coach)} style={buttonSecondary()}>
-                          Edit
-                        </button>
-                        <button onClick={() => void handleDeleteCoach(coach.id)} style={buttonSecondary()}>
-                          Delete
-                        </button>
-                      </div>
-                    ) : null}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <Badge tone={statusBadgeTone(currentStatus)}>
+                        {statusLabel(currentStatus)}
+                      </Badge>
+
+                      {isAdmin ? (
+                        <>
+                          <SecondaryButton onClick={() => handleEditCoach(coach)}>
+                            Edit
+                          </SecondaryButton>
+                          <DangerButton onClick={() => void handleDeleteCoach(coach.id)}>
+                            Delete
+                          </DangerButton>
+                        </>
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {(["available", "unavailable", "holiday"] as CoachAvailabilityStatus[]).map((status) => (
                       <button
                         key={status}
@@ -238,7 +291,7 @@ export default function CoachesManager({
                         onClick={() => void onSaveCoachAvailability(coach.id, selectedDate, status)}
                         style={statusStyle(status, currentStatus === status)}
                       >
-                        {status}
+                        {statusLabel(status)}
                       </button>
                     ))}
                   </div>
@@ -247,7 +300,7 @@ export default function CoachesManager({
             })
           )}
         </div>
-      </div>
+      </PageCard>
     </div>
   )
 }
