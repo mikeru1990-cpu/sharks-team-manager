@@ -17,10 +17,7 @@ import {
   type SavedLineup,
   type TimelineItem,
 } from "../../lib/types"
-import type {
-  EventWithPlan,
-  PeriodMode,
-} from "../../lib/dashboardTypes"
+import type { EventWithPlan, PeriodMode } from "../../lib/dashboardTypes"
 
 type OverallStatus = "developing" | "improving" | "strong"
 
@@ -106,6 +103,7 @@ type Props = {
   openEditEvent: (item: TimelineItem) => void
   handleDeleteTimelineItem: (id: string) => Promise<void>
   handleEndGame: () => Promise<void>
+
   periodMode: PeriodMode
   periodLength: number
   currentQuarter: number
@@ -140,9 +138,7 @@ function SectionTitle({
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 22, fontWeight: 900 }}>{title}</div>
-      {subtitle ? (
-        <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div>
-      ) : null}
+      {subtitle ? <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div> : null}
     </div>
   )
 }
@@ -435,17 +431,11 @@ export default function MatchTabContent(props: Props) {
             ) : null}
 
             {noAvailableCoaches ? (
-              <InfoBanner
-                tone="danger"
-                text="Warning: no coaches are available for this day."
-              />
+              <InfoBanner tone="danger" text="Warning: no coaches are available for this day." />
             ) : null}
 
             {!headCoachAvailable ? (
-              <InfoBanner
-                tone="warning"
-                text="Warning: no Head Coach is marked as available."
-              />
+              <InfoBanner tone="warning" text="Warning: no Head Coach is marked as available." />
             ) : null}
 
             {unavailablePlayers.length > 0 ? (
@@ -606,9 +596,7 @@ export default function MatchTabContent(props: Props) {
           <div style={{ display: "grid", gap: 14 }}>
             {matchPlayers.map((player) => {
               const existing = playerRatings.find(
-                (item) =>
-                  item.eventId === activeMatchEventId &&
-                  item.playerId === player.id
+                (item) => item.eventId === activeMatchEventId && item.playerId === player.id
               )
 
               const parsed = parseExistingFeedback(existing?.notes)
