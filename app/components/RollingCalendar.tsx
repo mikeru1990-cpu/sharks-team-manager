@@ -36,10 +36,10 @@ function formatHeaderRange(weekStart: Date) {
   const sameYear = weekStart.getFullYear() === weekEnd.getFullYear()
 
   if (sameMonth && sameYear) {
-    return `${weekStart.toLocaleDateString("en-GB", {
+    return weekStart.toLocaleDateString("en-GB", {
       month: "long",
       year: "numeric",
-    })}`
+    })
   }
 
   return `${weekStart.toLocaleDateString("en-GB", {
@@ -130,6 +130,38 @@ function miniDot(color: string) {
   )
 }
 
+function dayCardStyle({
+  isSelected,
+  isToday,
+}: {
+  isSelected: boolean
+  isToday: boolean
+}) {
+  return {
+    padding: "12px 8px",
+    borderRadius: 18,
+    border: isSelected
+      ? "2px solid #1e3a8a"
+      : isToday
+      ? "1px solid #93c5fd"
+      : "1px solid #e2e8f0",
+    background: isSelected
+      ? "linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)"
+      : isToday
+      ? "#f8fbff"
+      : "white",
+    minHeight: 112,
+    display: "grid",
+    gap: 8,
+    alignContent: "start" as const,
+    justifyItems: "center" as const,
+    boxShadow: isSelected
+      ? "0 6px 16px rgba(29, 78, 216, 0.10)"
+      : "0 1px 3px rgba(15, 23, 42, 0.04)",
+    width: "100%",
+  }
+}
+
 export default function RollingCalendar({
   selectedDate,
   onSelectDate,
@@ -148,6 +180,9 @@ export default function RollingCalendar({
       return d
     })
   }, [weekStart])
+
+  const firstRow = days.slice(0, 4)
+  const secondRow = days.slice(4, 7)
 
   const eventMeta = useMemo(() => getEventMeta(events), [events])
 
@@ -170,6 +205,97 @@ export default function RollingCalendar({
     onSelectDate(formatDate(now))
   }
 
+  function renderDay(day: Date) {
+    const key = formatDate(day)
+    const isSelected = key === selectedDate
+    const isToday = isSameDay(day, today)
+    const meta = eventMeta[key] || {
+      count: 0,
+      hasMatch: false,
+      hasTraining: false,
+      hasOther: false,
+    }
+
+    return (
+      <button
+        key={key}
+        onClick={() => onSelectDate(key)}
+        style={dayCardStyle({ isSelected, isToday })}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            color: isSelected ? "#1d4ed8" : "#64748b",
+            fontWeight: 800,
+            textTransform: "uppercase",
+            lineHeight: 1,
+          }}
+        >
+          {dayShort(day)}
+        </div>
+
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            display: "grid",
+            placeItems: "center",
+            background: isSelected ? "#1d4ed8" : isToday ? "#eff6ff" : "transparent",
+            color: isSelected ? "white" : "#0f172a",
+            fontSize: 18,
+            fontWeight: 900,
+          }}
+        >
+          {day.getDate()}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: 6,
+            justifyItems: "center",
+            minHeight: 24,
+          }}
+        >
+          {(meta.hasMatch || meta.hasTraining || meta.hasOther) && (
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              {meta.hasMatch && miniDot("#1d4ed8")}
+              {meta.hasTraining && miniDot("#059669")}
+              {meta.hasOther && miniDot("#64748b")}
+            </div>
+          )}
+
+          {meta.count > 0 ? (
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: isSelected ? "#1e3a8a" : "#1d4ed8",
+                background: isSelected ? "#bfdbfe" : "#eff6ff",
+                padding: "3px 8px",
+                borderRadius: 999,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {meta.count} event{meta.count > 1 ? "s" : ""}
+            </div>
+          ) : isToday && !isSelected ? (
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: "#64748b",
+              }}
+            >
+              Today
+            </div>
+          ) : null}
+        </div>
+      </button>
+    )
+  }
+
   return (
     <div
       style={{
@@ -182,12 +308,7 @@ export default function RollingCalendar({
         boxShadow: "0 2px 10px rgba(15, 23, 42, 0.04)",
       }}
     >
-      <div
-        style={{
-          display: "grid",
-          gap: 12,
-        }}
-      >
+      <div style={{ display: "grid", gap: 12 }}>
         <div>
           <div
             style={{
@@ -233,128 +354,26 @@ export default function RollingCalendar({
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          gap: 8,
-        }}
-      >
-        {days.map((day) => {
-          const key = formatDate(day)
-          const isSelected = key === selectedDate
-          const isToday = isSameDay(day, today)
-          const meta = eventMeta[key] || {
-            count: 0,
-            hasMatch: false,
-            hasTraining: false,
-            hasOther: false,
-          }
+      <div style={{ display: "grid", gap: 10 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+            gap: 8,
+          }}
+        >
+          {firstRow.map(renderDay)}
+        </div>
 
-          return (
-            <button
-              key={key}
-              onClick={() => onSelectDate(key)}
-              style={{
-                padding: "10px 6px",
-                borderRadius: 18,
-                border: isSelected
-                  ? "2px solid #1e3a8a"
-                  : isToday
-                  ? "1px solid #93c5fd"
-                  : "1px solid #e2e8f0",
-                background: isSelected
-                  ? "linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)"
-                  : isToday
-                  ? "#f8fbff"
-                  : "white",
-                minHeight: 96,
-                display: "grid",
-                gap: 8,
-                alignContent: "start",
-                justifyItems: "center",
-                boxShadow: isSelected
-                  ? "0 6px 16px rgba(29, 78, 216, 0.10)"
-                  : "0 1px 3px rgba(15, 23, 42, 0.04)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  color: isSelected ? "#1d4ed8" : "#64748b",
-                  fontWeight: 800,
-                  textTransform: "uppercase",
-                  lineHeight: 1,
-                }}
-              >
-                {dayShort(day)}
-              </div>
-
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 999,
-                  display: "grid",
-                  placeItems: "center",
-                  background: isSelected
-                    ? "#1d4ed8"
-                    : isToday
-                    ? "#eff6ff"
-                    : "transparent",
-                  color: isSelected ? "white" : "#0f172a",
-                  fontSize: 17,
-                  fontWeight: 900,
-                }}
-              >
-                {day.getDate()}
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gap: 5,
-                  justifyItems: "center",
-                  minHeight: 18,
-                }}
-              >
-                {(meta.hasMatch || meta.hasTraining || meta.hasOther) && (
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    {meta.hasMatch && miniDot("#1d4ed8")}
-                    {meta.hasTraining && miniDot("#059669")}
-                    {meta.hasOther && miniDot("#64748b")}
-                  </div>
-                )}
-
-                {meta.count > 0 ? (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: isSelected ? "#1e3a8a" : "#1d4ed8",
-                      background: isSelected ? "#bfdbfe" : "#eff6ff",
-                      padding: "2px 7px",
-                      borderRadius: 999,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {meta.count}
-                  </div>
-                ) : isToday && !isSelected ? (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: "#64748b",
-                    }}
-                  >
-                    Today
-                  </div>
-                ) : null}
-              </div>
-            </button>
-          )
-        })}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 8,
+          }}
+        >
+          {secondRow.map(renderDay)}
+        </div>
       </div>
 
       <div
@@ -390,7 +409,15 @@ export default function RollingCalendar({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", color: "#64748b", fontSize: 13 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            color: "#64748b",
+            fontSize: 13,
+          }}
+        >
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {miniDot("#1d4ed8")} <span>Match</span>
           </div>
