@@ -11,6 +11,19 @@ export type EventWithPlan = EventItem & {
   trainingPlanId?: string
   trainingPlanName?: string
 }
+export type Season = {
+  id: string
+  name: string
+  startDate: string
+  endDate: string
+  isActive: boolean
+}
+
+export type SeasonFormState = {
+  name: string
+  startDate: string
+  endDate: string
+}
 
 export type TrainingPlanState = {
   title: string
