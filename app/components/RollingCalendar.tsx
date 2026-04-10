@@ -103,15 +103,16 @@ function getEventMeta(events: CalendarEvent[]) {
   return byDate
 }
 
-function navButtonStyle() {
+function navButtonStyle(primary = false) {
   return {
     padding: "10px 12px",
     borderRadius: 12,
-    border: "1px solid #dbe3ef",
-    background: "white",
-    color: "#0f172a",
+    border: primary ? "1px solid #bfdbfe" : "1px solid #dbe3ef",
+    background: primary ? "#eff6ff" : "white",
+    color: primary ? "#1d4ed8" : "#0f172a",
     fontWeight: 800 as const,
     fontSize: 14,
+    minWidth: 0,
   }
 }
 
@@ -150,6 +151,13 @@ export default function RollingCalendar({
 
   const eventMeta = useMemo(() => getEventMeta(events), [events])
 
+  const selectedMeta = eventMeta[selectedDate] || {
+    count: 0,
+    hasMatch: false,
+    hasTraining: false,
+    hasOther: false,
+  }
+
   function changeWeek(offset: number) {
     const newDate = new Date(weekStart)
     newDate.setDate(newDate.getDate() + offset * 7)
@@ -168,43 +176,55 @@ export default function RollingCalendar({
         borderRadius: 22,
         border: "1px solid #e2e8f0",
         background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
-        padding: 16,
+        padding: 14,
         display: "grid",
-        gap: 16,
+        gap: 14,
         boxShadow: "0 2px 10px rgba(15, 23, 42, 0.04)",
       }}
     >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          display: "grid",
           gap: 12,
-          flexWrap: "wrap",
         }}
       >
         <div>
           <div
             style={{
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 800,
-              letterSpacing: 0.3,
+              letterSpacing: 0.4,
               color: "#64748b",
               textTransform: "uppercase",
             }}
           >
             Weekly Planner
           </div>
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+
+          <div
+            style={{
+              fontSize: 28,
+              fontWeight: 900,
+              color: "#0f172a",
+              marginTop: 4,
+              lineHeight: 1.1,
+            }}
+          >
             {formatHeaderRange(weekStart)}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
           <button onClick={() => changeWeek(-1)} style={navButtonStyle()}>
             ← Prev
           </button>
-          <button onClick={goToday} style={navButtonStyle()}>
+          <button onClick={goToday} style={navButtonStyle(true)}>
             Today
           </button>
           <button onClick={() => changeWeek(1)} style={navButtonStyle()}>
@@ -217,7 +237,7 @@ export default function RollingCalendar({
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          gap: 10,
+          gap: 8,
         }}
       >
         {days.map((day) => {
@@ -236,10 +256,10 @@ export default function RollingCalendar({
               key={key}
               onClick={() => onSelectDate(key)}
               style={{
-                padding: "12px 6px",
+                padding: "10px 6px",
                 borderRadius: 18,
                 border: isSelected
-                  ? "2px solid #0f2c73"
+                  ? "2px solid #1e3a8a"
                   : isToday
                   ? "1px solid #93c5fd"
                   : "1px solid #e2e8f0",
@@ -248,21 +268,23 @@ export default function RollingCalendar({
                   : isToday
                   ? "#f8fbff"
                   : "white",
-                minHeight: 118,
+                minHeight: 96,
                 display: "grid",
-                alignContent: "space-between",
+                gap: 8,
+                alignContent: "start",
                 justifyItems: "center",
                 boxShadow: isSelected
-                  ? "0 6px 16px rgba(29, 78, 216, 0.12)"
+                  ? "0 6px 16px rgba(29, 78, 216, 0.10)"
                   : "0 1px 3px rgba(15, 23, 42, 0.04)",
               }}
             >
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   color: isSelected ? "#1d4ed8" : "#64748b",
                   fontWeight: 800,
                   textTransform: "uppercase",
+                  lineHeight: 1,
                 }}
               >
                 {dayShort(day)}
@@ -270,8 +292,8 @@ export default function RollingCalendar({
 
               <div
                 style={{
-                  width: 38,
-                  height: 38,
+                  width: 36,
+                  height: 36,
                   borderRadius: 999,
                   display: "grid",
                   placeItems: "center",
@@ -281,7 +303,7 @@ export default function RollingCalendar({
                     ? "#eff6ff"
                     : "transparent",
                   color: isSelected ? "white" : "#0f172a",
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: 900,
                 }}
               >
@@ -290,10 +312,10 @@ export default function RollingCalendar({
 
               <div
                 style={{
-                  minHeight: 24,
                   display: "grid",
+                  gap: 5,
                   justifyItems: "center",
-                  gap: 6,
+                  minHeight: 18,
                 }}
               >
                 {(meta.hasMatch || meta.hasTraining || meta.hasOther) && (
@@ -307,20 +329,21 @@ export default function RollingCalendar({
                 {meta.count > 0 ? (
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 800,
                       color: isSelected ? "#1e3a8a" : "#1d4ed8",
                       background: isSelected ? "#bfdbfe" : "#eff6ff",
-                      padding: "3px 8px",
+                      padding: "2px 7px",
                       borderRadius: 999,
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {meta.count} event{meta.count > 1 ? "s" : ""}
+                    {meta.count}
                   </div>
-                ) : isToday ? (
+                ) : isToday && !isSelected ? (
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: 800,
                       color: "#64748b",
                     }}
@@ -340,18 +363,29 @@ export default function RollingCalendar({
           borderRadius: 16,
           background: "#f8fafc",
           border: "1px solid #e2e8f0",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
+          display: "grid",
+          gap: 10,
         }}
       >
         <div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: "#64748b",
+              textTransform: "uppercase",
+            }}
+          >
             Selected Day
           </div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+          <div
+            style={{
+              fontSize: 18,
+              fontWeight: 900,
+              color: "#0f172a",
+              marginTop: 4,
+            }}
+          >
             {formatSelectedLabel(selected)}
           </div>
         </div>
@@ -367,6 +401,25 @@ export default function RollingCalendar({
             {miniDot("#64748b")} <span>Other</span>
           </div>
         </div>
+
+        {selectedMeta.count > 0 ? (
+          <div
+            style={{
+              display: "inline-flex",
+              width: "fit-content",
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: 12,
+              fontWeight: 800,
+            }}
+          >
+            {selectedMeta.count} event{selectedMeta.count > 1 ? "s" : ""} on this day
+          </div>
+        ) : (
+          <div style={{ fontSize: 13, color: "#64748b" }}>No events on this day yet.</div>
+        )}
       </div>
     </div>
   )
