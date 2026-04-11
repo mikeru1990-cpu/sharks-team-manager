@@ -1,26 +1,117 @@
 "use client"
 
 import nextDynamic from "next/dynamic"
+
 import PlayersManager from "./PlayersManager"
 import HomeTab from "./tabs/HomeTab"
 import EventsTabContent from "./tabs/EventsTabContent"
 import MatchTabContent from "./tabs/MatchTabContent"
 import CoachesTabContent from "./tabs/CoachesTabContent"
+
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
+
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
-import SeasonSwitcher from "./layout/SeasonSwitcher"
-import SeasonModal from "./modals/SeasonModal"
+
+// ✅ SEASON
+import SeasonSwitcher from "./season/SeasonSwitcher"
+import SeasonModal from "./season/SeasonModal"
 
 import {
   TEAM,
   cardStyle,
+  type AttendanceStatus,
+  type Coach,
+  type CoachAvailability,
+  type EventAttendance,
+  type LeagueResult,
+  type MainTab,
+  type MatchEventDraft,
+  type MatchReport,
+  type MatchTab,
+  type Player,
+  type PlayerMatchRating,
 } from "../lib/types"
+
+import type {
+  EventWithPlan,
+  MatchEventDraftSetter,
+  TrainingPlanState,
+} from "../lib/dashboardTypes"
 
 const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
 
-type Props = any
+type Props = {
+  isAdmin: boolean
+  signOut: () => Promise<void>
+  loading: boolean
+
+  tab: MainTab
+  setTab: (tab: MainTab) => void
+  matchTab: MatchTab
+  setMatchTab: (tab: MatchTab) => void
+
+  players: Player[]
+  coaches: Coach[]
+  coachAvailability: CoachAvailability[]
+  events: EventWithPlan[]
+  attendance: EventAttendance[]
+  leagueResults: LeagueResult[]
+  playerRatings: PlayerMatchRating[]
+  matchReports: MatchReport[]
+
+  // ✅ SEASONS
+  seasons: any[]
+  activeSeasonId: string
+  setActiveSeasonId: (id: string) => void
+  showSeasonModal: boolean
+  setShowSeasonModal: (v: boolean) => void
+  seasonForm: any
+  setSeasonForm: (v: any) => void
+  handleCreateSeason: () => Promise<void>
+
+  selectedDate: string
+  setSelectedDate: (date: string) => void
+
+  selectedDateEvents: EventWithPlan[]
+  selectedEvent: EventWithPlan | null
+  selectedEventId: string | null
+  setSelectedEventId: (value: string | null) => void
+
+  activeMatchEventId: string | null
+  setActiveMatchEventId: (value: string | null) => void
+  activeMatchEvent: EventWithPlan | null
+
+  // UI + helpers
+  formatFullDate: (date: string) => string
+  statusStyle: (status: AttendanceStatus) => any
+  countAttendance: any
+  getPlayerStatus: any
+  loadTrainingPlanFromEvent: any
+
+  persistSettings: any
+  persistMatchState: any
+
+  savePlayers: any
+  saveCoaches: any
+  saveCoachAvailability: any
+  saveTrainingPlans: any
+  saveSessionRecord: any
+  savePlayerRating: any
+  saveAttendance: any
+
+  addEvent: any
+  openAddCalendarEvent: any
+  openEditCalendarEvent: any
+  deleteCalendarEvent: any
+
+  saveMatchEvent: any
+  saveMatchReport: any
+
+  // optional counts
+  availableCount?: number
+}
 
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin, signOut } = props
@@ -42,21 +133,30 @@ export default function DashboardShell(props: Props) {
         padding: 16,
         paddingBottom: 120,
         background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
-        overflowX: "hidden",
-        boxSizing: "border-box",
       }}
     >
-      <div
-        style={{
-          maxWidth: 980,
-          margin: "0 auto",
-          display: "grid",
-          gap: 16,
-          minWidth: 0,
-        }}
-      >
-        <DashboardHeader isAdmin={isAdmin} onSignOut={signOut} />
+      <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
 
+        {/* HEADER */}
+        <DashboardHeader
+          teamName={TEAM.name}
+          isAdmin={isAdmin}
+          onSignOut={signOut}
+          nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"}
+          nextEventDateLabel={
+            props.selectedDateEvents?.[0]
+              ? `${props.selectedDateEvents[0].date}${
+                  props.selectedDateEvents[0].startTime
+                    ? ` • ${props.selectedDateEvents[0].startTime}`
+                    : ""
+                }`
+              : "Select a day in the planner"
+          }
+          availablePlayersCount={props.availableCount}
+          totalPlayersCount={props.players?.length}
+        />
+
+        {/* ✅ SEASON SWITCHER */}
         {props.seasons && props.setActiveSeasonId ? (
           <SeasonSwitcher
             seasons={props.seasons}
@@ -66,6 +166,7 @@ export default function DashboardShell(props: Props) {
           />
         ) : null}
 
+        {/* TABS */}
         {tab === "home" && (
           <HomeTab
             teamName={TEAM.name}
@@ -102,16 +203,6 @@ export default function DashboardShell(props: Props) {
             setActiveMatchEventId={props.setActiveMatchEventId}
             players={props.players}
             attendance={props.attendance}
-            allTrainingPlans={props.allTrainingPlans}
-            selectedTemplateId={props.selectedTemplateId}
-            setSelectedTemplateId={props.setSelectedTemplateId}
-            trainingPlan={props.trainingPlan}
-            setTrainingPlan={props.setTrainingPlan}
-            selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
-            setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
-            activeSession={props.activeSession}
-            setActiveSession={props.setActiveSession}
-            sessionHistory={props.sessionHistory}
             formatFullDate={props.formatFullDate}
             statusStyle={props.statusStyle}
             countAttendance={props.countAttendance}
@@ -133,27 +224,32 @@ export default function DashboardShell(props: Props) {
             selectedDate={props.selectedDate}
             coaches={props.coaches}
             coachAvailability={props.coachAvailability}
-            selectedDateCoachAvailability={props.selectedDateCoachAvailability}
+            selectedDateCoachAvailability={[]}
             formatFullDate={props.formatFullDate}
             saveCoaches={props.saveCoaches}
             saveCoachAvailability={props.saveCoachAvailability}
           />
         )}
 
-        {tab === "match" && <MatchTabContent {...props} />}
+        {tab === "match" && (
+          <MatchTabContent {...props} />
+        )}
 
         {tab === "stats" && (
           <StatsTab
-            teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name}
+            teamName={TEAM.name}
             results={props.leagueResults}
             players={props.players}
             ratings={props.playerRatings}
-            timeline={props.timeline}
+            timeline={[]}
           />
         )}
       </div>
 
+      {/* ✅ FIXED NAV */}
       <BottomNav tab={props.tab} setTab={props.setTab} />
+
+      {/* MODALS */}
 
       <EventFormModal
         open={props.showEventForm}
@@ -175,41 +271,27 @@ export default function DashboardShell(props: Props) {
         setEventNotes={props.setEventNotes}
         selectedDate={props.selectedDate}
         onSave={props.addEvent}
-        onClose={() => {
-          props.setShowEventForm(false)
-          props.setEditingCalendarEventId(null)
-          props.setEventTitle("")
-          props.setEventType("training")
-          props.setEventStartTime("")
-          props.setEventLocation("")
-          props.setEventOpponent("")
-          props.setEventNotes("")
-          props.setSelectedDbTrainingPlanId("")
-        }}
+        onClose={() => props.setShowEventForm(false)}
       />
 
       <MatchEventModal
-        open={props.showMatchEventModal}
-        editingTimelineId={props.editingTimelineId}
-        eventDraft={props.eventDraft}
-        setEventDraft={props.setEventDraft}
-        matchPlayers={props.matchPlayers}
+        open={false}
+        editingTimelineId={null}
+        eventDraft={{} as MatchEventDraft}
+        setEventDraft={props.setEventDraft as MatchEventDraftSetter}
+        matchPlayers={props.players}
         onSave={props.saveMatchEvent}
-        onClose={() => {
-          props.setShowMatchEventModal(false)
-          props.setEditingTimelineId(null)
-        }}
+        onClose={() => {}}
       />
 
-      {props.setShowSeasonModal ? (
-        <SeasonModal
-          open={props.showSeasonModal}
-          value={props.seasonForm}
-          setValue={props.setSeasonForm}
-          onSave={props.handleCreateSeason}
-          onClose={() => props.setShowSeasonModal(false)}
-        />
-      ) : null}
+      {/* ✅ SEASON MODAL */}
+      <SeasonModal
+        open={props.showSeasonModal}
+        value={props.seasonForm}
+        setValue={props.setSeasonForm}
+        onSave={props.handleCreateSeason}
+        onClose={() => props.setShowSeasonModal(false)}
+      />
     </main>
   )
 }
