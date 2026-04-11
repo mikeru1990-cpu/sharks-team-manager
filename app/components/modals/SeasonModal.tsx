@@ -1,12 +1,19 @@
 "use client"
 
-import { buttonPrimary, buttonSecondary, cardStyle } from "../../lib/types"
-import type { SeasonFormState } from "../../lib/dashboardTypes"
+import { cardStyle } from "../../lib/types"
 
 type Props = {
   open: boolean
-  value: SeasonFormState
-  setValue: (value: SeasonFormState) => void
+  value: {
+    name: string
+    startDate: string
+    endDate: string
+  }
+  setValue: (value: {
+    name: string
+    startDate: string
+    endDate: string
+  }) => void
   onClose: () => void
   onSave: () => Promise<void> | void
 }
@@ -56,71 +63,76 @@ export default function SeasonModal({
           />
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>Start Date</div>
-              <input
-                type="date"
-                value={value.startDate}
-                onChange={(e) =>
-                  setValue({
-                    ...value,
-                    startDate: e.target.value,
-                  })
-                }
-                style={{
-                  width: "100%",
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 16,
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
+            <input
+              type="date"
+              value={value.startDate}
+              onChange={(e) =>
+                setValue({
+                  ...value,
+                  startDate: e.target.value,
+                })
+              }
+              style={{
+                width: "100%",
+                padding: 14,
+                borderRadius: 14,
+                border: "1px solid #cbd5e1",
+                fontSize: 16,
+                boxSizing: "border-box",
+              }}
+            />
 
-            <div>
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>End Date</div>
-              <input
-                type="date"
-                value={value.endDate}
-                onChange={(e) =>
-                  setValue({
-                    ...value,
-                    endDate: e.target.value,
-                  })
-                }
-                style={{
-                  width: "100%",
-                  padding: 14,
-                  borderRadius: 14,
-                  border: "1px solid #cbd5e1",
-                  fontSize: 16,
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 12,
-              background: "#f8fafc",
-              border: "1px solid #e2e8f0",
-              color: "#475569",
-              lineHeight: 1.5,
-              fontSize: 14,
-            }}
-          >
-            This should create a new active season while keeping past seasons as archived history.
+            <input
+              type="date"
+              value={value.endDate}
+              onChange={(e) =>
+                setValue({
+                  ...value,
+                  endDate: e.target.value,
+                })
+              }
+              style={{
+                width: "100%",
+                padding: 14,
+                borderRadius: 14,
+                border: "1px solid #cbd5e1",
+                fontSize: 16,
+                boxSizing: "border-box",
+              }}
+            />
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button onClick={() => void onSave()} style={{ ...buttonPrimary(), flex: 1 }}>
+          <button
+            onClick={() => void onSave()}
+            style={{
+              flex: 1,
+              padding: "14px 16px",
+              borderRadius: 16,
+              border: "none",
+              background: "#06245c",
+              color: "white",
+              fontWeight: 800,
+              fontSize: 16,
+            }}
+          >
             Create Season
           </button>
-          <button onClick={onClose} style={{ ...buttonSecondary(), flex: 1 }}>
+
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: "14px 16px",
+              borderRadius: 16,
+              border: "1px solid #cbd5e1",
+              background: "white",
+              color: "#0f172a",
+              fontWeight: 800,
+              fontSize: 16,
+            }}
+          >
             Cancel
           </button>
         </div>
