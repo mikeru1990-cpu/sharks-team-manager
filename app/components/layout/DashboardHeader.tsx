@@ -1,62 +1,39 @@
 "use client"
 
-import { TEAM } from "../../lib/types"
-import { Badge, PageCard, PrimaryButton } from "../ui"
-
 type Props = {
   isAdmin: boolean
-  onSignOut: () => Promise<void>
+  onSignOut: () => Promise<void> | void
 }
 
 export default function DashboardHeader({ isAdmin, onSignOut }: Props) {
   return (
-    <PageCard tone="blue">
+    <div
+      style={{
+        background: "linear-gradient(135deg, #06245c 0%, #0c235f 100%)",
+        color: "white",
+        borderRadius: 28,
+        padding: 18,
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 14px 36px rgba(15,23,42,0.14)",
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "auto minmax(0, 1fr) auto",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
           gap: 12,
-          alignItems: "center",
+          alignItems: "start",
         }}
       >
-        <div
-          style={{
-            width: 50,
-            height: 50,
-            borderRadius: 16,
-            background: "rgba(255,255,255,0.14)",
-            border: "1px solid rgba(255,255,255,0.18)",
-            display: "grid",
-            placeItems: "center",
-            color: "white",
-            fontSize: 24,
-            fontWeight: 900,
-            flexShrink: 0,
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12)",
-          }}
-        >
-          🦈
-        </div>
-
         <div style={{ minWidth: 0 }}>
           <div
             style={{
-              color: "white",
-              fontSize: 18,
-              fontWeight: 900,
-              lineHeight: 1.1,
-              overflowWrap: "anywhere",
-            }}
-          >
-            {TEAM.name}
-          </div>
-
-          <div
-            style={{
-              marginTop: 4,
-              color: "rgba(255,255,255,0.82)",
-              fontSize: 14,
-              fontWeight: 500,
+              fontSize: 12,
+              fontWeight: 800,
+              opacity: 0.78,
+              letterSpacing: 0.4,
+              textTransform: "uppercase",
             }}
           >
             Club Hub
@@ -64,23 +41,69 @@ export default function DashboardHeader({ isAdmin, onSignOut }: Props) {
 
           <div
             style={{
-              marginTop: 10,
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
+              marginTop: 8,
+              fontSize: 28,
+              fontWeight: 900,
+              lineHeight: 1.05,
+              overflowWrap: "anywhere",
             }}
           >
-            <Badge tone="blue">{isAdmin ? "Admin Mode" : "Coach View"}</Badge>
-            <Badge tone="default">Mobile First</Badge>
+            Leonard Stanley U10 Lioness
+          </div>
+
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 14,
+              lineHeight: 1.45,
+              opacity: 0.9,
+              maxWidth: 520,
+            }}
+          >
+            Fixtures, training, matchday management, player feedback and season planning.
           </div>
         </div>
 
-        <div style={{ alignSelf: "start", flexShrink: 0 }}>
-          <PrimaryButton onClick={() => void onSignOut()}>
+        <div
+          style={{
+            display: "grid",
+            justifyItems: "end",
+            gap: 8,
+            minWidth: 96,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: isAdmin ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.14)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isAdmin ? "Admin" : "Viewer"}
+          </div>
+
+          <button
+            onClick={() => void onSignOut()}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 14,
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "rgba(255,255,255,0.10)",
+              color: "white",
+              fontWeight: 800,
+              fontSize: 14,
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            }}
+          >
             Sign Out
-          </PrimaryButton>
+          </button>
         </div>
       </div>
-    </PageCard>
+    </div>
   )
 }
