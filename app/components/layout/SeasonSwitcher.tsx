@@ -1,7 +1,9 @@
 "use client"
 
+import type { SeasonItem } from "../../lib/dashboardTypes"
+
 type Props = {
-  seasons: any[]
+  seasons: SeasonItem[]
   activeSeasonId: string
   onChange: (id: string) => void
   onCreate: () => void
