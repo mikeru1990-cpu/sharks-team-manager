@@ -1,28 +1,17 @@
-"use client"
-
-import type {
-  EventItem,
-  MatchEventDraft,
-} from "./types"
-
 export type PeriodMode = "quarters" | "halves"
 
-export type EventWithPlan = EventItem & {
+export type EventWithPlan = {
+  id: string
+  title: string
+  date: string
+  type: "training" | "match" | "other"
+  startTime?: string
+  location?: string
+  opponent?: string
+  notes?: string
   trainingPlanId?: string
   trainingPlanName?: string
-}
-export type Season = {
-  id: string
-  name: string
-  startDate: string
-  endDate: string
-  isActive: boolean
-}
-
-export type SeasonFormState = {
-  name: string
-  startDate: string
-  endDate: string
+  seasonId?: string
 }
 
 export type TrainingPlanState = {
@@ -35,5 +24,32 @@ export type TrainingPlanState = {
 }
 
 export type MatchEventDraftSetter = (
-  updater: MatchEventDraft | ((prev: MatchEventDraft) => MatchEventDraft)
+  value:
+    | {
+        type: "goal" | "assist" | "sub" | "injury" | "note"
+        playerId: string
+        secondPlayerId: string
+        note: string
+      }
+    | ((
+        prev: {
+          type: "goal" | "assist" | "sub" | "injury" | "note"
+          playerId: string
+          secondPlayerId: string
+          note: string
+        }
+      ) => {
+        type: "goal" | "assist" | "sub" | "injury" | "note"
+        playerId: string
+        secondPlayerId: string
+        note: string
+      })
 ) => void
+
+export type SeasonItem = {
+  id: string
+  name: string
+  startDate: string
+  endDate: string
+  active: boolean
+}
