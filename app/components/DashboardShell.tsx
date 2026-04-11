@@ -10,13 +10,11 @@ import CoachesTabContent from "./tabs/CoachesTabContent"
 
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
+import SeasonModal from "./modals/SeasonModal"
 
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
-
-// ✅ SEASON
-import SeasonSwitcher from "./season/SeasonSwitcher"
-import SeasonModal from "./season/SeasonModal"
+import SeasonSwitcher from "./layout/SeasonSwitcher"
 
 import {
   TEAM,
@@ -37,7 +35,6 @@ import {
 import type {
   EventWithPlan,
   MatchEventDraftSetter,
-  TrainingPlanState,
 } from "../lib/dashboardTypes"
 
 const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
@@ -83,7 +80,7 @@ type Props = {
   setActiveMatchEventId: (value: string | null) => void
   activeMatchEvent: EventWithPlan | null
 
-  // UI + helpers
+  // helpers
   formatFullDate: (date: string) => string
   statusStyle: (status: AttendanceStatus) => any
   countAttendance: any
@@ -109,7 +106,7 @@ type Props = {
   saveMatchEvent: any
   saveMatchReport: any
 
-  // optional counts
+  // optional
   availableCount?: number
 }
 
@@ -167,6 +164,7 @@ export default function DashboardShell(props: Props) {
         ) : null}
 
         {/* TABS */}
+
         {tab === "home" && (
           <HomeTab
             teamName={TEAM.name}
