@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
 import DashboardShell from "./components/DashboardShell"
+import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -39,13 +40,12 @@ import {
   canPlaySlot,
   generateQuarterPlans,
 } from "./lib/rotation"
-
-type PeriodMode = "quarters" | "halves"
-
-type EventWithPlan = EventItem & {
-  trainingPlanId?: string
-  trainingPlanName?: string
-}
+import type {
+  EventWithPlan,
+  PeriodMode,
+  SeasonItem,
+  TrainingPlanState,
+} from "./lib/dashboardTypes"
 
 type DbTrainingPlanRow = {
   id: string
@@ -188,7 +188,7 @@ function Dashboard({
   const allTrainingPlans = dbTrainingPlans.length > 0 ? dbTrainingPlans : initialTrainingTemplates
 
   const [selectedTemplateId, setSelectedTemplateId] = useState(initialTrainingTemplates[0].id)
-  const [trainingPlan, setTrainingPlan] = useState({
+  const [trainingPlan, setTrainingPlan] = useState<TrainingPlanState>({
     title: initialTrainingTemplates[0].name,
     warmUp: initialTrainingTemplates[0].warmUp,
     drill1: initialTrainingTemplates[0].drill1,
@@ -201,11 +201,45 @@ function Dashboard({
   const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [seasons, setSeasons] = useState<SeasonItem[]>([
+    {
+      id: "season-2025-2026",
+      name: "2025/26",
+      startDate: "2025-08-01",
+      endDate: "2026-07-31",
+      active: true,
+    },
+  ])
+  const [activeSeasonId, setActiveSeasonId] = useState("season-2025-2026")
+  const [showSeasonModal, setShowSeasonModal] = useState(false)
+  const [seasonForm, setSeasonForm] = useState({
+    name: "",
+    startDate: "",
+    endDate: "",
+  })
+
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
+
+  const activeSeason = useMemo(
+    () => seasons.find((season) => season.id === activeSeasonId),
+    [seasons, activeSeasonId]
+  )
+
+  function isDateInSeason(date: string, season?: SeasonItem) {
+    if (!season) return true
+    return date >= season.startDate && date <= season.endDate
+  }
+
+  const seasonEvents = useMemo(() => {
+    return events.filter((event) => {
+      if (event.seasonId) return event.seasonId === activeSeasonId
+      return isDateInSeason(event.date, activeSeason)
+    })
+  }, [events, activeSeasonId, activeSeason])
 
   const selectedDateEvents = useMemo(
     () =>
-      events
+      seasonEvents
         .filter((e) => e.date === selectedDate)
         .slice()
         .sort((a, b) => {
@@ -215,11 +249,11 @@ function Dashboard({
           if (timeCompare !== 0) return timeCompare
           return a.title.localeCompare(b.title)
         }),
-    [events, selectedDate]
+    [seasonEvents, selectedDate]
   )
 
-  const selectedEvent = events.find((e) => e.id === selectedEventId) || null
-  const activeMatchEvent = events.find((e) => e.id === activeMatchEventId) || null
+  const selectedEvent = seasonEvents.find((e) => e.id === selectedEventId) || null
+  const activeMatchEvent = seasonEvents.find((e) => e.id === activeMatchEventId) || null
 
   function countAttendance(eventId: string, status: AttendanceStatus) {
     return attendance.filter((a) => a.eventId === eventId && a.status === status).length
@@ -313,10 +347,24 @@ function Dashboard({
 
   const noAvailableCoaches = availableCoaches.length === 0
 
+  const seasonLeagueResults = useMemo(() => {
+    return leagueResults.filter((result) => isDateInSeason(result.playedOn, activeSeason))
+  }, [leagueResults, activeSeason])
+
+  const seasonPlayerRatings = useMemo(() => {
+    const eventIds = new Set(seasonEvents.map((event) => event.id))
+    return playerRatings.filter((rating) => eventIds.has(rating.eventId))
+  }, [playerRatings, seasonEvents])
+
+  const seasonMatchReports = useMemo(() => {
+    const eventIds = new Set(seasonEvents.map((event) => event.id))
+    return matchReports.filter((report) => eventIds.has(report.eventId))
+  }, [matchReports, seasonEvents])
+
   const playerOfMatchMap = useMemo(() => {
     const byEvent: Record<string, PlayerMatchRating[]> = {}
 
-    for (const rating of playerRatings) {
+    for (const rating of seasonPlayerRatings) {
       if (!byEvent[rating.eventId]) byEvent[rating.eventId] = []
       byEvent[rating.eventId].push(rating)
     }
@@ -331,15 +379,15 @@ function Dashboard({
     }
 
     return winners
-  }, [playerRatings])
+  }, [seasonPlayerRatings])
 
   const activeMatchRatings = useMemo(() => {
     if (!activeMatchEventId) return []
-    return playerRatings
+    return seasonPlayerRatings
       .filter((item) => item.eventId === activeMatchEventId)
       .slice()
       .sort((a, b) => b.rating - a.rating)
-  }, [playerRatings, activeMatchEventId])
+  }, [seasonPlayerRatings, activeMatchEventId])
 
   const activeTopPerformers = useMemo(() => {
     return activeMatchRatings
@@ -355,8 +403,32 @@ function Dashboard({
 
   const latestActiveMatchReport = useMemo(() => {
     if (!activeMatchEventId) return null
-    return matchReports.find((item) => item.eventId === activeMatchEventId) || null
-  }, [matchReports, activeMatchEventId])
+    return seasonMatchReports.find((item) => item.eventId === activeMatchEventId) || null
+  }, [seasonMatchReports, activeMatchEventId])
+
+  async function handleCreateSeason() {
+    if (!seasonForm.name.trim() || !seasonForm.startDate || !seasonForm.endDate) {
+      window.alert("Please complete all season fields.")
+      return
+    }
+
+    const nextSeason: SeasonItem = {
+      id: crypto.randomUUID?.() || makeId(),
+      name: seasonForm.name.trim(),
+      startDate: seasonForm.startDate,
+      endDate: seasonForm.endDate,
+      active: true,
+    }
+
+    setSeasons((prev) => [...prev.map((s) => ({ ...s, active: false })), nextSeason])
+    setActiveSeasonId(nextSeason.id)
+    setSeasonForm({
+      name: "",
+      startDate: "",
+      endDate: "",
+    })
+    setShowSeasonModal(false)
+  }
 
   async function loadLeagueResults() {
     if (!supabase) return
@@ -455,6 +527,7 @@ function Dashboard({
           notes: row.notes || "",
           trainingPlanId: row.training_plan_id || "",
           trainingPlanName: row.training_plan_name || "",
+          seasonId: row.season_id || "",
         }))
       )
     }
@@ -1068,58 +1141,52 @@ function Dashboard({
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase) {
-      window.alert("Supabase is not configured")
-      return
-    }
+    if (!supabase) return
 
-    console.log("saveAttendance start", { eventId, playerId, status })
-
-    const existing = attendance.find(
-      (item) => item.eventId === eventId && item.playerId === playerId
-    )
-
-    const rowId = existing?.id || crypto.randomUUID?.() || makeId()
-
-    const { data, error } = await supabase
+    const { data: existingRow, error: fetchError } = await supabase
       .from("event_attendance")
-      .upsert(
-        {
-          id: rowId,
-          event_id: eventId,
-          player_id: playerId,
-          status,
-        },
-        {
-          onConflict: "event_id,player_id",
-        }
-      )
       .select("id, event_id, player_id, status")
-      .single()
+      .eq("event_id", eventId)
+      .eq("player_id", playerId)
+      .maybeSingle()
 
-    if (error) {
-      console.error("saveAttendance upsert error", error)
-      window.alert(error.message)
+    if (fetchError) {
+      alert(fetchError.message)
       return
     }
 
-    setAttendance((prev) => {
-      const filtered = prev.filter(
-        (item) => !(item.eventId === eventId && item.playerId === playerId)
-      )
+    if (existingRow) {
+      const { error: updateError } = await supabase
+        .from("event_attendance")
+        .update({ status })
+        .eq("id", existingRow.id)
 
-      return [
-        ...filtered,
-        {
-          id: data.id,
-          eventId: data.event_id,
-          playerId: data.player_id,
-          status: data.status as AttendanceStatus,
-        },
-      ]
+      if (updateError) {
+        alert(updateError.message)
+        return
+      }
+
+      setAttendance((prev) =>
+        prev.map((item) => (item.id === existingRow.id ? { ...item, status } : item))
+      )
+      return
+    }
+
+    const newId = crypto.randomUUID?.() || makeId()
+
+    const { error: insertError } = await supabase.from("event_attendance").insert({
+      id: newId,
+      event_id: eventId,
+      player_id: playerId,
+      status,
     })
 
-    console.log("saveAttendance saved", { eventId, playerId, status })
+    if (insertError) {
+      alert(insertError.message)
+      return
+    }
+
+    setAttendance((prev) => [...prev, { id: newId, eventId, playerId, status }])
   }
 
   async function addEvent() {
@@ -1144,6 +1211,7 @@ function Dashboard({
       notes: eventNotes.trim(),
       trainingPlanId: linkedPlan?.id || "",
       trainingPlanName: linkedPlan?.name || "",
+      seasonId: activeSeasonId,
     }
 
     const { error } = await supabase.from("events").upsert({
@@ -1158,6 +1226,7 @@ function Dashboard({
       notes: newEvent.notes || "",
       training_plan_id: linkedPlan?.id || null,
       training_plan_name: linkedPlan?.name || "",
+      season_id: activeSeasonId,
     })
 
     if (error) {
@@ -1606,11 +1675,19 @@ function Dashboard({
       players={players}
       coaches={coaches}
       coachAvailability={coachAvailability}
-      events={events}
+      events={seasonEvents}
       attendance={attendance}
-      leagueResults={leagueResults}
-      playerRatings={playerRatings}
-      matchReports={matchReports}
+      leagueResults={seasonLeagueResults}
+      playerRatings={seasonPlayerRatings}
+      matchReports={seasonMatchReports}
+      seasons={seasons}
+      activeSeasonId={activeSeasonId}
+      setActiveSeasonId={setActiveSeasonId}
+      showSeasonModal={showSeasonModal}
+      setShowSeasonModal={setShowSeasonModal}
+      seasonForm={seasonForm}
+      setSeasonForm={setSeasonForm}
+      handleCreateSeason={handleCreateSeason}
       selectedDate={selectedDate}
       setSelectedDate={setSelectedDate}
       showEventForm={showEventForm}
@@ -1752,9 +1829,7 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => (
-        <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />
-      )}
+      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
     </AuthGate>
   )
 }
