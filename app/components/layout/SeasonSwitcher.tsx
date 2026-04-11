@@ -1,29 +1,26 @@
 "use client"
 
-import { buttonPrimary, buttonSecondary } from "../../lib/types"
-import type { Season } from "../../lib/dashboardTypes"
-
 type Props = {
-  isAdmin: boolean
-  seasons: Season[]
+  seasons: any[]
   activeSeasonId: string
-  setActiveSeasonId: (value: string) => void
-  onOpenCreateSeason: () => void
+  onChange: (id: string) => void
+  onCreate: () => void
 }
 
 export default function SeasonSwitcher({
-  isAdmin,
   seasons,
   activeSeasonId,
-  setActiveSeasonId,
-  onOpenCreateSeason,
+  onChange,
+  onCreate,
 }: Props) {
-  const activeSeason =
-    seasons.find((season) => season.id === activeSeasonId) || null
-
   return (
     <div
       style={{
+        background: "white",
+        border: "1px solid #dbe3ef",
+        borderRadius: 24,
+        padding: 16,
+        boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -31,41 +28,26 @@ export default function SeasonSwitcher({
         flexWrap: "wrap",
       }}
     >
-      <div style={{ minWidth: 0 }}>
+      <div>
         <div
           style={{
             fontSize: 12,
             fontWeight: 800,
             color: "#64748b",
             textTransform: "uppercase",
-            letterSpacing: 0.3,
           }}
         >
-          Season
+          Active Season
         </div>
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 22,
-            fontWeight: 900,
-            color: "#0f172a",
-          }}
-        >
-          {activeSeason?.name || "No season selected"}
+        <div style={{ marginTop: 4, fontSize: 22, fontWeight: 900 }}>
+          {seasons.find((s) => s.id === activeSeasonId)?.name || "No season"}
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <select
           value={activeSeasonId}
-          onChange={(e) => setActiveSeasonId(e.target.value)}
+          onChange={(e) => onChange(e.target.value)}
           style={{
             padding: 12,
             borderRadius: 14,
@@ -83,11 +65,20 @@ export default function SeasonSwitcher({
           ))}
         </select>
 
-        {isAdmin ? (
-          <button onClick={onOpenCreateSeason} style={buttonPrimary()}>
-            New Season
-          </button>
-        ) : null}
+        <button
+          onClick={onCreate}
+          style={{
+            padding: "12px 16px",
+            borderRadius: 16,
+            border: "none",
+            background: "#06245c",
+            color: "white",
+            fontWeight: 800,
+            fontSize: 16,
+          }}
+        >
+          New Season
+        </button>
       </div>
     </div>
   )
