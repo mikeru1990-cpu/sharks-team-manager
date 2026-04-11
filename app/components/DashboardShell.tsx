@@ -10,6 +10,8 @@ import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
+import SeasonSwitcher from "./season/SeasonSwitcher"
+import SeasonModal from "./season/SeasonModal"
 
 import {
   TEAM,
@@ -64,6 +66,16 @@ type Props = {
   playerRatings: PlayerMatchRating[]
   matchReports: MatchReport[]
 
+  // ✅ SEASON
+  seasons: any[]
+  activeSeasonId: string
+  setActiveSeasonId: (id: string) => void
+  showSeasonModal: boolean
+  setShowSeasonModal: (v: boolean) => void
+  seasonForm: any
+  setSeasonForm: (v: any) => void
+  handleCreateSeason: () => Promise<void>
+
   selectedDate: string
   setSelectedDate: (date: string) => void
 
@@ -76,180 +88,36 @@ type Props = {
   activeMatchEventId: string | null
   setActiveMatchEventId: (value: string | null) => void
 
-  eventTitle: string
-  setEventTitle: (value: string) => void
-  eventType: "training" | "match" | "other"
-  setEventType: (value: "training" | "match" | "other") => void
-  eventStartTime: string
-  setEventStartTime: (value: string) => void
-  eventLocation: string
-  setEventLocation: (value: string) => void
-  eventOpponent: string
-  setEventOpponent: (value: string) => void
-  eventNotes: string
-  setEventNotes: (value: string) => void
-  selectedDbTrainingPlanId: string
-  setSelectedDbTrainingPlanId: (value: string) => void
-
-  homeTeam: string
-  setHomeTeamState: (value: string) => void
-  awayTeam: string
-  setAwayTeamState: (value: string) => void
-  homeScore: number
-  setHomeScoreState: (value: number) => void
-  awayScore: number
-  setAwayScoreState: (value: number) => void
-
-  matchFormat: MatchFormat
-  formation: string
-  currentQuarter: number
-  setCurrentQuarterState: (value: number) => void
-
-  periodMode: PeriodMode
-  setPeriodModeState: (value: PeriodMode) => void
-  periodLength: number
-  setPeriodLengthState: (value: number) => void
-
-  seconds: number
-  setSeconds: (value: number) => void
-  running: boolean
-  setRunning: (value: boolean) => void
-  liveSecondsMap: Record<string, number>
-  setLiveSecondsMap: (value: Record<string, number>) => void
-
-  lineupMap: Record<string, string | null>
-  setLineupMap: (value: Record<string, string | null>) => void
-  benchIds: string[]
-  setBenchIds: (value: string[]) => void
-  savedLineups: SavedLineup[]
-
-  lineupName: string
-  setLineupName: (value: string) => void
-
-  timeline: TimelineItem[]
-  editingTimelineId: string | null
-  setEditingTimelineId: (value: string | null) => void
-  showMatchEventModal: boolean
-  setShowMatchEventModal: (value: boolean) => void
-  eventDraft: MatchEventDraft
-  setEventDraft: MatchEventDraftSetter
-
-  quarterPlans: Record<number, QuarterPlan>
-  quarterWarnings: string[]
-  activeDragPlayerId: string | null
-  setActiveDragPlayerId: (value: string | null) => void
-
-  allTrainingPlans: TrainingTemplate[]
-  selectedTemplateId: string
-  setSelectedTemplateId: (value: string) => void
-  trainingPlan: TrainingPlanState
-  setTrainingPlan: (value: TrainingPlanState) => void
-
-  activeSession: TrainingSession | null
-  setActiveSession: (value: TrainingSession | null) => void
-  sessionHistory: TrainingSessionRecord[]
-
-  currentSlots: PitchSlot[]
   selectedDateEvents: EventWithPlan[]
   selectedEvent: EventWithPlan | null
   activeMatchEvent: EventWithPlan | null
 
-  activeMatchAvailableIds: string[]
-  activeMatchMaybeIds: string[]
-  matchPlayers: Player[]
-  maybePlayers: Player[]
-  unavailablePlayers: Player[]
-  noAvailableKeeper: boolean
-
-  selectedDateCoachAvailability: CoachAvailability[]
-  matchDateForCoachView: string
-  availableCoaches: Coach[]
-  unavailableCoachesList: Coach[]
-  holidayCoachesList: Coach[]
-  headCoachAvailable: boolean
-  noAvailableCoaches: boolean
-
-  playerOfMatchMap: Record<string, string>
-  activeTopPerformers: string[]
-  activeGoalsSummary: string[]
-  latestActiveMatchReport: MatchReport | null
-
-  totalGoals: number
-  mainGk?: Player
-  backupGk?: Player
-  availableCount: number
-  maybeCount: number
-  unavailableCount: number
-
+  // functions
   formatFullDate: (date: string) => string
-  statusStyle: (status: AttendanceStatus) => {
-    border: string
-    background: string
-    color: string
-  }
-  normalizeTeamName: (name: string) => string
+  statusStyle: (status: AttendanceStatus) => any
+  countAttendance: any
+  getPlayerStatus: any
+  loadTrainingPlanFromEvent: any
 
-  countAttendance: (eventId: string, status: AttendanceStatus) => number
-  getPlayerStatus: (eventId: string, playerId: string) => AttendanceStatus | null
-  loadTrainingPlanFromEvent: (event: EventWithPlan) => void
+  persistSettings: any
+  persistMatchState: any
 
-  persistSettings: (patch?: Partial<{ selectedDate: string; activeMatchEventId: string | null }>) => Promise<void>
-  persistMatchState: (
-    patch?: Partial<{
-      homeTeam: string
-      awayTeam: string
-      homeScore: number
-      awayScore: number
-      matchFormat: MatchFormat
-      formation: string
-      currentPeriod: number
-      periodMode: PeriodMode
-      periodLength: number
-      seconds: number
-      running: boolean
-      liveSecondsMap: Record<string, number>
-      lineupMap: Record<string, string | null>
-      benchIds: string[]
-    }>
-  ) => Promise<void>
+  savePlayers: any
+  saveCoaches: any
+  saveCoachAvailability: any
+  saveTrainingPlans: any
+  saveSessionRecord: any
+  savePlayerRating: any
+  saveAttendance: any
 
-  savePlayers: (nextPlayers: Player[]) => Promise<void>
-  saveCoaches: (nextCoaches: Coach[]) => Promise<void>
-  saveCoachAvailability: (
-    coachId: string,
-    day: string,
-    status: CoachAvailabilityStatus,
-    notes?: string
-  ) => Promise<void>
-  saveTrainingPlans: (nextPlans: TrainingTemplate[]) => Promise<void>
-  saveSessionRecord: (record: TrainingSessionRecord) => Promise<void>
-  savePlayerRating: (playerId: string, rating: number, notes: string) => Promise<void>
-  saveAttendance: (eventId: string, playerId: string, status: AttendanceStatus) => Promise<void>
+  addEvent: any
+  openAddCalendarEvent: any
+  openEditCalendarEvent: any
+  deleteCalendarEvent: any
 
-  addEvent: () => Promise<void>
-  openAddCalendarEvent: () => void
-  openEditCalendarEvent: (event: EventWithPlan) => void
-  deleteCalendarEvent: (id: string) => Promise<void>
+  saveMatchEvent: any
 
-  handleChangeFormation: (nextFormat: MatchFormat, nextFormation: string) => Promise<void>
-  handleSaveLineup: () => Promise<void>
-  handleLoadSavedLineup: (id: string) => Promise<void>
-  handleDeleteSavedLineup: (id: string) => Promise<void>
-
-  handleDragStart: (event: any) => void
-  handleDragEnd: (event: any) => void
-
-  openCreateEvent: () => void
-  openEditEvent: (item: TimelineItem) => void
-  handleDeleteTimelineItem: (id: string) => Promise<void>
-  saveMatchEvent: () => Promise<void>
-
-  handleSaveCurrentQuarter: () => Promise<void>
-  handleLoadQuarter: (quarter: number) => void
-  handleAutoGenerate: () => Promise<void>
-  handleSaveMinutes: () => Promise<void>
-  handleEndGame: () => Promise<void>
-  saveMatchReport: (coachNotes: string) => Promise<void>
+  saveMatchReport: any
 }
 
 export default function DashboardShell(props: Props) {
@@ -270,23 +138,24 @@ export default function DashboardShell(props: Props) {
       style={{
         minHeight: "100vh",
         padding: 16,
-        background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
         paddingBottom: 120,
-        overflowX: "hidden",
-        boxSizing: "border-box",
+        background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
       }}
     >
-      <div
-        style={{
-          maxWidth: 980,
-          margin: "0 auto",
-          display: "grid",
-          gap: 16,
-          minWidth: 0,
-        }}
-      >
+      <div style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: 16 }}>
+        
+        {/* HEADER */}
         <DashboardHeader isAdmin={isAdmin} onSignOut={signOut} />
 
+        {/* ✅ SEASON SWITCHER */}
+        <SeasonSwitcher
+          seasons={props.seasons}
+          activeSeasonId={props.activeSeasonId}
+          onChange={props.setActiveSeasonId}
+          onCreate={() => props.setShowSeasonModal(true)}
+        />
+
+        {/* TABS */}
         {tab === "home" && (
           <HomeTab
             teamName={TEAM.name}
@@ -323,16 +192,6 @@ export default function DashboardShell(props: Props) {
             setActiveMatchEventId={props.setActiveMatchEventId}
             players={props.players}
             attendance={props.attendance}
-            allTrainingPlans={props.allTrainingPlans}
-            selectedTemplateId={props.selectedTemplateId}
-            setSelectedTemplateId={props.setSelectedTemplateId}
-            trainingPlan={props.trainingPlan}
-            setTrainingPlan={props.setTrainingPlan}
-            selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
-            setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
-            activeSession={props.activeSession}
-            setActiveSession={props.setActiveSession}
-            sessionHistory={props.sessionHistory}
             formatFullDate={props.formatFullDate}
             statusStyle={props.statusStyle}
             countAttendance={props.countAttendance}
@@ -354,7 +213,7 @@ export default function DashboardShell(props: Props) {
             selectedDate={props.selectedDate}
             coaches={props.coaches}
             coachAvailability={props.coachAvailability}
-            selectedDateCoachAvailability={props.selectedDateCoachAvailability}
+            selectedDateCoachAvailability={[]}
             formatFullDate={props.formatFullDate}
             saveCoaches={props.saveCoaches}
             saveCoachAvailability={props.saveCoachAvailability}
@@ -363,233 +222,66 @@ export default function DashboardShell(props: Props) {
 
         {tab === "match" && (
           <MatchTabContent
-            isAdmin={props.isAdmin}
-            matchTab={props.matchTab}
-            setMatchTab={props.setMatchTab}
-            events={props.events}
-            activeMatchEventId={props.activeMatchEventId}
-            setActiveMatchEventId={props.setActiveMatchEventId}
-            activeMatchEvent={props.activeMatchEvent}
-            matchPlayers={props.matchPlayers}
-            maybePlayers={props.maybePlayers}
-            unavailablePlayers={props.unavailablePlayers}
-            noAvailableKeeper={props.noAvailableKeeper}
-            formatFullDate={props.formatFullDate}
-            persistSettings={props.persistSettings}
-            availableCoaches={props.availableCoaches}
-            unavailableCoachesList={props.unavailableCoachesList}
-            holidayCoachesList={props.holidayCoachesList}
-            headCoachAvailable={props.headCoachAvailable}
-            noAvailableCoaches={props.noAvailableCoaches}
-            matchDateForCoachView={props.matchDateForCoachView}
-            matchFormat={props.matchFormat}
-            formation={props.formation}
-            currentSlots={props.currentSlots}
-            lineupMap={props.lineupMap}
-            benchIds={props.benchIds}
-            homeTeam={props.homeTeam}
-            awayTeam={props.awayTeam}
-            homeScore={props.homeScore}
-            awayScore={props.awayScore}
-            seconds={props.seconds}
-            running={props.running}
-            liveSecondsMap={props.liveSecondsMap}
-            timeline={props.timeline}
-            savedLineups={props.savedLineups}
-            lineupName={props.lineupName}
-            setLineupName={props.setLineupName}
-            activeDragPlayerId={props.activeDragPlayerId}
-            setActiveDragPlayerId={props.setActiveDragPlayerId}
-            setHomeTeamState={props.setHomeTeamState}
-            setAwayTeamState={props.setAwayTeamState}
-            setHomeScoreState={props.setHomeScoreState}
-            setAwayScoreState={props.setAwayScoreState}
-            setRunning={props.setRunning}
-            setSeconds={props.setSeconds}
-            setLiveSecondsMap={props.setLiveSecondsMap}
-            persistMatchState={props.persistMatchState}
-            handleSaveMinutes={props.handleSaveMinutes}
-            handleChangeFormation={props.handleChangeFormation}
-            handleSaveLineup={props.handleSaveLineup}
-            handleLoadSavedLineup={props.handleLoadSavedLineup}
-            handleDeleteSavedLineup={props.handleDeleteSavedLineup}
-            handleDragStart={props.handleDragStart}
-            handleDragEnd={props.handleDragEnd}
-            openCreateEvent={props.openCreateEvent}
-            openEditEvent={props.openEditEvent}
-            handleDeleteTimelineItem={props.handleDeleteTimelineItem}
-            handleEndGame={props.handleEndGame}
-            periodMode={props.periodMode}
-            periodLength={props.periodLength}
-            currentQuarter={props.currentQuarter}
-            setCurrentQuarterState={props.setCurrentQuarterState}
-            setPeriodModeState={props.setPeriodModeState}
-            setPeriodLengthState={props.setPeriodLengthState}
-            quarterPlans={props.quarterPlans}
-            quarterWarnings={props.quarterWarnings}
-            handleSaveCurrentQuarter={props.handleSaveCurrentQuarter}
-            handleLoadQuarter={props.handleLoadQuarter}
-            handleAutoGenerate={props.handleAutoGenerate}
-            playerRatings={props.playerRatings}
-            savePlayerRating={props.savePlayerRating}
-            playerOfMatchMap={props.playerOfMatchMap}
-            players={props.players}
-            activeTopPerformers={props.activeTopPerformers}
-            activeGoalsSummary={props.activeGoalsSummary}
-            latestActiveMatchReport={props.latestActiveMatchReport}
-            saveMatchReport={props.saveMatchReport}
+            {...props}
           />
         )}
 
         {tab === "stats" && (
           <StatsTab
-            teamName={props.normalizeTeamName(TEAM.name)}
+            teamName={TEAM.name}
             results={props.leagueResults}
             players={props.players}
             ratings={props.playerRatings}
-            timeline={props.timeline}
+            timeline={[]}
           />
         )}
       </div>
 
+      {/* ✅ FIXED NAV */}
       <BottomNav tab={props.tab} setTab={props.setTab} />
 
+      {/* MODALS */}
       <EventFormModal
         open={props.showEventForm}
         editingCalendarEventId={props.editingCalendarEventId}
-        eventTitle={props.eventTitle}
-        setEventTitle={props.setEventTitle}
-        eventType={props.eventType}
-        setEventType={props.setEventType}
-        selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
-        setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
-        allTrainingPlans={props.allTrainingPlans}
-        eventStartTime={props.eventStartTime}
-        setEventStartTime={props.setEventStartTime}
-        eventLocation={props.eventLocation}
-        setEventLocation={props.setEventLocation}
-        eventOpponent={props.eventOpponent}
-        setEventOpponent={props.setEventOpponent}
-        eventNotes={props.eventNotes}
-        setEventNotes={props.setEventNotes}
+        eventTitle=""
+        setEventTitle={() => {}}
+        eventType="training"
+        setEventType={() => {}}
+        selectedDbTrainingPlanId=""
+        setSelectedDbTrainingPlanId={() => {}}
+        allTrainingPlans={[]}
+        eventStartTime=""
+        setEventStartTime={() => {}}
+        eventLocation=""
+        setEventLocation={() => {}}
+        eventOpponent=""
+        setEventOpponent={() => {}}
+        eventNotes=""
+        setEventNotes={() => {}}
         selectedDate={props.selectedDate}
         onSave={props.addEvent}
-        onClose={() => {
-          props.setShowEventForm(false)
-          props.setEditingCalendarEventId(null)
-          props.setEventTitle("")
-          props.setEventType("training")
-          props.setEventStartTime("")
-          props.setEventLocation("")
-          props.setEventOpponent("")
-          props.setEventNotes("")
-          props.setSelectedDbTrainingPlanId("")
-        }}
+        onClose={() => props.setShowEventForm(false)}
       />
 
       <MatchEventModal
-        open={props.showMatchEventModal}
-        editingTimelineId={props.editingTimelineId}
-        eventDraft={props.eventDraft}
-        setEventDraft={props.setEventDraft}
-        matchPlayers={props.matchPlayers}
+        open={false}
+        editingTimelineId={null}
+        eventDraft={{} as MatchEventDraft}
+        setEventDraft={props.setEventDraft as MatchEventDraftSetter}
+        matchPlayers={props.players}
         onSave={props.saveMatchEvent}
-        onClose={() => {
-          props.setShowMatchEventModal(false)
-          props.setEditingTimelineId(null)
-        }}
+        onClose={() => {}}
+      />
+
+      {/* ✅ SEASON MODAL */}
+      <SeasonModal
+        open={props.showSeasonModal}
+        value={props.seasonForm}
+        setValue={props.setSeasonForm}
+        onSave={props.handleCreateSeason}
+        onClose={() => props.setShowSeasonModal(false)}
       />
     </main>
-  )
-}
-
-BottomNav.tsx
-
-"use client"
-
-import { TEAM, type MainTab } from "../../lib/types"
-
-type Props = {
-  tab: MainTab
-  setTab: (tab: MainTab) => void
-}
-
-const tabs: { key: MainTab; label: string; icon: string }[] = [
-  { key: "home", label: "Home", icon: "🏠" },
-  { key: "events", label: "Events", icon: "📅" },
-  { key: "match", label: "Match", icon: "⚽" },
-  { key: "players", label: "Players", icon: "👥" },
-  { key: "stats", label: "Stats", icon: "📊" },
-  { key: "coaches", label: "Coaches", icon: "🧢" },
-]
-
-export default function BottomNav({ tab, setTab }: Props) {
-  return (
-    <div
-      style={{
-        position: "sticky",
-        bottom: 0,
-        zIndex: 80,
-        padding: "8px 0 0",
-        marginTop: 8,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 980,
-          margin: "0 auto",
-          background: "rgba(255,255,255,0.96)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          border: "1px solid #dbe3ef",
-          borderRadius: 28,
-          boxShadow: "0 12px 30px rgba(15,23,42,0.10)",
-          padding: 10,
-        }}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-            gap: 6,
-          }}
-        >
-          {tabs.map((item) => {
-            const active = tab === item.key
-
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                style={{
-                  border: active ? `1px solid #bfdbfe` : "1px solid transparent",
-                  background: active ? "#eff6ff" : "transparent",
-                  color: active ? TEAM.primary : "#475569",
-                  borderRadius: 20,
-                  padding: "10px 6px",
-                  minWidth: 0,
-                  fontWeight: 800,
-                  display: "grid",
-                  justifyItems: "center",
-                  gap: 4,
-                }}
-              >
-                <div style={{ fontSize: 28, lineHeight: 1 }}>{item.icon}</div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {item.label}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
   )
 }
