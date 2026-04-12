@@ -23,6 +23,7 @@ import {
   initials,
 } from "../lib/types"
 import { canPlaySlot } from "../lib/rotation"
+import { autoPickLineup } from "../lib/autoLineup"
 import {
   Badge,
   PageCard,
@@ -79,6 +80,28 @@ type Props = {
   setCurrentPeriod: (value: number) => void
   setPeriodMode: (value: PeriodMode) => Promise<void>
   setPeriodLength: (value: number) => Promise<void>
+
+  // optional instant-update helpers
+  setLineupMapState?: (value: Record<string, string | null>) => void
+  setBenchIdsState?: (value: string[]) => void
+  persistMatchState?: (
+    patch?: Partial<{
+      homeTeam: string
+      awayTeam: string
+      homeScore: number
+      awayScore: number
+      matchFormat: MatchFormat
+      formation: string
+      currentPeriod: number
+      periodMode: PeriodMode
+      periodLength: number
+      seconds: number
+      running: boolean
+      liveSecondsMap: Record<string, number>
+      lineupMap: Record<string, string | null>
+      benchIds: string[]
+    }>
+  ) => Promise<void>
 }
 
 function miniButtonStyle(primary = false, danger = false, disabled = false) {
@@ -449,6 +472,9 @@ export default function MatchCenter(props: Props) {
     setCurrentPeriod,
     setPeriodMode,
     setPeriodLength,
+    setLineupMapState,
+    setBenchIdsState,
+    persistMatchState,
   } = props
 
   const lineupPlayers = Object.values(lineupMap)
@@ -473,6 +499,25 @@ export default function MatchCenter(props: Props) {
   const periodLabel = periodMode === "quarters" ? `Q${currentPeriod}` : `H${currentPeriod}`
   const periodName = periodMode === "quarters" ? "Quarter" : "Half"
   const periodsTabLabel = periodMode === "quarters" ? "Quarters" : "Halves"
+
+  async function handleAutoPickLineup() {
+    const result = autoPickLineup(players, currentSlots)
+
+    if (setLineupMapState) {
+      setLineupMapState(result.lineupMap)
+    }
+
+    if (setBenchIdsState) {
+      setBenchIdsState(result.benchIds)
+    }
+
+    if (persistMatchState) {
+      await persistMatchState({
+        lineupMap: result.lineupMap,
+        benchIds: result.benchIds,
+      })
+    }
+  }
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -791,6 +836,14 @@ export default function MatchCenter(props: Props) {
         <div style={{ display: "grid", gap: 16 }}>
           <PageCard>
             <SectionHeader title="Formation & Saved Lineups" />
+
+            {isAdmin ? (
+              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                <PrimaryButton onClick={() => void handleAutoPickLineup()}>
+                  ⚡ Auto Pick Lineup
+                </PrimaryButton>
+              </div>
+            ) : null}
 
             <div
               style={{
