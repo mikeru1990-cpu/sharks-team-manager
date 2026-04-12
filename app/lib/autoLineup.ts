@@ -9,33 +9,34 @@ function sortByMinutes(players: Player[]) {
 }
 
 export function autoPickLineup(players: Player[], slots: PitchSlot[]) {
+  const safePlayers = Array.isArray(players) ? players : []
+  const safeSlots = Array.isArray(slots) ? slots : []
+
   const lineupMap: Record<string, string | null> = {}
   const usedPlayers = new Set<string>()
+  const sortedPlayers = sortByMinutes(safePlayers)
 
-  // Sort players by LOWEST minutes first (fair rotation)
-  const sortedPlayers = sortByMinutes(players)
-
-  // 1. Pick GK first
   const gk =
     sortedPlayers.find((p) => p.mainGK) ||
-    sortedPlayers.find((p) => p.backupGK)
+    sortedPlayers.find((p) => p.backupGK) ||
+    sortedPlayers.find((p) => Array.isArray(p.positions) && p.positions.includes("GK"))
 
   if (gk) {
-    const gkSlot = slots.find((s) => s.position === "GK")
+    const gkSlot = safeSlots.find((s) => s.position === "GK")
     if (gkSlot) {
       lineupMap[gkSlot.id] = gk.id
       usedPlayers.add(gk.id)
     }
   }
 
-  // 2. Fill by PRIMARY position match
-  for (const slot of slots) {
+  for (const slot of safeSlots) {
     if (lineupMap[slot.id]) continue
 
     const player = sortedPlayers.find(
       (p) =>
         !usedPlayers.has(p.id) &&
-        p.positions[0] === slot.position // strongest fit
+        Array.isArray(p.positions) &&
+        p.positions[0] === slot.position
     )
 
     if (player) {
@@ -44,13 +45,13 @@ export function autoPickLineup(players: Player[], slots: PitchSlot[]) {
     }
   }
 
-  // 3. Fill by ANY matching position
-  for (const slot of slots) {
+  for (const slot of safeSlots) {
     if (lineupMap[slot.id]) continue
 
     const player = sortedPlayers.find(
       (p) =>
         !usedPlayers.has(p.id) &&
+        Array.isArray(p.positions) &&
         p.positions.includes(slot.position)
     )
 
@@ -60,8 +61,7 @@ export function autoPickLineup(players: Player[], slots: PitchSlot[]) {
     }
   }
 
-  // 4. Fill remaining slots (fallback)
-  for (const slot of slots) {
+  for (const slot of safeSlots) {
     if (lineupMap[slot.id]) continue
 
     const player = sortedPlayers.find((p) => !usedPlayers.has(p.id))
@@ -72,8 +72,7 @@ export function autoPickLineup(players: Player[], slots: PitchSlot[]) {
     }
   }
 
-  // Bench = everyone else
-  const benchIds = players
+  const benchIds = safePlayers
     .filter((p) => !usedPlayers.has(p.id))
     .map((p) => p.id)
 
