@@ -16,20 +16,9 @@ import type {
   SavedLineup,
   TimelineItem,
 } from "../lib/types"
-import {
-  TEAM,
-  formatClock,
-  formatMinutes,
-  initials,
-} from "../lib/types"
+import { TEAM, formatClock, formatMinutes, initials } from "../lib/types"
 import { canPlaySlot } from "../lib/rotation"
-import { autoPickLineup } from "../lib/autoLineup"
-import {
-  Badge,
-  PageCard,
-  PrimaryButton,
-  SectionHeader,
-} from "./ui"
+import { Badge, PageCard, PrimaryButton, SectionHeader } from "./ui"
 
 type PeriodMode = "quarters" | "halves"
 
@@ -80,8 +69,6 @@ type Props = {
   setCurrentPeriod: (value: number) => void
   setPeriodMode: (value: PeriodMode) => Promise<void>
   setPeriodLength: (value: number) => Promise<void>
-
-  // optional instant-update helpers
   setLineupMapState?: (value: Record<string, string | null>) => void
   setBenchIdsState?: (value: string[]) => void
   persistMatchState?: (
@@ -477,22 +464,28 @@ export default function MatchCenter(props: Props) {
     persistMatchState,
   } = props
 
-  const lineupPlayers = Object.values(lineupMap)
+  const safePlayers = Array.isArray(players) ? players : []
+  const safeCurrentSlots = Array.isArray(currentSlots) ? currentSlots : []
+  const safeBenchIds = Array.isArray(benchIds) ? benchIds : []
+  const safeTimeline = Array.isArray(timeline) ? timeline : []
+  const safeSavedLineups = Array.isArray(savedLineups) ? savedLineups : []
+
+  const lineupPlayers = Object.values(lineupMap || {})
     .filter(Boolean)
-    .map((id) => players.find((p) => p.id === id))
+    .map((id) => safePlayers.find((p) => p.id === id))
     .filter(Boolean) as Player[]
 
-  const benchPlayers = benchIds
-    .map((id) => players.find((p) => p.id === id))
+  const benchPlayers = safeBenchIds
+    .map((id) => safePlayers.find((p) => p.id === id))
     .filter(Boolean) as Player[]
 
-  const activeDragPlayer = players.find((p) => p.id === activeDragPlayerId) || null
+  const activeDragPlayer = safePlayers.find((p) => p.id === activeDragPlayerId) || null
 
   const pitchRows = [
-    currentSlots.filter((s) => s.position === "FWD"),
-    currentSlots.filter((s) => s.position === "MID"),
-    currentSlots.filter((s) => s.position === "DEF"),
-    currentSlots.filter((s) => s.position === "GK"),
+    safeCurrentSlots.filter((s) => s.position === "FWD"),
+    safeCurrentSlots.filter((s) => s.position === "MID"),
+    safeCurrentSlots.filter((s) => s.position === "DEF"),
+    safeCurrentSlots.filter((s) => s.position === "GK"),
   ]
 
   const periodCount = periodMode === "quarters" ? 4 : 2
@@ -501,21 +494,43 @@ export default function MatchCenter(props: Props) {
   const periodsTabLabel = periodMode === "quarters" ? "Quarters" : "Halves"
 
   async function handleAutoPickLineup() {
-    const result = autoPickLineup(players, currentSlots)
+    try {
+      if (!safePlayers.length || !safeCurrentSlots.length) {
+        window.alert("No players or pitch slots available yet.")
+        return
+      }
 
-    if (setLineupMapState) {
-      setLineupMapState(result.lineupMap)
-    }
+      const mod = await import("../lib/autoLineup")
+      if (!mod || typeof mod.autoPickLineup !== "function") {
+        throw new Error("autoPickLineup export not found")
+      }
 
-    if (setBenchIdsState) {
-      setBenchIdsState(result.benchIds)
-    }
+      const result = mod.autoPickLineup(safePlayers, safeCurrentSlots)
 
-    if (persistMatchState) {
-      await persistMatchState({
-        lineupMap: result.lineupMap,
-        benchIds: result.benchIds,
-      })
+      if (!result || typeof result !== "object") {
+        throw new Error("autoPickLineup returned invalid result")
+      }
+
+      const nextLineupMap = result.lineupMap || {}
+      const nextBenchIds = Array.isArray(result.benchIds) ? result.benchIds : []
+
+      if (setLineupMapState) {
+        setLineupMapState(nextLineupMap)
+      }
+
+      if (setBenchIdsState) {
+        setBenchIdsState(nextBenchIds)
+      }
+
+      if (persistMatchState) {
+        await persistMatchState({
+          lineupMap: nextLineupMap,
+          benchIds: nextBenchIds,
+        })
+      }
+    } catch (error) {
+      console.error("Auto Pick Lineup failed:", error)
+      window.alert("Auto Pick Lineup failed. The rest of the app is still safe.")
     }
   }
 
@@ -897,18 +912,16 @@ export default function MatchCenter(props: Props) {
                   placeholder="Save lineup name"
                   style={{ padding: 12, borderRadius: 12, border: "1px solid #cbd5e1", fontSize: 15 }}
                 />
-                <PrimaryButton onClick={() => void onSaveLineup()}>
-                  Save
-                </PrimaryButton>
+                <PrimaryButton onClick={() => void onSaveLineup()}>Save</PrimaryButton>
               </div>
             ) : null}
           </PageCard>
 
-          {savedLineups.length > 0 && (
+          {safeSavedLineups.length > 0 && (
             <PageCard>
               <SectionHeader title="Saved Lineups" />
               <div style={{ display: "grid", gap: 10 }}>
-                {savedLineups.map((item) => (
+                {safeSavedLineups.map((item) => (
                   <div
                     key={item.id}
                     style={{
@@ -1013,7 +1026,7 @@ export default function MatchCenter(props: Props) {
                     >
                       {row.map((slot) => {
                         const playerId = lineupMap[slot.id]
-                        const player = players.find((p) => p.id === playerId)
+                        const player = safePlayers.find((p) => p.id === playerId)
                         return (
                           <PitchDropSlot
                             key={slot.id}
@@ -1059,19 +1072,15 @@ export default function MatchCenter(props: Props) {
             <SectionHeader
               title="Match Timeline"
               action={
-                isAdmin ? (
-                  <PrimaryButton onClick={onOpenCreateEvent}>
-                    Add Event
-                  </PrimaryButton>
-                ) : null
+                isAdmin ? <PrimaryButton onClick={onOpenCreateEvent}>Add Event</PrimaryButton> : null
               }
             />
 
             <div style={{ display: "grid", gap: 8 }}>
-              {timeline.length === 0 ? (
+              {safeTimeline.length === 0 ? (
                 <div style={{ color: "#64748b" }}>No live events yet.</div>
               ) : (
-                [...timeline]
+                [...safeTimeline]
                   .sort((a, b) => a.minute - b.minute || a.sortOrder - b.sortOrder)
                   .map((t) => (
                     <div
@@ -1119,7 +1128,7 @@ export default function MatchCenter(props: Props) {
           <PageCard>
             <SectionHeader title="Live Minutes" />
             <div style={{ display: "grid", gap: 8 }}>
-              {players.map((player) => (
+              {safePlayers.map((player) => (
                 <CompactPlayerRow
                   key={player.id}
                   player={player}
@@ -1147,7 +1156,7 @@ export default function MatchCenter(props: Props) {
         <PageCard>
           <SectionHeader title="Match Stats" />
           <div style={{ display: "grid", gap: 8 }}>
-            {players.map((player) => (
+            {safePlayers.map((player) => (
               <CompactPlayerRow
                 key={player.id}
                 player={player}
