@@ -160,8 +160,10 @@ function Dashboard({
   const [periodMode, setPeriodModeState] = useState<PeriodMode>("quarters")
   const [periodLength, setPeriodLengthState] = useState(10)
 
-  const [seconds, setSeconds] = useState(0)
-  const [running, setRunning] = useState(false)
+  const [seconds, setSecondsState] = useState(0)
+  const [pausedSeconds, setPausedSeconds] = useState(0)
+  const [running, setRunningState] = useState(false)
+  const [timerStartedAt, setTimerStartedAt] = useState<string | null>(null)
   const [liveSecondsMap, setLiveSecondsMap] = useState<Record<string, number>>({})
 
   const [lineupMap, setLineupMap] = useState<Record<string, string | null>>({})
@@ -214,6 +216,26 @@ function Dashboard({
   function isDateInSeason(date: string, season: SeasonItem | undefined) {
     if (!season) return true
     return date >= season.startDate && date <= season.endDate
+  }
+
+  function getElapsedSecondsFromTimer(baseSeconds: number, startedAt: string | null) {
+    if (!startedAt) return baseSeconds
+
+    const startedMs = new Date(startedAt).getTime()
+    const nowMs = Date.now()
+    const diffSeconds = Math.max(0, Math.floor((nowMs - startedMs) / 1000))
+
+    return baseSeconds + diffSeconds
+  }
+
+  function handleSetSeconds(value: number) {
+    const safeValue = Math.max(0, value || 0)
+    setPausedSeconds(safeValue)
+    setSecondsState(safeValue)
+
+    if (safeValue === 0) {
+      setTimerStartedAt(null)
+    }
   }
 
   const activeSeason = seasons.find((s) => s.id === activeSeasonId)
@@ -711,8 +733,10 @@ function Dashboard({
       setCurrentQuarterState(1)
       setPeriodModeState("quarters")
       setPeriodLengthState(10)
-      setSeconds(0)
-      setRunning(false)
+      setPausedSeconds(0)
+      setSecondsState(0)
+      setRunningState(false)
+      setTimerStartedAt(null)
       setLiveSecondsMap({})
       setLineupMap({})
       setBenchIds([])
@@ -751,8 +775,20 @@ function Dashboard({
       setCurrentQuarterState(stateRes.data.current_period || 1)
       setPeriodModeState((stateRes.data.period_mode as PeriodMode) || "quarters")
       setPeriodLengthState(stateRes.data.period_length || 10)
-      setSeconds(stateRes.data.seconds || 0)
-      setRunning(!!stateRes.data.running)
+
+      const loadedBaseSeconds = stateRes.data.seconds || 0
+      const loadedRunning = !!stateRes.data.running
+      const loadedTimerStartedAt = stateRes.data.timer_started_at || null
+
+      setPausedSeconds(loadedBaseSeconds)
+      setRunningState(loadedRunning)
+      setTimerStartedAt(loadedTimerStartedAt)
+      setSecondsState(
+        loadedRunning
+          ? getElapsedSecondsFromTimer(loadedBaseSeconds, loadedTimerStartedAt)
+          : loadedBaseSeconds
+      )
+
       setLiveSecondsMap(JSON.parse(stateRes.data.live_seconds_json || "{}"))
       setLineupMap(JSON.parse(stateRes.data.lineup_json || "{}"))
       setBenchIds(JSON.parse(stateRes.data.bench_json || "[]"))
@@ -771,8 +807,10 @@ function Dashboard({
       setCurrentQuarterState(1)
       setPeriodModeState("quarters")
       setPeriodLengthState(10)
-      setSeconds(0)
-      setRunning(false)
+      setPausedSeconds(0)
+      setSecondsState(0)
+      setRunningState(false)
+      setTimerStartedAt(null)
       setLiveSecondsMap({})
       setLineupMap(auto.lineup)
       setBenchIds(auto.bench)
@@ -835,8 +873,9 @@ function Dashboard({
   useEffect(() => {
     if (!running || !activeMatchEventId) return
 
-    const interval = window.setInterval(() => {
-      setSeconds((prev) => prev + 1)
+    const tick = () => {
+      setSecondsState(getElapsedSecondsFromTimer(pausedSeconds, timerStartedAt))
+
       setLiveSecondsMap((prev) => {
         const next = { ...prev }
         Object.values(lineupMap)
@@ -847,10 +886,28 @@ function Dashboard({
           })
         return next
       })
-    }, 1000)
+    }
+
+    tick()
+    const interval = window.setInterval(tick, 1000)
 
     return () => window.clearInterval(interval)
-  }, [running, lineupMap, activeMatchEventId])
+  }, [running, activeMatchEventId, pausedSeconds, timerStartedAt, lineupMap])
+
+  useEffect(() => {
+    const syncTimerFromVisibility = () => {
+      if (!running) return
+      setSecondsState(getElapsedSecondsFromTimer(pausedSeconds, timerStartedAt))
+    }
+
+    document.addEventListener("visibilitychange", syncTimerFromVisibility)
+    window.addEventListener("focus", syncTimerFromVisibility)
+
+    return () => {
+      document.removeEventListener("visibilitychange", syncTimerFromVisibility)
+      window.removeEventListener("focus", syncTimerFromVisibility)
+    }
+  }, [running, pausedSeconds, timerStartedAt])
 
   useEffect(() => {
     if (selectedEventId && !seasonEvents.some((event) => event.id === selectedEventId)) {
@@ -895,6 +952,7 @@ function Dashboard({
       periodLength: number
       seconds: number
       running: boolean
+      timerStartedAt: string | null
       liveSecondsMap: Record<string, number>
       lineupMap: Record<string, string | null>
       benchIds: string[]
@@ -912,8 +970,9 @@ function Dashboard({
       currentPeriod: patch?.currentPeriod ?? currentQuarter,
       periodMode: patch?.periodMode ?? periodMode,
       periodLength: patch?.periodLength ?? periodLength,
-      seconds: patch?.seconds ?? seconds,
+      seconds: patch?.seconds ?? pausedSeconds,
       running: patch?.running ?? running,
+      timerStartedAt: patch?.timerStartedAt ?? timerStartedAt,
       liveSecondsMap: patch?.liveSecondsMap ?? liveSecondsMap,
       lineupMap: patch?.lineupMap ?? lineupMap,
       benchIds: patch?.benchIds ?? benchIds,
@@ -932,10 +991,42 @@ function Dashboard({
       period_length: next.periodLength,
       seconds: next.seconds,
       running: next.running,
+      timer_started_at: next.timerStartedAt,
       live_seconds_json: JSON.stringify(next.liveSecondsMap),
       lineup_json: JSON.stringify(next.lineupMap),
       bench_json: JSON.stringify(next.benchIds),
       updated_at: new Date().toISOString(),
+    })
+  }
+
+  async function handleSetRunning(nextRunning: boolean) {
+    if (nextRunning === running) return
+
+    if (nextRunning) {
+      const nowIso = new Date().toISOString()
+      setRunningState(true)
+      setTimerStartedAt(nowIso)
+      setSecondsState(pausedSeconds)
+
+      await persistMatchState({
+        running: true,
+        seconds: pausedSeconds,
+        timerStartedAt: nowIso,
+      })
+      return
+    }
+
+    const nextSeconds = getElapsedSecondsFromTimer(pausedSeconds, timerStartedAt)
+
+    setRunningState(false)
+    setTimerStartedAt(null)
+    setPausedSeconds(nextSeconds)
+    setSecondsState(nextSeconds)
+
+    await persistMatchState({
+      running: false,
+      seconds: nextSeconds,
+      timerStartedAt: null,
     })
   }
 
@@ -1655,8 +1746,14 @@ function Dashboard({
       return
     }
 
-    setRunning(false)
-    await persistMatchState({ running: false })
+    setRunningState(false)
+    setTimerStartedAt(null)
+    setPausedSeconds(seconds)
+    await persistMatchState({
+      running: false,
+      seconds,
+      timerStartedAt: null,
+    })
     await loadLeagueResults()
     alert("Game result saved")
   }
@@ -1801,9 +1898,9 @@ function Dashboard({
       periodLength={periodLength}
       setPeriodLengthState={setPeriodLengthState}
       seconds={seconds}
-      setSeconds={setSeconds}
+      setSeconds={handleSetSeconds}
       running={running}
-      setRunning={setRunning}
+      setRunning={handleSetRunning}
       liveSecondsMap={liveSecondsMap}
       setLiveSecondsMap={setLiveSecondsMap}
       lineupMap={lineupMap}
@@ -1901,9 +1998,7 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => (
-        <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />
-      )}
+      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
     </AuthGate>
   )
 }
