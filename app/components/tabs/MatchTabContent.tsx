@@ -75,6 +75,9 @@ type Props = {
   setSeconds: (value: number) => void
   setLiveSecondsMap: (value: Record<string, number>) => void
 
+  setLineupMapState: (value: Record<string, string | null>) => void
+  setBenchIdsState: (value: string[]) => void
+
   persistMatchState: (
     patch?: Partial<{
       homeTeam: string
@@ -300,6 +303,8 @@ export default function MatchTabContent(props: Props) {
     setRunning,
     setSeconds,
     setLiveSecondsMap,
+    setLineupMapState,
+    setBenchIdsState,
     persistMatchState,
     handleSaveMinutes,
     handleChangeFormation,
@@ -581,6 +586,9 @@ export default function MatchTabContent(props: Props) {
             ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
             : ""
         }
+        setLineupMapState={setLineupMapState}
+        setBenchIdsState={setBenchIdsState}
+        persistMatchState={persistMatchState}
       />
 
       {matchTab === "quarters" ? (
@@ -707,6 +715,9 @@ export default function MatchTabContent(props: Props) {
         setLineupName={setLineupName}
         onChangeFormation={handleChangeFormation}
         onApplyLineup={async (nextLineupMap, nextBenchIds) => {
+          setLineupMapState(nextLineupMap)
+          setBenchIdsState(nextBenchIds)
+
           await persistMatchState({
             lineupMap: nextLineupMap,
             benchIds: nextBenchIds,
