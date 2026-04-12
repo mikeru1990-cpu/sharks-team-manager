@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react"
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core"
 import AuthGate from "./components/AuthGate"
 import DashboardShell from "./components/DashboardShell"
-import { buildSessionFromTemplate } from "./lib/sessionBuilder"
 import { supabase } from "./lib/supabase"
 import {
   TEAM,
@@ -201,16 +200,8 @@ function Dashboard({
   const [sessionHistory, setSessionHistory] = useState<TrainingSessionRecord[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [seasons, setSeasons] = useState<SeasonItem[]>([
-    {
-      id: "season-2025-2026",
-      name: "2025/26",
-      startDate: "2025-08-01",
-      endDate: "2026-07-31",
-      active: true,
-    },
-  ])
-  const [activeSeasonId, setActiveSeasonId] = useState("season-2025-2026")
+  const [seasons, setSeasons] = useState<SeasonItem[]>([])
+  const [activeSeasonId, setActiveSeasonId] = useState("")
   const [showSeasonModal, setShowSeasonModal] = useState(false)
   const [seasonForm, setSeasonForm] = useState({
     name: "",
@@ -220,22 +211,20 @@ function Dashboard({
 
   const currentSlots = useMemo(() => buildPitchSlots(matchFormat, formation), [matchFormat, formation])
 
-  const activeSeason = useMemo(
-    () => seasons.find((season) => season.id === activeSeasonId),
-    [seasons, activeSeasonId]
-  )
-
-  function isDateInSeason(date: string, season?: SeasonItem) {
+  function isDateInSeason(date: string, season: SeasonItem | undefined) {
     if (!season) return true
     return date >= season.startDate && date <= season.endDate
   }
 
+  const activeSeason = seasons.find((s) => s.id === activeSeasonId)
+
   const seasonEvents = useMemo(() => {
+    if (!activeSeason) return events
     return events.filter((event) => {
-      if (event.seasonId) return event.seasonId === activeSeasonId
+      if (event.seasonId) return event.seasonId === activeSeason.id
       return isDateInSeason(event.date, activeSeason)
     })
-  }, [events, activeSeasonId, activeSeason])
+  }, [events, activeSeason])
 
   const selectedDateEvents = useMemo(
     () =>
@@ -254,6 +243,20 @@ function Dashboard({
 
   const selectedEvent = seasonEvents.find((e) => e.id === selectedEventId) || null
   const activeMatchEvent = seasonEvents.find((e) => e.id === activeMatchEventId) || null
+
+  const seasonLeagueResults = useMemo(() => {
+    return leagueResults.filter((result) => isDateInSeason(result.playedOn, activeSeason))
+  }, [leagueResults, activeSeason])
+
+  const seasonPlayerRatings = useMemo(() => {
+    const eventIds = new Set(seasonEvents.map((event) => event.id))
+    return playerRatings.filter((rating) => eventIds.has(rating.eventId))
+  }, [playerRatings, seasonEvents])
+
+  const seasonMatchReports = useMemo(() => {
+    const eventIds = new Set(seasonEvents.map((event) => event.id))
+    return matchReports.filter((report) => eventIds.has(report.eventId))
+  }, [matchReports, seasonEvents])
 
   function countAttendance(eventId: string, status: AttendanceStatus) {
     return attendance.filter((a) => a.eventId === eventId && a.status === status).length
@@ -347,20 +350,6 @@ function Dashboard({
 
   const noAvailableCoaches = availableCoaches.length === 0
 
-  const seasonLeagueResults = useMemo(() => {
-    return leagueResults.filter((result) => isDateInSeason(result.playedOn, activeSeason))
-  }, [leagueResults, activeSeason])
-
-  const seasonPlayerRatings = useMemo(() => {
-    const eventIds = new Set(seasonEvents.map((event) => event.id))
-    return playerRatings.filter((rating) => eventIds.has(rating.eventId))
-  }, [playerRatings, seasonEvents])
-
-  const seasonMatchReports = useMemo(() => {
-    const eventIds = new Set(seasonEvents.map((event) => event.id))
-    return matchReports.filter((report) => eventIds.has(report.eventId))
-  }, [matchReports, seasonEvents])
-
   const playerOfMatchMap = useMemo(() => {
     const byEvent: Record<string, PlayerMatchRating[]> = {}
 
@@ -406,30 +395,6 @@ function Dashboard({
     return seasonMatchReports.find((item) => item.eventId === activeMatchEventId) || null
   }, [seasonMatchReports, activeMatchEventId])
 
-  async function handleCreateSeason() {
-    if (!seasonForm.name.trim() || !seasonForm.startDate || !seasonForm.endDate) {
-      window.alert("Please complete all season fields.")
-      return
-    }
-
-    const nextSeason: SeasonItem = {
-      id: crypto.randomUUID?.() || makeId(),
-      name: seasonForm.name.trim(),
-      startDate: seasonForm.startDate,
-      endDate: seasonForm.endDate,
-      active: true,
-    }
-
-    setSeasons((prev) => [...prev.map((s) => ({ ...s, active: false })), nextSeason])
-    setActiveSeasonId(nextSeason.id)
-    setSeasonForm({
-      name: "",
-      startDate: "",
-      endDate: "",
-    })
-    setShowSeasonModal(false)
-  }
-
   async function loadLeagueResults() {
     if (!supabase) return
 
@@ -458,6 +423,73 @@ function Dashboard({
     )
   }
 
+  async function saveSeasons(nextSeasons: SeasonItem[], nextActiveSeasonId?: string) {
+    if (!supabase) return
+
+    const activeId = nextActiveSeasonId ?? activeSeasonId
+
+    const payload = nextSeasons.map((season) => ({
+      id: season.id,
+      name: season.name,
+      start_date: season.startDate,
+      end_date: season.endDate,
+      active: season.id === activeId,
+    }))
+
+    const { error } = await supabase.from("seasons").upsert(payload)
+
+    if (error) {
+      alert(error.message)
+      return
+    }
+
+    setSeasons(
+      nextSeasons.map((season) => ({
+        ...season,
+        active: season.id === activeId,
+      }))
+    )
+    setActiveSeasonId(activeId)
+  }
+
+  async function handleCreateSeason() {
+    if (!seasonForm.name.trim() || !seasonForm.startDate || !seasonForm.endDate) {
+      window.alert("Please complete all season fields.")
+      return
+    }
+
+    const nextSeason: SeasonItem = {
+      id: crypto.randomUUID?.() || makeId(),
+      name: seasonForm.name.trim(),
+      startDate: seasonForm.startDate,
+      endDate: seasonForm.endDate,
+      active: true,
+    }
+
+    const nextSeasons = seasons.map((season) => ({
+      ...season,
+      active: false,
+    }))
+
+    await saveSeasons([...nextSeasons, nextSeason], nextSeason.id)
+
+    setSeasonForm({
+      name: "",
+      startDate: "",
+      endDate: "",
+    })
+    setShowSeasonModal(false)
+  }
+
+  async function handleChangeSeason(id: string) {
+    const nextSeasons = seasons.map((season) => ({
+      ...season,
+      active: season.id === id,
+    }))
+
+    await saveSeasons(nextSeasons, id)
+  }
+
   async function loadAll() {
     setLoading(true)
 
@@ -471,6 +503,7 @@ function Dashboard({
     const [
       playersRes,
       settingsRes,
+      seasonsRes,
       eventsRes,
       attendanceRes,
       coachesRes,
@@ -482,6 +515,7 @@ function Dashboard({
     ] = await Promise.all([
       supabase.from("players").select("*").order("sort_order", { ascending: true }),
       supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
+      supabase.from("seasons").select("*").order("start_date", { ascending: false }),
       supabase.from("events").select("*").order("date", { ascending: true }),
       supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
       supabase.from("coaches").select("*").order("name", { ascending: true }),
@@ -512,6 +546,34 @@ function Dashboard({
     if (!settingsRes.error && settingsRes.data) {
       setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
       setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
+    }
+
+    if (!seasonsRes.error && seasonsRes.data && seasonsRes.data.length > 0) {
+      const loadedSeasons: SeasonItem[] = seasonsRes.data.map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        active: !!row.active,
+      }))
+
+      setSeasons(loadedSeasons)
+
+      const active = loadedSeasons.find((season) => season.active) || loadedSeasons[0]
+      if (active) {
+        setActiveSeasonId(active.id)
+      }
+    } else {
+      const fallbackSeason: SeasonItem = {
+        id: "season-2025-2026",
+        name: "2025/26",
+        startDate: "2025-08-01",
+        endDate: "2026-07-31",
+        active: true,
+      }
+
+      setSeasons([fallbackSeason])
+      setActiveSeasonId(fallbackSeason.id)
     }
 
     if (!eventsRes.error && eventsRes.data) {
@@ -789,6 +851,16 @@ function Dashboard({
 
     return () => window.clearInterval(interval)
   }, [running, lineupMap, activeMatchEventId])
+
+  useEffect(() => {
+    if (selectedEventId && !seasonEvents.some((event) => event.id === selectedEventId)) {
+      setSelectedEventId(null)
+    }
+
+    if (activeMatchEventId && !seasonEvents.some((event) => event.id === activeMatchEventId)) {
+      setActiveMatchEventId(null)
+    }
+  }, [seasonEvents, selectedEventId, activeMatchEventId])
 
   async function persistSettings(
     patch?: Partial<{
@@ -1682,7 +1754,7 @@ function Dashboard({
       matchReports={seasonMatchReports}
       seasons={seasons}
       activeSeasonId={activeSeasonId}
-      setActiveSeasonId={setActiveSeasonId}
+      setActiveSeasonId={handleChangeSeason}
       showSeasonModal={showSeasonModal}
       setShowSeasonModal={setShowSeasonModal}
       seasonForm={seasonForm}
@@ -1829,7 +1901,9 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
+      {({ user, isAdmin, signOut }) => (
+        <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />
+      )}
     </AuthGate>
   )
 }
