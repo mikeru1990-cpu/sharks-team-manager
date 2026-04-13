@@ -164,7 +164,13 @@ export default function DashboardShell(props: Props) {
           />
         )}
 
-        {tab === "match" && <MatchTabContent {...props} />}
+        {tab === "match" && (
+          <MatchTabContent
+            {...props}
+            setLineupMapState={props.setLineupMap}
+            setBenchIdsState={props.setBenchIds}
+          />
+        )}
 
         {tab === "stats" && (
           <StatsTab
