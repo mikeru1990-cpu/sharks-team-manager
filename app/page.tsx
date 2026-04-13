@@ -17,7 +17,6 @@ import {
   type CoachAvailability,
   type CoachAvailabilityStatus,
   type EventAttendance,
-  type EventItem,
   type LeagueResult,
   type MainTab,
   type MatchEventDraft,
@@ -54,6 +53,39 @@ type DbTrainingPlanRow = {
   drill_2: string | null
   game: string | null
   notes: string | null
+}
+
+function safeId() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID()
+    }
+  } catch {}
+
+  return makeId()
+}
+
+function safeJsonParseArray<T = any>(value: unknown, fallback: T[] = []): T[] {
+  try {
+    if (typeof value !== "string" || !value.trim()) return fallback
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function safeJsonParseObject<T extends Record<string, any> = Record<string, any>>(
+  value: unknown,
+  fallback: T
+): T {
+  try {
+    if (typeof value !== "string" || !value.trim()) return fallback
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback
+  } catch {
+    return fallback
+  }
 }
 
 function formatFullDate(date: string) {
@@ -481,7 +513,7 @@ function Dashboard({
     }
 
     const nextSeason: SeasonItem = {
-      id: crypto.randomUUID?.() || makeId(),
+      id: safeId(),
       name: seasonForm.name.trim(),
       startDate: seasonForm.startDate,
       endDate: seasonForm.endDate,
@@ -513,217 +545,382 @@ function Dashboard({
   }
 
   async function loadAll() {
-    setLoading(true)
+    try {
+      setLoading(true)
 
-    if (!supabase) {
-      console.error("Supabase env vars are missing")
+      if (!supabase) {
+        console.error("Supabase env vars are missing")
+        setPlayers(initialPlayers)
+        return
+      }
+
+      const [
+        playersRes,
+        settingsRes,
+        seasonsRes,
+        eventsRes,
+        attendanceRes,
+        coachesRes,
+        coachAvailabilityRes,
+        trainingPlansRes,
+        sessionHistoryRes,
+        ratingsRes,
+        reportsRes,
+      ] = await Promise.all([
+        supabase.from("players").select("*").order("sort_order", { ascending: true }),
+        supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
+        supabase.from("seasons").select("*").order("start_date", { ascending: false }),
+        supabase.from("events").select("*").order("date", { ascending: true }),
+        supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
+        supabase.from("coaches").select("*").order("name", { ascending: true }),
+        supabase.from("coach_availability").select("*").order("day", { ascending: true }),
+        supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
+        supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
+        supabase.from("player_match_ratings").select("*").order("created_at", { ascending: false }),
+        supabase.from("match_reports").select("*").order("created_at", { ascending: false }),
+      ])
+
+      if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
+        setPlayers(
+          playersRes.data.map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            positions: safeJsonParseArray<string>(row.positions_json, []),
+            mainGK: !!row.main_gk,
+            backupGK: !!row.backup_gk,
+            captain: !!row.captain,
+            viceCaptain: !!row.vice_captain,
+            seasonSeconds: row.season_seconds || 0,
+          }))
+        )
+      } else {
+        setPlayers(initialPlayers)
+      }
+
+      if (!settingsRes.error && settingsRes.data) {
+        setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
+        setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
+      }
+
+      if (!seasonsRes.error && seasonsRes.data && seasonsRes.data.length > 0) {
+        const loadedSeasons: SeasonItem[] = seasonsRes.data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          startDate: row.start_date,
+          endDate: row.end_date,
+          active: !!row.active,
+        }))
+
+        setSeasons(loadedSeasons)
+
+        const active = loadedSeasons.find((season) => season.active) || loadedSeasons[0]
+        if (active) {
+          setActiveSeasonId(active.id)
+        }
+      } else {
+        const fallbackSeason: SeasonItem = {
+          id: "season-2025-2026",
+          name: "2025/26",
+          startDate: "2025-08-01",
+          endDate: "2026-07-31",
+          active: true,
+        }
+
+        setSeasons([fallbackSeason])
+        setActiveSeasonId(fallbackSeason.id)
+      }
+
+      if (!eventsRes.error && eventsRes.data) {
+        setEvents(
+          eventsRes.data.map((row: any) => ({
+            id: row.id,
+            date: row.date,
+            title: row.title,
+            type: row.type,
+            startTime: row.start_time || "",
+            location: row.location || "",
+            opponent: row.opponent || "",
+            notes: row.notes || "",
+            trainingPlanId: row.training_plan_id || "",
+            trainingPlanName: row.training_plan_name || "",
+            seasonId: row.season_id || "",
+          }))
+        )
+      } else {
+        setEvents([])
+      }
+
+      if (!attendanceRes.error && attendanceRes.data) {
+        setAttendance(
+          attendanceRes.data.map((row: any) => ({
+            id: row.id,
+            eventId: row.event_id,
+            playerId: row.player_id,
+            status: row.status,
+          }))
+        )
+      } else {
+        setAttendance([])
+      }
+
+      if (!coachesRes.error && coachesRes.data) {
+        setCoaches(
+          coachesRes.data.map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            role: row.role || "",
+            active: row.active ?? true,
+          }))
+        )
+      } else {
+        setCoaches([])
+      }
+
+      if (!coachAvailabilityRes.error && coachAvailabilityRes.data) {
+        setCoachAvailability(
+          coachAvailabilityRes.data.map((row: any) => ({
+            id: row.id,
+            coachId: row.coach_id,
+            day: row.day,
+            status: row.status as CoachAvailabilityStatus,
+            notes: row.notes || "",
+          }))
+        )
+      } else {
+        setCoachAvailability([])
+      }
+
+      if (!trainingPlansRes.error && trainingPlansRes.data) {
+        const nextPlans = (trainingPlansRes.data as DbTrainingPlanRow[]).map((row) => ({
+          id: row.id,
+          name: row.name,
+          warmUp: row.warm_up || "",
+          drill1: row.drill_1 || "",
+          drill2: row.drill_2 || "",
+          game: row.game || "",
+          notes: row.notes || "",
+        }))
+
+        setDbTrainingPlans(nextPlans)
+
+        if (nextPlans.length > 0) {
+          setSelectedTemplateId(nextPlans[0].id)
+          setTrainingPlan({
+            title: nextPlans[0].name,
+            warmUp: nextPlans[0].warmUp,
+            drill1: nextPlans[0].drill1,
+            drill2: nextPlans[0].drill2,
+            game: nextPlans[0].game,
+            notes: nextPlans[0].notes,
+          })
+        }
+      }
+
+      if (!sessionHistoryRes.error && sessionHistoryRes.data) {
+        setSessionHistory(
+          sessionHistoryRes.data.map((row: any) => ({
+            id: row.id,
+            date: row.session_date,
+            planName: row.plan_name,
+            notes: row.notes || "",
+            blocks: safeJsonParseArray(row.blocks_json, []),
+          }))
+        )
+      } else {
+        setSessionHistory([])
+      }
+
+      if (!ratingsRes.error && ratingsRes.data) {
+        setPlayerRatings(
+          ratingsRes.data.map((row: any) => ({
+            id: row.id,
+            eventId: row.event_id,
+            playerId: row.player_id,
+            rating: Number(row.rating || 0),
+            notes: row.notes || "",
+          }))
+        )
+      } else {
+        setPlayerRatings([])
+      }
+
+      if (!reportsRes.error && reportsRes.data) {
+        setMatchReports(
+          reportsRes.data.map((row: any) => ({
+            id: row.id,
+            eventId: row.event_id,
+            title: row.title,
+            matchDate: row.match_date,
+            opponent: row.opponent,
+            scoreLine: row.score_line,
+            playerOfTheMatch: row.player_of_the_match,
+            topPerformers: safeJsonParseArray<string>(row.top_performers_json, []),
+            goalsSummary: safeJsonParseArray<string>(row.goals_summary_json, []),
+            coachNotes: row.coach_notes || "",
+            reportText: row.report_text,
+            createdAt: row.created_at || "",
+          }))
+        )
+      } else {
+        setMatchReports([])
+      }
+    } catch (error) {
+      console.error("loadAll crashed:", error)
       setPlayers(initialPlayers)
+      setCoaches([])
+      setCoachAvailability([])
+      setEvents([])
+      setAttendance([])
+      setLeagueResults([])
+      setPlayerRatings([])
+      setMatchReports([])
+    } finally {
       setLoading(false)
-      return
     }
-
-    const [
-      playersRes,
-      settingsRes,
-      seasonsRes,
-      eventsRes,
-      attendanceRes,
-      coachesRes,
-      coachAvailabilityRes,
-      trainingPlansRes,
-      sessionHistoryRes,
-      ratingsRes,
-      reportsRes,
-    ] = await Promise.all([
-      supabase.from("players").select("*").order("sort_order", { ascending: true }),
-      supabase.from("app_settings").select("*").eq("id", "main").maybeSingle(),
-      supabase.from("seasons").select("*").order("start_date", { ascending: false }),
-      supabase.from("events").select("*").order("date", { ascending: true }),
-      supabase.from("event_attendance").select("*").order("updated_at", { ascending: false }),
-      supabase.from("coaches").select("*").order("name", { ascending: true }),
-      supabase.from("coach_availability").select("*").order("day", { ascending: true }),
-      supabase.from("training_plans").select("*").order("created_at", { ascending: false }),
-      supabase.from("training_session_history").select("*").order("created_at", { ascending: false }),
-      supabase.from("player_match_ratings").select("*").order("created_at", { ascending: false }),
-      supabase.from("match_reports").select("*").order("created_at", { ascending: false }),
-    ])
-
-    if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
-      setPlayers(
-        playersRes.data.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          positions: JSON.parse(row.positions_json || "[]"),
-          mainGK: !!row.main_gk,
-          backupGK: !!row.backup_gk,
-          captain: !!row.captain,
-          viceCaptain: !!row.vice_captain,
-          seasonSeconds: row.season_seconds || 0,
-        }))
-      )
-    } else {
-      setPlayers(initialPlayers)
-    }
-
-    if (!settingsRes.error && settingsRes.data) {
-      setSelectedDate(settingsRes.data.selected_date || new Date().toISOString().split("T")[0])
-      setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
-    }
-
-    if (!seasonsRes.error && seasonsRes.data && seasonsRes.data.length > 0) {
-      const loadedSeasons: SeasonItem[] = seasonsRes.data.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        startDate: row.start_date,
-        endDate: row.end_date,
-        active: !!row.active,
-      }))
-
-      setSeasons(loadedSeasons)
-
-      const active = loadedSeasons.find((season) => season.active) || loadedSeasons[0]
-      if (active) {
-        setActiveSeasonId(active.id)
-      }
-    } else {
-      const fallbackSeason: SeasonItem = {
-        id: "season-2025-2026",
-        name: "2025/26",
-        startDate: "2025-08-01",
-        endDate: "2026-07-31",
-        active: true,
-      }
-
-      setSeasons([fallbackSeason])
-      setActiveSeasonId(fallbackSeason.id)
-    }
-
-    if (!eventsRes.error && eventsRes.data) {
-      setEvents(
-        eventsRes.data.map((row: any) => ({
-          id: row.id,
-          date: row.date,
-          title: row.title,
-          type: row.type,
-          startTime: row.start_time || "",
-          location: row.location || "",
-          opponent: row.opponent || "",
-          notes: row.notes || "",
-          trainingPlanId: row.training_plan_id || "",
-          trainingPlanName: row.training_plan_name || "",
-          seasonId: row.season_id || "",
-        }))
-      )
-    }
-
-    if (!attendanceRes.error && attendanceRes.data) {
-      setAttendance(
-        attendanceRes.data.map((row: any) => ({
-          id: row.id,
-          eventId: row.event_id,
-          playerId: row.player_id,
-          status: row.status,
-        }))
-      )
-    }
-
-    if (!coachesRes.error && coachesRes.data) {
-      setCoaches(
-        coachesRes.data.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          role: row.role || "",
-          active: row.active ?? true,
-        }))
-      )
-    }
-
-    if (!coachAvailabilityRes.error && coachAvailabilityRes.data) {
-      setCoachAvailability(
-        coachAvailabilityRes.data.map((row: any) => ({
-          id: row.id,
-          coachId: row.coach_id,
-          day: row.day,
-          status: row.status as CoachAvailabilityStatus,
-          notes: row.notes || "",
-        }))
-      )
-    }
-
-    if (!trainingPlansRes.error && trainingPlansRes.data) {
-      const nextPlans = (trainingPlansRes.data as DbTrainingPlanRow[]).map((row) => ({
-        id: row.id,
-        name: row.name,
-        warmUp: row.warm_up || "",
-        drill1: row.drill_1 || "",
-        drill2: row.drill_2 || "",
-        game: row.game || "",
-        notes: row.notes || "",
-      }))
-
-      setDbTrainingPlans(nextPlans)
-
-      if (nextPlans.length > 0) {
-        setSelectedTemplateId(nextPlans[0].id)
-        setTrainingPlan({
-          title: nextPlans[0].name,
-          warmUp: nextPlans[0].warmUp,
-          drill1: nextPlans[0].drill1,
-          drill2: nextPlans[0].drill2,
-          game: nextPlans[0].game,
-          notes: nextPlans[0].notes,
-        })
-      }
-    }
-
-    if (!sessionHistoryRes.error && sessionHistoryRes.data) {
-      setSessionHistory(
-        sessionHistoryRes.data.map((row: any) => ({
-          id: row.id,
-          date: row.session_date,
-          planName: row.plan_name,
-          notes: row.notes || "",
-          blocks: JSON.parse(row.blocks_json || "[]"),
-        }))
-      )
-    }
-
-    if (!ratingsRes.error && ratingsRes.data) {
-      setPlayerRatings(
-        ratingsRes.data.map((row: any) => ({
-          id: row.id,
-          eventId: row.event_id,
-          playerId: row.player_id,
-          rating: Number(row.rating || 0),
-          notes: row.notes || "",
-        }))
-      )
-    }
-
-    if (!reportsRes.error && reportsRes.data) {
-      setMatchReports(
-        reportsRes.data.map((row: any) => ({
-          id: row.id,
-          eventId: row.event_id,
-          title: row.title,
-          matchDate: row.match_date,
-          opponent: row.opponent,
-          scoreLine: row.score_line,
-          playerOfTheMatch: row.player_of_the_match,
-          topPerformers: JSON.parse(row.top_performers_json || "[]"),
-          goalsSummary: JSON.parse(row.goals_summary_json || "[]"),
-          coachNotes: row.coach_notes || "",
-          reportText: row.report_text,
-          createdAt: row.created_at || "",
-        }))
-      )
-    }
-
-    setLoading(false)
   }
 
   async function loadMatchState(eventId: string | null) {
-    if (!supabase || !eventId) {
+    try {
+      if (!supabase || !eventId) {
+        setHomeTeamState(TEAM.name)
+        setAwayTeamState("Opposition")
+        setHomeScoreState(0)
+        setAwayScoreState(0)
+        setMatchFormat("7v7")
+        setFormation("2-3-1")
+        setCurrentQuarterState(1)
+        setPeriodModeState("quarters")
+        setPeriodLengthState(10)
+        setPausedSeconds(0)
+        setSecondsState(0)
+        setRunningState(false)
+        setTimerStartedAt(null)
+        setLiveSecondsMap({})
+        setLineupMap({})
+        setBenchIds([])
+        setTimeline([])
+        setSavedLineups([])
+        setQuarterPlans({})
+        return
+      }
+
+      const [stateRes, timelineRes, lineupsRes, quarterRes] = await Promise.all([
+        supabase.from("match_state").select("*").eq("event_id", eventId).maybeSingle(),
+        supabase
+          .from("match_timeline_events")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("match_lineups")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("match_quarter_plans")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("quarter_number", { ascending: true }),
+      ])
+
+      if (!stateRes.error && stateRes.data) {
+        setHomeTeamState(stateRes.data.home_team || TEAM.name)
+        setAwayTeamState(stateRes.data.away_team || "Opposition")
+        setHomeScoreState(stateRes.data.home_score || 0)
+        setAwayScoreState(stateRes.data.away_score || 0)
+        setMatchFormat((stateRes.data.match_format as MatchFormat) || "7v7")
+        setFormation(stateRes.data.formation || "2-3-1")
+        setCurrentQuarterState(stateRes.data.current_period || 1)
+        setPeriodModeState((stateRes.data.period_mode as PeriodMode) || "quarters")
+        setPeriodLengthState(stateRes.data.period_length || 10)
+
+        const loadedBaseSeconds = stateRes.data.seconds || 0
+        const loadedRunning = !!stateRes.data.running
+        const loadedTimerStartedAt = stateRes.data.timer_started_at || null
+
+        setPausedSeconds(loadedBaseSeconds)
+        setRunningState(loadedRunning)
+        setTimerStartedAt(loadedTimerStartedAt)
+        setSecondsState(
+          loadedRunning
+            ? getElapsedSecondsFromTimer(loadedBaseSeconds, loadedTimerStartedAt)
+            : loadedBaseSeconds
+        )
+
+        setLiveSecondsMap(
+          safeJsonParseObject<Record<string, number>>(stateRes.data.live_seconds_json, {})
+        )
+        setLineupMap(
+          safeJsonParseObject<Record<string, string | null>>(stateRes.data.lineup_json, {})
+        )
+        setBenchIds(safeJsonParseArray<string>(stateRes.data.bench_json, []))
+      } else {
+        const defaultFormat: MatchFormat = "7v7"
+        const defaultFormation = "2-3-1"
+        const defaultSlots = buildPitchSlots(defaultFormat, defaultFormation)
+        const auto = buildAutoLineup(matchPlayers.length > 0 ? matchPlayers : players, defaultSlots)
+
+        setHomeTeamState(TEAM.name)
+        setAwayTeamState(activeMatchEvent?.opponent || "Opposition")
+        setHomeScoreState(0)
+        setAwayScoreState(0)
+        setMatchFormat(defaultFormat)
+        setFormation(defaultFormation)
+        setCurrentQuarterState(1)
+        setPeriodModeState("quarters")
+        setPeriodLengthState(10)
+        setPausedSeconds(0)
+        setSecondsState(0)
+        setRunningState(false)
+        setTimerStartedAt(null)
+        setLiveSecondsMap({})
+        setLineupMap(auto.lineup)
+        setBenchIds(auto.bench)
+      }
+
+      if (!timelineRes.error && timelineRes.data) {
+        setTimeline(
+          timelineRes.data.map((row: any) => ({
+            id: row.id,
+            minute: row.minute,
+            type: row.type,
+            text: row.text,
+            sortOrder: row.sort_order || 0,
+          }))
+        )
+      } else {
+        setTimeline([])
+      }
+
+      if (!lineupsRes.error && lineupsRes.data) {
+        setSavedLineups(
+          lineupsRes.data.map((row: any) => ({
+            id: row.id,
+            name: row.name,
+            format: row.match_format,
+            formation: row.formation,
+            lineup: safeJsonParseObject<Record<string, string | null>>(row.lineup_json, {}),
+            bench: safeJsonParseArray<string>(row.bench_json, []),
+          }))
+        )
+      } else {
+        setSavedLineups([])
+      }
+
+      if (!quarterRes.error && quarterRes.data) {
+        const nextPlans: Record<number, QuarterPlan> = {}
+        quarterRes.data.forEach((row: any) => {
+          nextPlans[row.quarter_number] = {
+            lineup: safeJsonParseObject<Record<string, string | null>>(row.lineup_json, {}),
+            bench: safeJsonParseArray<string>(row.bench_json, []),
+          }
+        })
+        setQuarterPlans(nextPlans)
+      } else {
+        setQuarterPlans({})
+      }
+    } catch (error) {
+      console.error("loadMatchState crashed:", error)
       setHomeTeamState(TEAM.name)
       setAwayTeamState("Opposition")
       setHomeScoreState(0)
@@ -742,119 +939,6 @@ function Dashboard({
       setBenchIds([])
       setTimeline([])
       setSavedLineups([])
-      setQuarterPlans({})
-      return
-    }
-
-    const [stateRes, timelineRes, lineupsRes, quarterRes] = await Promise.all([
-      supabase.from("match_state").select("*").eq("event_id", eventId).maybeSingle(),
-      supabase
-        .from("match_timeline_events")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("match_lineups")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("updated_at", { ascending: false }),
-      supabase
-        .from("match_quarter_plans")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("quarter_number", { ascending: true }),
-    ])
-
-    if (!stateRes.error && stateRes.data) {
-      setHomeTeamState(stateRes.data.home_team || TEAM.name)
-      setAwayTeamState(stateRes.data.away_team || "Opposition")
-      setHomeScoreState(stateRes.data.home_score || 0)
-      setAwayScoreState(stateRes.data.away_score || 0)
-      setMatchFormat((stateRes.data.match_format as MatchFormat) || "7v7")
-      setFormation(stateRes.data.formation || "2-3-1")
-      setCurrentQuarterState(stateRes.data.current_period || 1)
-      setPeriodModeState((stateRes.data.period_mode as PeriodMode) || "quarters")
-      setPeriodLengthState(stateRes.data.period_length || 10)
-
-      const loadedBaseSeconds = stateRes.data.seconds || 0
-      const loadedRunning = !!stateRes.data.running
-      const loadedTimerStartedAt = stateRes.data.timer_started_at || null
-
-      setPausedSeconds(loadedBaseSeconds)
-      setRunningState(loadedRunning)
-      setTimerStartedAt(loadedTimerStartedAt)
-      setSecondsState(
-        loadedRunning
-          ? getElapsedSecondsFromTimer(loadedBaseSeconds, loadedTimerStartedAt)
-          : loadedBaseSeconds
-      )
-
-      setLiveSecondsMap(JSON.parse(stateRes.data.live_seconds_json || "{}"))
-      setLineupMap(JSON.parse(stateRes.data.lineup_json || "{}"))
-      setBenchIds(JSON.parse(stateRes.data.bench_json || "[]"))
-    } else {
-      const defaultFormat: MatchFormat = "7v7"
-      const defaultFormation = "2-3-1"
-      const defaultSlots = buildPitchSlots(defaultFormat, defaultFormation)
-      const auto = buildAutoLineup(matchPlayers.length > 0 ? matchPlayers : players, defaultSlots)
-
-      setHomeTeamState(TEAM.name)
-      setAwayTeamState(activeMatchEvent?.opponent || "Opposition")
-      setHomeScoreState(0)
-      setAwayScoreState(0)
-      setMatchFormat(defaultFormat)
-      setFormation(defaultFormation)
-      setCurrentQuarterState(1)
-      setPeriodModeState("quarters")
-      setPeriodLengthState(10)
-      setPausedSeconds(0)
-      setSecondsState(0)
-      setRunningState(false)
-      setTimerStartedAt(null)
-      setLiveSecondsMap({})
-      setLineupMap(auto.lineup)
-      setBenchIds(auto.bench)
-    }
-
-    if (!timelineRes.error && timelineRes.data) {
-      setTimeline(
-        timelineRes.data.map((row: any) => ({
-          id: row.id,
-          minute: row.minute,
-          type: row.type,
-          text: row.text,
-          sortOrder: row.sort_order || 0,
-        }))
-      )
-    } else {
-      setTimeline([])
-    }
-
-    if (!lineupsRes.error && lineupsRes.data) {
-      setSavedLineups(
-        lineupsRes.data.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          format: row.match_format,
-          formation: row.formation,
-          lineup: JSON.parse(row.lineup_json || "{}"),
-          bench: JSON.parse(row.bench_json || "[]"),
-        }))
-      )
-    } else {
-      setSavedLineups([])
-    }
-
-    if (!quarterRes.error && quarterRes.data) {
-      const nextPlans: Record<number, QuarterPlan> = {}
-      quarterRes.data.forEach((row: any) => {
-        nextPlans[row.quarter_number] = {
-          lineup: JSON.parse(row.lineup_json || "{}"),
-          bench: JSON.parse(row.bench_json || "[]"),
-        }
-      })
-      setQuarterPlans(nextPlans)
-    } else {
       setQuarterPlans({})
     }
   }
@@ -1114,7 +1198,7 @@ function Dashboard({
       return
     }
 
-    const id = crypto.randomUUID?.() || makeId()
+    const id = safeId()
 
     const { error } = await supabase.from("coach_availability").insert({
       id,
@@ -1204,7 +1288,7 @@ function Dashboard({
       (item) => item.eventId === activeMatchEventId && item.playerId === playerId
     )
 
-    const nextId = existing?.id || crypto.randomUUID?.() || makeId()
+    const nextId = existing?.id || safeId()
 
     const payload = {
       id: nextId,
@@ -1335,7 +1419,7 @@ function Dashboard({
       return
     }
 
-    const newId = crypto.randomUUID?.() || makeId()
+    const newId = safeId()
 
     const { error: insertError } = await supabase.from("event_attendance").insert({
       id: newId,
@@ -1360,7 +1444,7 @@ function Dashboard({
     }
 
     const safeTime = eventStartTime.trim() || "00:00"
-    const newId = editingCalendarEventId || (crypto.randomUUID?.() || makeId())
+    const newId = editingCalendarEventId || safeId()
     const linkedPlan = allTrainingPlans.find((plan) => plan.id === selectedDbTrainingPlanId) || null
 
     const newEvent: EventWithPlan = {
@@ -1490,7 +1574,7 @@ function Dashboard({
 
     const nextLineups = [
       {
-        id: crypto.randomUUID?.() || makeId(),
+        id: safeId(),
         name: lineupName.trim(),
         format: matchFormat,
         formation,
@@ -1650,7 +1734,7 @@ function Dashboard({
       : [
           ...timeline,
           {
-            id: crypto.randomUUID?.() || makeId(),
+            id: safeId(),
             minute: Math.floor(seconds / 60),
             type: eventDraft.type,
             text,
@@ -1761,7 +1845,7 @@ function Dashboard({
   async function saveMatchReport(coachNotes: string) {
     if (!supabase || !activeMatchEvent || !isAdmin) return
 
-    const reportId = latestActiveMatchReport?.id || crypto.randomUUID?.() || makeId()
+    const reportId = latestActiveMatchReport?.id || safeId()
 
     const playerOfTheMatchName =
       players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || "TBC"
@@ -1998,7 +2082,9 @@ function Dashboard({
 export default function Page() {
   return (
     <AuthGate>
-      {({ user, isAdmin, signOut }) => <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} />}
+      {({ user, isAdmin, signOut }) =>
+        user ? <Dashboard key={user.id} isAdmin={isAdmin} signOut={signOut} /> : null
+      }
     </AuthGate>
   )
 }
