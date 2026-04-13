@@ -1,13 +1,5 @@
 "use client"
 
-import {
-  DndContext,
-  closestCenter,
-  useDraggable,
-  useDroppable,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core"
 import type {
   MatchTab,
   MatchFormat,
@@ -16,8 +8,7 @@ import type {
   SavedLineup,
   TimelineItem,
 } from "../lib/types"
-import { TEAM, formatClock, formatMinutes, initials } from "../lib/types"
-import { canPlaySlot } from "../lib/rotation"
+import { TEAM, formatClock, formatMinutes } from "../lib/types"
 import { Badge, PageCard, PrimaryButton, SectionHeader } from "./ui"
 
 type PeriodMode = "quarters" | "halves"
@@ -56,8 +47,8 @@ type Props = {
   onSaveLineup: () => Promise<void>
   onLoadSavedLineup: (id: string) => Promise<void>
   onDeleteSavedLineup: (id: string) => Promise<void>
-  onDragStartExternal: (event: DragStartEvent) => void
-  onDragEndExternal: (event: DragEndEvent) => void
+  onDragStartExternal: (event: any) => void
+  onDragEndExternal: (event: any) => void
   onOpenCreateEvent: () => void
   onOpenEditEvent: (item: TimelineItem) => void
   onDeleteTimelineItem: (id: string) => Promise<void>
@@ -71,24 +62,7 @@ type Props = {
   setPeriodLength: (value: number) => Promise<void>
   setLineupMapState?: (value: Record<string, string | null>) => void
   setBenchIdsState?: (value: string[]) => void
-  persistMatchState?: (
-    patch?: Partial<{
-      homeTeam: string
-      awayTeam: string
-      homeScore: number
-      awayScore: number
-      matchFormat: MatchFormat
-      formation: string
-      currentPeriod: number
-      periodMode: PeriodMode
-      periodLength: number
-      seconds: number
-      running: boolean
-      liveSecondsMap: Record<string, number>
-      lineupMap: Record<string, string | null>
-      benchIds: string[]
-    }>
-  ) => Promise<void>
+  persistMatchState?: (patch?: any) => Promise<void>
 }
 
 function miniButtonStyle(primary = false, danger = false, disabled = false) {
@@ -139,270 +113,6 @@ function tabButtonStyle(active: boolean) {
   }
 }
 
-function ShirtMarker({
-  player,
-  compact = false,
-}: {
-  player: Player
-  compact?: boolean
-}) {
-  return (
-    <div
-      style={{
-        width: compact ? 42 : 54,
-        height: compact ? 42 : 54,
-        margin: "0 auto",
-        position: "relative",
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          clipPath:
-            "polygon(18% 6%, 32% 6%, 39% 18%, 61% 18%, 68% 6%, 82% 6%, 94% 30%, 79% 38%, 79% 100%, 21% 100%, 21% 38%, 6% 30%)",
-          background: `linear-gradient(180deg, ${TEAM.secondary} 0%, ${TEAM.primary} 100%)`,
-          border: "2px solid rgba(255,255,255,0.75)",
-          boxShadow: "0 6px 14px rgba(2,6,23,0.16)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "grid",
-          placeItems: "center",
-          color: "white",
-          fontSize: compact ? 10 : 11,
-          fontWeight: 900,
-          textShadow: "0 2px 4px rgba(0,0,0,0.25)",
-        }}
-      >
-        {initials(player.name)}
-      </div>
-    </div>
-  )
-}
-
-function PlayerBadges({ player }: { player: Player }) {
-  return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-      {player.mainGK ? <Badge tone="blue">Main GK</Badge> : null}
-      {player.backupGK ? <Badge tone="blue">Backup GK</Badge> : null}
-      {player.captain ? <Badge tone="yellow">Captain</Badge> : null}
-      {player.viceCaptain ? <Badge tone="yellow">Vice-Captain</Badge> : null}
-    </div>
-  )
-}
-
-function parseDragId(value: string) {
-  const parts = value.split("::")
-  if (parts.length !== 4) return null
-  return { playerId: parts[1], fromId: parts[3] }
-}
-
-function CompactPlayerRow({
-  player,
-  subtitle,
-  accent = "#f8fafc",
-}: {
-  player: Player
-  subtitle?: string
-  accent?: string
-}) {
-  return (
-    <div
-      style={{
-        border: "1px solid #e2e8f0",
-        borderRadius: 16,
-        padding: 10,
-        background: accent,
-        display: "grid",
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
-        gap: 10,
-        alignItems: "center",
-      }}
-    >
-      <ShirtMarker player={player} compact />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 900, fontSize: 14, lineHeight: 1.2 }}>{player.name}</div>
-        <div style={{ color: "#64748b", marginTop: 4, fontSize: 12 }}>{player.positions.join("/")}</div>
-        <div style={{ marginTop: 6 }}>
-          <PlayerBadges player={player} />
-        </div>
-      </div>
-      {subtitle ? (
-        <div style={{ textAlign: "right", fontWeight: 800, fontSize: 12, color: "#475569" }}>
-          {subtitle}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function DraggablePlayerCard({
-  player,
-  originId,
-  compact = false,
-  subtitle,
-}: {
-  player: Player
-  originId: string
-  compact?: boolean
-  subtitle?: string
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `player::${player.id}::from::${originId}`,
-  })
-
-  const dragStyle = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : 1,
-    touchAction: "none" as const,
-    cursor: "grab",
-  }
-
-  if (compact) {
-    return (
-      <div
-        ref={setNodeRef}
-        {...listeners}
-        {...attributes}
-        style={{
-          ...dragStyle,
-          width: "100%",
-          maxWidth: 150,
-          borderRadius: 16,
-          background: "rgba(255,255,255,0.16)",
-          padding: 8,
-          textAlign: "center",
-          color: "white",
-        }}
-      >
-        <ShirtMarker player={player} compact />
-        <div
-          style={{
-            marginTop: 6,
-            fontWeight: 900,
-            fontSize: 12,
-            lineHeight: 1.2,
-            overflowWrap: "anywhere",
-          }}
-        >
-          {player.name}
-        </div>
-        <div style={{ marginTop: 4, fontSize: 10 }}>{player.positions.join("/")}</div>
-        <div style={{ marginTop: 6 }}>
-          <PlayerBadges player={player} />
-        </div>
-        {subtitle ? <div style={{ marginTop: 6, fontSize: 10 }}>{subtitle}</div> : null}
-      </div>
-    )
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      style={{
-        ...dragStyle,
-        border: "1px solid #e2e8f0",
-        padding: 10,
-        borderRadius: 16,
-        background: "white",
-        display: "grid",
-        gridTemplateColumns: "auto minmax(0, 1fr) auto",
-        gap: 10,
-        alignItems: "center",
-      }}
-    >
-      <ShirtMarker player={player} compact />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 900, fontSize: 14, lineHeight: 1.2 }}>{player.name}</div>
-        <div style={{ color: "#64748b", marginTop: 4, fontSize: 12 }}>{player.positions.join("/")}</div>
-        <div style={{ marginTop: 6 }}>
-          <PlayerBadges player={player} />
-        </div>
-      </div>
-      {subtitle ? (
-        <div style={{ color: "#64748b", fontSize: 12, textAlign: "right" }}>{subtitle}</div>
-      ) : null}
-    </div>
-  )
-}
-
-function PitchDropSlot({
-  slot,
-  player,
-  activePlayer,
-  liveSeconds,
-}: {
-  slot: PitchSlot
-  player?: Player
-  activePlayer?: Player | null
-  liveSeconds?: number
-}) {
-  const { isOver, setNodeRef } = useDroppable({ id: slot.id })
-  const invalid = activePlayer ? !canPlaySlot(activePlayer, slot.position) : false
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        minHeight: 112,
-        borderRadius: 18,
-        border: isOver
-          ? invalid
-            ? "2px solid #ef4444"
-            : "2px solid #93c5fd"
-          : "1px solid rgba(255,255,255,0.22)",
-        background: isOver
-          ? invalid
-            ? "rgba(239,68,68,0.22)"
-            : "rgba(147,197,253,0.25)"
-          : "rgba(255,255,255,0.12)",
-        display: "grid",
-        placeItems: "center",
-        padding: 8,
-      }}
-    >
-      {player ? (
-        <DraggablePlayerCard
-          player={player}
-          originId={slot.id}
-          compact
-          subtitle={typeof liveSeconds === "number" ? `${formatMinutes(liveSeconds)}m` : undefined}
-        />
-      ) : (
-        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.95)" }}>
-          <div style={{ fontWeight: 900, fontSize: 11 }}>{slot.label}</div>
-          <div style={{ marginTop: 4, fontSize: 11 }}>{slot.position}</div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function BenchDropZone({ children }: { children: React.ReactNode }) {
-  const { isOver, setNodeRef } = useDroppable({ id: "bench" })
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={{
-        padding: 12,
-        borderRadius: 18,
-        border: isOver ? `2px solid ${TEAM.secondary}` : "1px solid #e2e8f0",
-        background: isOver ? "#eff6ff" : "#fff7ed",
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
 function TimelineBadge({ type }: { type: TimelineItem["type"] }) {
   if (type === "goal") return <Badge tone="green">Goal</Badge>
   if (type === "assist") return <Badge tone="blue">Assist</Badge>
@@ -418,7 +128,6 @@ export default function MatchCenter(props: Props) {
     setMatchTab,
     matchFormat,
     formation,
-    currentSlots,
     players,
     lineupMap,
     benchIds,
@@ -433,8 +142,6 @@ export default function MatchCenter(props: Props) {
     savedLineups,
     lineupName,
     setLineupName,
-    activeDragPlayerId,
-    setActiveDragPlayerId,
     setHomeTeam,
     setAwayTeam,
     setHomeScore,
@@ -446,8 +153,6 @@ export default function MatchCenter(props: Props) {
     onSaveLineup,
     onLoadSavedLineup,
     onDeleteSavedLineup,
-    onDragStartExternal,
-    onDragEndExternal,
     onOpenCreateEvent,
     onOpenEditEvent,
     onDeleteTimelineItem,
@@ -459,16 +164,12 @@ export default function MatchCenter(props: Props) {
     setCurrentPeriod,
     setPeriodMode,
     setPeriodLength,
-    setLineupMapState,
-    setBenchIdsState,
-    persistMatchState,
   } = props
 
   const safePlayers = Array.isArray(players) ? players : []
-  const safeCurrentSlots = Array.isArray(currentSlots) ? currentSlots : []
-  const safeBenchIds = Array.isArray(benchIds) ? benchIds : []
   const safeTimeline = Array.isArray(timeline) ? timeline : []
   const safeSavedLineups = Array.isArray(savedLineups) ? savedLineups : []
+  const safeBenchIds = Array.isArray(benchIds) ? benchIds : []
 
   const lineupPlayers = Object.values(lineupMap || {})
     .filter(Boolean)
@@ -479,60 +180,10 @@ export default function MatchCenter(props: Props) {
     .map((id) => safePlayers.find((p) => p.id === id))
     .filter(Boolean) as Player[]
 
-  const activeDragPlayer = safePlayers.find((p) => p.id === activeDragPlayerId) || null
-
-  const pitchRows = [
-    safeCurrentSlots.filter((s) => s.position === "FWD"),
-    safeCurrentSlots.filter((s) => s.position === "MID"),
-    safeCurrentSlots.filter((s) => s.position === "DEF"),
-    safeCurrentSlots.filter((s) => s.position === "GK"),
-  ]
-
   const periodCount = periodMode === "quarters" ? 4 : 2
   const periodLabel = periodMode === "quarters" ? `Q${currentPeriod}` : `H${currentPeriod}`
   const periodName = periodMode === "quarters" ? "Quarter" : "Half"
   const periodsTabLabel = periodMode === "quarters" ? "Quarters" : "Halves"
-
-  async function handleAutoPickLineup() {
-    try {
-      if (!safePlayers.length || !safeCurrentSlots.length) {
-        window.alert("No players or pitch slots available yet.")
-        return
-      }
-
-      const mod = await import("../lib/autoLineup")
-      if (!mod || typeof mod.autoPickLineup !== "function") {
-        throw new Error("autoPickLineup export not found")
-      }
-
-      const result = mod.autoPickLineup(safePlayers, safeCurrentSlots)
-
-      if (!result || typeof result !== "object") {
-        throw new Error("autoPickLineup returned invalid result")
-      }
-
-      const nextLineupMap = result.lineupMap || {}
-      const nextBenchIds = Array.isArray(result.benchIds) ? result.benchIds : []
-
-      if (setLineupMapState) {
-        setLineupMapState(nextLineupMap)
-      }
-
-      if (setBenchIdsState) {
-        setBenchIdsState(nextBenchIds)
-      }
-
-      if (persistMatchState) {
-        await persistMatchState({
-          lineupMap: nextLineupMap,
-          benchIds: nextBenchIds,
-        })
-      }
-    } catch (error) {
-      console.error("Auto Pick Lineup failed:", error)
-      window.alert("Auto Pick Lineup failed. The rest of the app is still safe.")
-    }
-  }
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -616,15 +267,7 @@ export default function MatchCenter(props: Props) {
           <div style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{homeScore}</div>
             {isAdmin ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 6,
-                  marginTop: 6,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                 <MiniButton onClick={() => void setHomeScore(homeScore + 1)}>+1</MiniButton>
                 <MiniButton onClick={() => void setHomeScore(Math.max(0, homeScore - 1))}>-1</MiniButton>
               </div>
@@ -644,15 +287,7 @@ export default function MatchCenter(props: Props) {
           <div style={{ textAlign: "center", color: "white" }}>
             <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1 }}>{awayScore}</div>
             {isAdmin ? (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  gap: 6,
-                  marginTop: 6,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
                 <MiniButton onClick={() => void setAwayScore(awayScore + 1)}>+1</MiniButton>
                 <MiniButton onClick={() => void setAwayScore(Math.max(0, awayScore - 1))}>-1</MiniButton>
               </div>
@@ -669,14 +304,10 @@ export default function MatchCenter(props: Props) {
               gap: 8,
             }}
           >
-            <MiniButton primary onClick={() => setRunning(true)}>
-              Start
-            </MiniButton>
+            <MiniButton primary onClick={() => setRunning(true)}>Start</MiniButton>
             <MiniButton onClick={() => setRunning(false)}>Pause</MiniButton>
             <MiniButton onClick={resetClock}>Reset</MiniButton>
-            <MiniButton danger onClick={() => void onEndGame()}>
-              End Game
-            </MiniButton>
+            <MiniButton danger onClick={() => void onEndGame()}>End Game</MiniButton>
           </div>
         ) : null}
       </PageCard>
@@ -800,9 +431,7 @@ export default function MatchCenter(props: Props) {
 
               {isAdmin ? (
                 <div style={{ display: "grid", gap: 8 }}>
-                  <MiniButton primary onClick={() => setRunning(true)}>
-                    Start
-                  </MiniButton>
+                  <MiniButton primary onClick={() => setRunning(true)}>Start</MiniButton>
                   <MiniButton onClick={() => setRunning(false)}>Pause</MiniButton>
                   <MiniButton onClick={resetClock}>Reset</MiniButton>
                   <MiniButton onClick={() => void saveMinutes()}>Save Minutes</MiniButton>
@@ -825,7 +454,20 @@ export default function MatchCenter(props: Props) {
                   <div style={{ color: "#64748b" }}>No lineup selected yet.</div>
                 ) : (
                   lineupPlayers.map((player) => (
-                    <CompactPlayerRow key={player.id} player={player} accent="#f8fafc" />
+                    <div
+                      key={player.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 14,
+                        border: "1px solid #e2e8f0",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{player.name}</div>
+                      <div style={{ color: "#64748b", marginTop: 4, fontSize: 13 }}>
+                        {player.positions.join("/")}
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -838,7 +480,20 @@ export default function MatchCenter(props: Props) {
                   <div style={{ color: "#64748b" }}>No players on the bench.</div>
                 ) : (
                   benchPlayers.map((player) => (
-                    <CompactPlayerRow key={player.id} player={player} accent="#fff7ed" />
+                    <div
+                      key={player.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 14,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff7ed",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900 }}>{player.name}</div>
+                      <div style={{ color: "#64748b", marginTop: 4, fontSize: 13 }}>
+                        {player.positions.join("/")}
+                      </div>
+                    </div>
                   ))
                 )}
               </div>
@@ -851,14 +506,6 @@ export default function MatchCenter(props: Props) {
         <div style={{ display: "grid", gap: 16 }}>
           <PageCard>
             <SectionHeader title="Formation & Saved Lineups" />
-
-            {isAdmin ? (
-              <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                <PrimaryButton onClick={() => void handleAutoPickLineup()}>
-                  ⚡ Auto Pick Lineup
-                </PrimaryButton>
-              </div>
-            ) : null}
 
             <div
               style={{
@@ -943,9 +590,7 @@ export default function MatchCenter(props: Props) {
                     </div>
                     <MiniButton onClick={() => void onLoadSavedLineup(item.id)}>Load</MiniButton>
                     {isAdmin ? (
-                      <MiniButton danger onClick={() => void onDeleteSavedLineup(item.id)}>
-                        Delete
-                      </MiniButton>
+                      <MiniButton danger onClick={() => void onDeleteSavedLineup(item.id)}>Delete</MiniButton>
                     ) : null}
                   </div>
                 ))}
@@ -954,114 +599,29 @@ export default function MatchCenter(props: Props) {
           )}
 
           <PageCard>
-            <SectionHeader title="Tactics Board" />
-            <DndContext
-              collisionDetection={closestCenter}
-              onDragStart={(e) => {
-                const parsed = parseDragId(String(e.active.id))
-                setActiveDragPlayerId(parsed?.playerId || null)
-                onDragStartExternal(e)
-              }}
-              onDragEnd={(e) => {
-                setActiveDragPlayerId(null)
-                onDragEndExternal(e)
-              }}
-            >
-              <div
-                style={{
-                  borderRadius: 22,
-                  color: "white",
-                  position: "relative",
-                  overflow: "hidden",
-                  padding: 12,
-                  background: "linear-gradient(180deg, #1d8a3f 0%, #157435 100%)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 12,
-                    border: "2px solid rgba(255,255,255,0.22)",
-                    borderRadius: 22,
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "50%",
-                    top: 12,
-                    bottom: 12,
-                    width: 2,
-                    background: "rgba(255,255,255,0.18)",
-                    transform: "translateX(-50%)",
-                    pointerEvents: "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    left: "50%",
-                    top: "50%",
-                    width: 88,
-                    height: 88,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,0.20)",
-                    transform: "translate(-50%, -50%)",
-                    pointerEvents: "none",
-                  }}
-                />
-
-                <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 12 }}>
-                  {pitchRows.map((row, rowIndex) => (
-                    <div
-                      key={rowIndex}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: `repeat(${Math.max(row.length, 1)}, minmax(0, 1fr))`,
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
-                      {row.map((slot) => {
-                        const playerId = lineupMap[slot.id]
-                        const player = safePlayers.find((p) => p.id === playerId)
-                        return (
-                          <PitchDropSlot
-                            key={slot.id}
-                            slot={slot}
-                            player={player}
-                            activePlayer={activeDragPlayer}
-                            liveSeconds={playerId ? liveSecondsMap[playerId] || 0 : 0}
-                          />
-                        )
-                      })}
+            <SectionHeader title="Current Lineup" />
+            <div style={{ display: "grid", gap: 8 }}>
+              {lineupPlayers.length === 0 ? (
+                <div style={{ color: "#64748b" }}>No lineup selected yet.</div>
+              ) : (
+                lineupPlayers.map((player) => (
+                  <div
+                    key={player.id}
+                    style={{
+                      padding: 12,
+                      borderRadius: 14,
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <div style={{ fontWeight: 900 }}>{player.name}</div>
+                    <div style={{ color: "#64748b", marginTop: 4, fontSize: 13 }}>
+                      {player.positions.join("/")}
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 12 }}>
-                <SectionHeader title="Bench" />
-                <BenchDropZone>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {benchPlayers.length === 0 ? (
-                      <div style={{ color: "#64748b" }}>No players on the bench.</div>
-                    ) : (
-                      benchPlayers.map((player) => (
-                        <DraggablePlayerCard
-                          key={player.id}
-                          player={player}
-                          originId="bench"
-                          subtitle={`${formatMinutes(liveSecondsMap[player.id] || 0)}m`}
-                        />
-                      ))
-                    )}
                   </div>
-                </BenchDropZone>
-              </div>
-            </DndContext>
+                ))
+              )}
+            </div>
           </PageCard>
         </div>
       )}
@@ -1071,9 +631,7 @@ export default function MatchCenter(props: Props) {
           <PageCard>
             <SectionHeader
               title="Match Timeline"
-              action={
-                isAdmin ? <PrimaryButton onClick={onOpenCreateEvent}>Add Event</PrimaryButton> : null
-              }
+              action={isAdmin ? <PrimaryButton onClick={onOpenCreateEvent}>Add Event</PrimaryButton> : null}
             />
 
             <div style={{ display: "grid", gap: 8 }}>
@@ -1111,9 +669,7 @@ export default function MatchCenter(props: Props) {
                         {isAdmin ? (
                           <div style={{ display: "flex", gap: 8 }}>
                             <MiniButton onClick={() => onOpenEditEvent(t)}>Edit</MiniButton>
-                            <MiniButton danger onClick={() => void onDeleteTimelineItem(t.id)}>
-                              Delete
-                            </MiniButton>
+                            <MiniButton danger onClick={() => void onDeleteTimelineItem(t.id)}>Delete</MiniButton>
                           </div>
                         ) : null}
                       </div>
@@ -1129,13 +685,20 @@ export default function MatchCenter(props: Props) {
             <SectionHeader title="Live Minutes" />
             <div style={{ display: "grid", gap: 8 }}>
               {safePlayers.map((player) => (
-                <CompactPlayerRow
+                <div
                   key={player.id}
-                  player={player}
-                  subtitle={`${formatMinutes(liveSecondsMap[player.id] || 0)}m live / ${formatMinutes(
-                    player.seasonSeconds || 0
-                  )}m season`}
-                />
+                  style={{
+                    padding: 12,
+                    borderRadius: 14,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div style={{ fontWeight: 900 }}>{player.name}</div>
+                  <div style={{ color: "#64748b", marginTop: 4, fontSize: 13 }}>
+                    {formatMinutes(liveSecondsMap[player.id] || 0)}m live / {formatMinutes(player.seasonSeconds || 0)}m season
+                  </div>
+                </div>
               ))}
             </div>
           </PageCard>
@@ -1157,13 +720,20 @@ export default function MatchCenter(props: Props) {
           <SectionHeader title="Match Stats" />
           <div style={{ display: "grid", gap: 8 }}>
             {safePlayers.map((player) => (
-              <CompactPlayerRow
+              <div
                 key={player.id}
-                player={player}
-                subtitle={`Live ${formatMinutes(liveSecondsMap[player.id] || 0)}m • Season ${formatMinutes(
-                  player.seasonSeconds || 0
-                )}m`}
-              />
+                style={{
+                  padding: 12,
+                  borderRadius: 14,
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              >
+                <div style={{ fontWeight: 900 }}>{player.name}</div>
+                <div style={{ color: "#64748b", marginTop: 4, fontSize: 13 }}>
+                  Live {formatMinutes(liveSecondsMap[player.id] || 0)}m • Season {formatMinutes(player.seasonSeconds || 0)}m
+                </div>
+              </div>
             ))}
           </div>
         </PageCard>
