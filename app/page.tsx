@@ -23,6 +23,7 @@ import {
   type MatchFormat,
   type MatchReport,
   type MatchTab,
+  type PitchPosition,
   type Player,
   type PlayerMatchRating,
   type QuarterPlan,
@@ -86,6 +87,14 @@ function safeJsonParseObject<T extends Record<string, any> = Record<string, any>
   } catch {
     return fallback
   }
+}
+
+function safePitchPositions(value: unknown): PitchPosition[] {
+  const allowed: PitchPosition[] = ["GK", "DEF", "MID", "FWD"]
+  const parsed = safeJsonParseArray<string>(value, [])
+  return parsed.filter((item): item is PitchPosition =>
+    allowed.includes(item as PitchPosition)
+  )
 }
 
 function formatFullDate(date: string) {
@@ -585,7 +594,7 @@ function Dashboard({
           playersRes.data.map((row: any) => ({
             id: row.id,
             name: row.name,
-            positions: safeJsonParseArray<string>(row.positions_json, []),
+            positions: safePitchPositions(row.positions_json),
             mainGK: !!row.main_gk,
             backupGK: !!row.backup_gk,
             captain: !!row.captain,
