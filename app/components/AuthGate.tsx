@@ -5,9 +5,7 @@ import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
 import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
 
-const ADMIN_EMAILS = [
-  "mikeru1990@hotmail.com",
-]
+const ADMIN_EMAILS = ["mikeru1990@hotmail.com"]
 
 type AuthGateProps = {
   children: (args: {
@@ -27,24 +25,43 @@ export default function AuthGate({ children }: AuthGateProps) {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) return
-      setUser(data.user ?? null)
-      setLoading(false)
-    })
+    async function init() {
+      try {
+        // 🔥 SAFE GUARD (this is the fix)
+        if (!supabase) {
+          console.error("Supabase is not configured")
+          setLoading(false)
+          return
+        }
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+        const { data } = await supabase.auth.getUser()
+        if (!mounted) return
+
+        setUser(data.user ?? null)
+        setLoading(false)
+
+        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+          setUser(session?.user ?? null)
+          setLoading(false)
+        })
+
+        return () => listener.subscription.unsubscribe()
+      } catch (err) {
+        console.error("Auth error:", err)
+        setLoading(false)
+      }
+    }
+
+    init()
 
     return () => {
       mounted = false
-      data.subscription.unsubscribe()
     }
   }, [])
 
   async function signIn() {
+    if (!supabase) return setMessage("Supabase not configured")
+
     setMessage("")
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -54,27 +71,52 @@ export default function AuthGate({ children }: AuthGateProps) {
   }
 
   async function signUp() {
+    if (!supabase) return setMessage("Supabase not configured")
+
     setMessage("")
     const { error } = await supabase.auth.signUp({
       email,
       password,
     })
     if (error) setMessage(error.message)
-    else setMessage("Account created. Confirm email if your project requires it.")
+    else setMessage("Account created. Check your email.")
   }
 
   async function signOut() {
+    if (!supabase) return
     await supabase.auth.signOut()
   }
 
+  // 🔥 LOADING SCREEN
   if (loading) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24, background: "#f4f7fb" }}>
-        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>Loading...</div>
+      <main style={{ minHeight: "100vh", padding: 24 }}>
+        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
+          Loading...
+        </div>
       </main>
     )
   }
 
+  // 🔥 IF SUPABASE BROKEN → SHOW MESSAGE INSTEAD OF BLACK SCREEN
+  if (!supabase) {
+    return (
+      <main style={{ minHeight: "100vh", padding: 24 }}>
+        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
+          ❌ Supabase not configured
+          <br />
+          <br />
+          Add these to Vercel:
+          <br />
+          NEXT_PUBLIC_SUPABASE_URL
+          <br />
+          NEXT_PUBLIC_SUPABASE_ANON_KEY
+        </div>
+      </main>
+    )
+  }
+
+  // 🔥 LOGIN SCREEN
   if (!user) {
     return (
       <main
@@ -82,7 +124,6 @@ export default function AuthGate({ children }: AuthGateProps) {
           minHeight: "100vh",
           padding: 20,
           background: "linear-gradient(180deg, #f4f7fb 0%, #eaf0ff 100%)",
-          boxSizing: "border-box",
         }}
       >
         <div style={{ maxWidth: 420, margin: "40px auto" }}>
@@ -93,28 +134,15 @@ export default function AuthGate({ children }: AuthGateProps) {
               marginBottom: 16,
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.8 }}>SHARKS FOOTBALL</div>
-            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 8 }}>Team Manager Pro</div>
-            <div style={{ marginTop: 8, opacity: 0.9 }}>Login to access squad, match and training data.</div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>Team Manager</div>
           </div>
 
           <div style={cardStyle()}>
-            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 12 }}>Login</div>
-
             <input
-              type="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: 14,
-                borderRadius: 14,
-                border: "1px solid #cbd5e1",
-                marginBottom: 12,
-                fontSize: 16,
-              }}
+              style={{ width: "100%", padding: 12, marginBottom: 10 }}
             />
 
             <input
@@ -122,27 +150,14 @@ export default function AuthGate({ children }: AuthGateProps) {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: 14,
-                borderRadius: 14,
-                border: "1px solid #cbd5e1",
-                marginBottom: 12,
-                fontSize: 16,
-              }}
+              style={{ width: "100%", padding: 12, marginBottom: 10 }}
             />
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={signIn} style={{ ...buttonPrimary(), flex: 1 }}>
-                Sign In
-              </button>
-              <button onClick={signUp} style={{ ...buttonSecondary(), flex: 1 }}>
-                Sign Up
-              </button>
-            </div>
+            <button onClick={signIn} style={buttonPrimary()}>
+              Sign In
+            </button>
 
-            {message ? <div style={{ marginTop: 12, color: "#475569" }}>{message}</div> : null}
+            {message && <div style={{ marginTop: 10 }}>{message}</div>}
           </div>
         </div>
       </main>
@@ -150,5 +165,6 @@ export default function AuthGate({ children }: AuthGateProps) {
   }
 
   const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+
   return <>{children({ user, isAdmin, signOut })}</>
 }
