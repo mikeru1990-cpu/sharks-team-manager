@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +9,10 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    console.error("Global app error:", error)
+  }, [error])
+
   return (
     <main
       style={{
@@ -34,7 +40,7 @@ export default function GlobalError({
         </div>
 
         <div style={{ color: "#475569", lineHeight: 1.6 }}>
-          The app hit an error, but it did not crash into a blank screen.
+          The app hit an error, but it did not fall into a blank black screen.
         </div>
 
         <div
@@ -47,14 +53,17 @@ export default function GlobalError({
             fontFamily: "monospace",
             fontSize: 13,
             overflowX: "auto",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
           }}
         >
           {error?.message || "Unknown error"}
+          {error?.digest ? `\n\nDigest: ${error.digest}` : ""}
         </div>
 
-        <div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
-            onClick={reset}
+            onClick={() => reset()}
             style={{
               border: "none",
               borderRadius: 14,
@@ -66,6 +75,21 @@ export default function GlobalError({
             }}
           >
             Try again
+          </button>
+
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              border: "1px solid #cbd5e1",
+              borderRadius: 14,
+              padding: "12px 16px",
+              background: "white",
+              color: "#0f172a",
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            Reload app
           </button>
         </div>
       </div>
