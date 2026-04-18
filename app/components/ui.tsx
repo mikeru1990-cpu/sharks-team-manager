@@ -12,6 +12,9 @@ type Tone =
   | "softGreen"
   | "softYellow"
 
+/* =========================
+   PAGE CARD
+========================= */
 export function PageCard({
   children,
   tone = "default",
@@ -64,6 +67,9 @@ export function PageCard({
   )
 }
 
+/* =========================
+   SECTION TITLE
+========================= */
 export function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div
@@ -79,14 +85,19 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
+/* =========================
+   SECTION HEADER (FIXED)
+========================= */
 export function SectionHeader({
   title,
   subtitle,
   action,
+  light = false,
 }: {
   title: string
   subtitle?: string
   action?: React.ReactNode
+  light?: boolean
 }) {
   return (
     <div
@@ -104,17 +115,20 @@ export function SectionHeader({
           style={{
             fontSize: 20,
             fontWeight: 800,
-            color: THEME.colors.textPrimary,
+            color: light ? "white" : THEME.colors.textPrimary,
             lineHeight: 1.2,
           }}
         >
           {title}
         </div>
+
         {subtitle ? (
           <div
             style={{
               marginTop: 4,
-              color: THEME.colors.textSecondary,
+              color: light
+                ? "rgba(255,255,255,0.82)"
+                : THEME.colors.textSecondary,
               fontSize: 14,
             }}
           >
@@ -128,6 +142,9 @@ export function SectionHeader({
   )
 }
 
+/* =========================
+   BUTTONS
+========================= */
 export function PrimaryButton({
   children,
   onClick,
@@ -215,6 +232,9 @@ export function DangerButton({
   )
 }
 
+/* =========================
+   BADGE
+========================= */
 export function Badge({
   children,
   tone = "default",
