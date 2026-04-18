@@ -45,6 +45,12 @@ import type {
   SeasonItem,
   TrainingPlanState,
 } from "./lib/dashboardTypes"
+import {
+  enqueueSyncItem,
+  loadOfflineCache,
+  saveOfflineCache,
+} from "./lib/offlineStore"
+import { flushOfflineQueue } from "./lib/offlineSync"
 
 type DbTrainingPlanRow = {
   id: string
@@ -62,8 +68,20 @@ function safeId() {
       return crypto.randomUUID()
     }
   } catch {}
-
   return makeId()
+}
+
+function isOnline() {
+  return typeof navigator === "undefined" ? true : navigator.onLine
+}
+
+function queueItem(type: any, payload: any) {
+  return {
+    id: safeId(),
+    createdAt: new Date().toISOString(),
+    type,
+    payload,
+  }
 }
 
 function safeJsonParseArray<T = any>(value: unknown, fallback: T[] = []): T[] {
@@ -425,9 +443,7 @@ function Dashboard({
 
     for (const eventId of Object.keys(byEvent)) {
       const sorted = byEvent[eventId].slice().sort((a, b) => b.rating - a.rating)
-      if (sorted.length > 0) {
-        winners[eventId] = sorted[0].playerId
-      }
+      if (sorted.length > 0) winners[eventId] = sorted[0].playerId
     }
 
     return winners
@@ -471,27 +487,25 @@ function Dashboard({
       return
     }
 
-    setLeagueResults(
-      (data || []).map((row: any) => ({
-        id: row.id,
-        playedOn: row.played_on,
-        eventId: row.event_id || null,
-        opponent: row.opponent || "",
-        homeTeam: normalizeTeamName(row.home_team),
-        awayTeam: normalizeTeamName(row.away_team),
-        homeScore: row.home_score,
-        awayScore: row.away_score,
-        competition: row.competition || "",
-      }))
-    )
+    const next = (data || []).map((row: any) => ({
+      id: row.id,
+      playedOn: row.played_on,
+      eventId: row.event_id || null,
+      opponent: row.opponent || "",
+      homeTeam: normalizeTeamName(row.home_team),
+      awayTeam: normalizeTeamName(row.away_team),
+      homeScore: row.home_score,
+      awayScore: row.away_score,
+      competition: row.competition || "",
+    }))
+    setLeagueResults(next)
+    saveOfflineCache({ leagueResults: next })
   }
 
   async function saveSeasons(nextSeasons: SeasonItem[], nextActiveSeasonId?: string) {
-    if (!supabase) return
-
     const activeId = nextActiveSeasonId ?? activeSeasonId
 
-    const payload = nextSeasons.map((season) => ({
+    const rows = nextSeasons.map((season) => ({
       id: season.id,
       name: season.name,
       start_date: season.startDate,
@@ -499,20 +513,22 @@ function Dashboard({
       active: season.id === activeId,
     }))
 
-    const { error } = await supabase.from("seasons").upsert(payload)
+    const nextLocal = nextSeasons.map((season) => ({
+      ...season,
+      active: season.id === activeId,
+    }))
 
-    if (error) {
-      alert(error.message)
+    setSeasons(nextLocal)
+    setActiveSeasonId(activeId)
+    saveOfflineCache({ seasons: nextLocal })
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_seasons", { rows }))
       return
     }
 
-    setSeasons(
-      nextSeasons.map((season) => ({
-        ...season,
-        active: season.id === activeId,
-      }))
-    )
-    setActiveSeasonId(activeId)
+    const { error } = await supabase.from("seasons").upsert(rows)
+    if (error) alert(error.message)
   }
 
   async function handleCreateSeason() {
@@ -549,13 +565,30 @@ function Dashboard({
       ...season,
       active: season.id === id,
     }))
-
     await saveSeasons(nextSeasons, id)
   }
 
   async function loadAll() {
     try {
       setLoading(true)
+
+      const offline = loadOfflineCache()
+
+      if (offline.players?.length) setPlayers(offline.players)
+      if (offline.coaches?.length) setCoaches(offline.coaches)
+      if (offline.coachAvailability?.length) setCoachAvailability(offline.coachAvailability)
+      if (offline.events?.length) setEvents(offline.events)
+      if (offline.attendance?.length) setAttendance(offline.attendance)
+      if (offline.leagueResults?.length) setLeagueResults(offline.leagueResults)
+      if (offline.playerRatings?.length) setPlayerRatings(offline.playerRatings)
+      if (offline.matchReports?.length) setMatchReports(offline.matchReports)
+      if (offline.trainingPlans?.length) setDbTrainingPlans(offline.trainingPlans)
+      if (offline.sessionHistory?.length) setSessionHistory(offline.sessionHistory)
+      if (offline.seasons?.length) setSeasons(offline.seasons)
+      if (offline.appSettings?.selectedDate) setSelectedDate(offline.appSettings.selectedDate)
+      if (typeof offline.appSettings?.activeMatchEventId !== "undefined") {
+        setActiveMatchEventId(offline.appSettings.activeMatchEventId ?? null)
+      }
 
       if (!supabase) {
         console.error("Supabase env vars are missing")
@@ -589,19 +622,19 @@ function Dashboard({
         supabase.from("match_reports").select("*").order("created_at", { ascending: false }),
       ])
 
+      let nextPlayers: Player[] = initialPlayers
       if (!playersRes.error && playersRes.data && playersRes.data.length > 0) {
-        setPlayers(
-          playersRes.data.map((row: any) => ({
-            id: row.id,
-            name: row.name,
-            positions: safePitchPositions(row.positions_json),
-            mainGK: !!row.main_gk,
-            backupGK: !!row.backup_gk,
-            captain: !!row.captain,
-            viceCaptain: !!row.vice_captain,
-            seasonSeconds: row.season_seconds || 0,
-          }))
-        )
+        nextPlayers = playersRes.data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          positions: safePitchPositions(row.positions_json),
+          mainGK: !!row.main_gk,
+          backupGK: !!row.backup_gk,
+          captain: !!row.captain,
+          viceCaptain: !!row.vice_captain,
+          seasonSeconds: row.season_seconds || 0,
+        }))
+        setPlayers(nextPlayers)
       } else {
         setPlayers(initialPlayers)
       }
@@ -611,21 +644,19 @@ function Dashboard({
         setActiveMatchEventId(settingsRes.data.active_match_event_id || null)
       }
 
+      let nextSeasons: SeasonItem[] = seasons
       if (!seasonsRes.error && seasonsRes.data && seasonsRes.data.length > 0) {
-        const loadedSeasons: SeasonItem[] = seasonsRes.data.map((row: any) => ({
+        nextSeasons = seasonsRes.data.map((row: any) => ({
           id: row.id,
           name: row.name,
           startDate: row.start_date,
           endDate: row.end_date,
           active: !!row.active,
         }))
+        setSeasons(nextSeasons)
 
-        setSeasons(loadedSeasons)
-
-        const active = loadedSeasons.find((season) => season.active) || loadedSeasons[0]
-        if (active) {
-          setActiveSeasonId(active.id)
-        }
+        const active = nextSeasons.find((season) => season.active) || nextSeasons[0]
+        if (active) setActiveSeasonId(active.id)
       } else {
         const fallbackSeason: SeasonItem = {
           id: "season-2025-2026",
@@ -634,73 +665,74 @@ function Dashboard({
           endDate: "2026-07-31",
           active: true,
         }
-
-        setSeasons([fallbackSeason])
+        nextSeasons = [fallbackSeason]
+        setSeasons(nextSeasons)
         setActiveSeasonId(fallbackSeason.id)
       }
 
+      let nextEvents: EventWithPlan[] = []
       if (!eventsRes.error && eventsRes.data) {
-        setEvents(
-          eventsRes.data.map((row: any) => ({
-            id: row.id,
-            date: row.date,
-            title: row.title,
-            type: row.type,
-            startTime: row.start_time || "",
-            location: row.location || "",
-            opponent: row.opponent || "",
-            notes: row.notes || "",
-            trainingPlanId: row.training_plan_id || "",
-            trainingPlanName: row.training_plan_name || "",
-            seasonId: row.season_id || "",
-          }))
-        )
+        nextEvents = eventsRes.data.map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          title: row.title,
+          type: row.type,
+          startTime: row.start_time || "",
+          location: row.location || "",
+          opponent: row.opponent || "",
+          notes: row.notes || "",
+          trainingPlanId: row.training_plan_id || "",
+          trainingPlanName: row.training_plan_name || "",
+          seasonId: row.season_id || "",
+        }))
+        setEvents(nextEvents)
       } else {
         setEvents([])
       }
 
+      let nextAttendance: EventAttendance[] = []
       if (!attendanceRes.error && attendanceRes.data) {
-        setAttendance(
-          attendanceRes.data.map((row: any) => ({
-            id: row.id,
-            eventId: row.event_id,
-            playerId: row.player_id,
-            status: row.status,
-          }))
-        )
+        nextAttendance = attendanceRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          playerId: row.player_id,
+          status: row.status,
+        }))
+        setAttendance(nextAttendance)
       } else {
         setAttendance([])
       }
 
+      let nextCoaches: Coach[] = []
       if (!coachesRes.error && coachesRes.data) {
-        setCoaches(
-          coachesRes.data.map((row: any) => ({
-            id: row.id,
-            name: row.name,
-            role: row.role || "",
-            active: row.active ?? true,
-          }))
-        )
+        nextCoaches = coachesRes.data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          role: row.role || "",
+          active: row.active ?? true,
+        }))
+        setCoaches(nextCoaches)
       } else {
         setCoaches([])
       }
 
+      let nextCoachAvailability: CoachAvailability[] = []
       if (!coachAvailabilityRes.error && coachAvailabilityRes.data) {
-        setCoachAvailability(
-          coachAvailabilityRes.data.map((row: any) => ({
-            id: row.id,
-            coachId: row.coach_id,
-            day: row.day,
-            status: row.status as CoachAvailabilityStatus,
-            notes: row.notes || "",
-          }))
-        )
+        nextCoachAvailability = coachAvailabilityRes.data.map((row: any) => ({
+          id: row.id,
+          coachId: row.coach_id,
+          day: row.day,
+          status: row.status as CoachAvailabilityStatus,
+          notes: row.notes || "",
+        }))
+        setCoachAvailability(nextCoachAvailability)
       } else {
         setCoachAvailability([])
       }
 
+      let nextTrainingPlans: TrainingTemplate[] = dbTrainingPlans
       if (!trainingPlansRes.error && trainingPlansRes.data) {
-        const nextPlans = (trainingPlansRes.data as DbTrainingPlanRow[]).map((row) => ({
+        nextTrainingPlans = (trainingPlansRes.data as DbTrainingPlanRow[]).map((row) => ({
           id: row.id,
           name: row.name,
           warmUp: row.warm_up || "",
@@ -709,70 +741,87 @@ function Dashboard({
           game: row.game || "",
           notes: row.notes || "",
         }))
+        setDbTrainingPlans(nextTrainingPlans)
 
-        setDbTrainingPlans(nextPlans)
-
-        if (nextPlans.length > 0) {
-          setSelectedTemplateId(nextPlans[0].id)
+        if (nextTrainingPlans.length > 0) {
+          setSelectedTemplateId(nextTrainingPlans[0].id)
           setTrainingPlan({
-            title: nextPlans[0].name,
-            warmUp: nextPlans[0].warmUp,
-            drill1: nextPlans[0].drill1,
-            drill2: nextPlans[0].drill2,
-            game: nextPlans[0].game,
-            notes: nextPlans[0].notes,
+            title: nextTrainingPlans[0].name,
+            warmUp: nextTrainingPlans[0].warmUp,
+            drill1: nextTrainingPlans[0].drill1,
+            drill2: nextTrainingPlans[0].drill2,
+            game: nextTrainingPlans[0].game,
+            notes: nextTrainingPlans[0].notes,
           })
         }
       }
 
+      let nextSessionHistory: TrainingSessionRecord[] = []
       if (!sessionHistoryRes.error && sessionHistoryRes.data) {
-        setSessionHistory(
-          sessionHistoryRes.data.map((row: any) => ({
-            id: row.id,
-            date: row.session_date,
-            planName: row.plan_name,
-            notes: row.notes || "",
-            blocks: safeJsonParseArray(row.blocks_json, []),
-          }))
-        )
+        nextSessionHistory = sessionHistoryRes.data.map((row: any) => ({
+          id: row.id,
+          date: row.session_date,
+          planName: row.plan_name,
+          notes: row.notes || "",
+          blocks: safeJsonParseArray(row.blocks_json, []),
+        }))
+        setSessionHistory(nextSessionHistory)
       } else {
         setSessionHistory([])
       }
 
+      let nextRatings: PlayerMatchRating[] = []
       if (!ratingsRes.error && ratingsRes.data) {
-        setPlayerRatings(
-          ratingsRes.data.map((row: any) => ({
-            id: row.id,
-            eventId: row.event_id,
-            playerId: row.player_id,
-            rating: Number(row.rating || 0),
-            notes: row.notes || "",
-          }))
-        )
+        nextRatings = ratingsRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          playerId: row.player_id,
+          rating: Number(row.rating || 0),
+          notes: row.notes || "",
+        }))
+        setPlayerRatings(nextRatings)
       } else {
         setPlayerRatings([])
       }
 
+      let nextReports: MatchReport[] = []
       if (!reportsRes.error && reportsRes.data) {
-        setMatchReports(
-          reportsRes.data.map((row: any) => ({
-            id: row.id,
-            eventId: row.event_id,
-            title: row.title,
-            matchDate: row.match_date,
-            opponent: row.opponent,
-            scoreLine: row.score_line,
-            playerOfTheMatch: row.player_of_the_match,
-            topPerformers: safeJsonParseArray<string>(row.top_performers_json, []),
-            goalsSummary: safeJsonParseArray<string>(row.goals_summary_json, []),
-            coachNotes: row.coach_notes || "",
-            reportText: row.report_text,
-            createdAt: row.created_at || "",
-          }))
-        )
+        nextReports = reportsRes.data.map((row: any) => ({
+          id: row.id,
+          eventId: row.event_id,
+          title: row.title,
+          matchDate: row.match_date,
+          opponent: row.opponent,
+          scoreLine: row.score_line,
+          playerOfTheMatch: row.player_of_the_match,
+          topPerformers: safeJsonParseArray<string>(row.top_performers_json, []),
+          goalsSummary: safeJsonParseArray<string>(row.goals_summary_json, []),
+          coachNotes: row.coach_notes || "",
+          reportText: row.report_text,
+          createdAt: row.created_at || "",
+        }))
+        setMatchReports(nextReports)
       } else {
         setMatchReports([])
       }
+
+      saveOfflineCache({
+        players: nextPlayers,
+        coaches: nextCoaches,
+        coachAvailability: nextCoachAvailability,
+        events: nextEvents,
+        attendance: nextAttendance,
+        leagueResults,
+        playerRatings: nextRatings,
+        matchReports: nextReports,
+        trainingPlans: nextTrainingPlans,
+        sessionHistory: nextSessionHistory,
+        seasons: nextSeasons,
+        appSettings: {
+          selectedDate: settingsRes.data?.selected_date || selectedDate,
+          activeMatchEventId: settingsRes.data?.active_match_event_id || activeMatchEventId,
+        },
+      })
     } catch (error) {
       console.error("loadAll crashed:", error)
       setPlayers(initialPlayers)
@@ -790,26 +839,49 @@ function Dashboard({
 
   async function loadMatchState(eventId: string | null) {
     try {
+      const offline = loadOfflineCache()
+      if (eventId && offline.matchStateByEventId?.[eventId]) {
+        const cached = offline.matchStateByEventId[eventId]
+        setHomeTeamState(cached.homeTeam || TEAM.name)
+        setAwayTeamState(cached.awayTeam || "Opposition")
+        setHomeScoreState(cached.homeScore || 0)
+        setAwayScoreState(cached.awayScore || 0)
+        setMatchFormat((cached.matchFormat as MatchFormat) || "7v7")
+        setFormation(cached.formation || "2-3-1")
+        setCurrentQuarterState(cached.currentPeriod || 1)
+        setPeriodModeState((cached.periodMode as PeriodMode) || "quarters")
+        setPeriodLengthState(cached.periodLength || 10)
+        setPausedSeconds(cached.seconds || 0)
+        setSecondsState(cached.seconds || 0)
+        setRunningState(!!cached.running)
+        setTimerStartedAt(cached.timerStartedAt || null)
+        setLiveSecondsMap(cached.liveSecondsMap || {})
+        setLineupMap(cached.lineupMap || {})
+        setBenchIds(cached.benchIds || [])
+      }
+
       if (!supabase || !eventId) {
-        setHomeTeamState(TEAM.name)
-        setAwayTeamState("Opposition")
-        setHomeScoreState(0)
-        setAwayScoreState(0)
-        setMatchFormat("7v7")
-        setFormation("2-3-1")
-        setCurrentQuarterState(1)
-        setPeriodModeState("quarters")
-        setPeriodLengthState(10)
-        setPausedSeconds(0)
-        setSecondsState(0)
-        setRunningState(false)
-        setTimerStartedAt(null)
-        setLiveSecondsMap({})
-        setLineupMap({})
-        setBenchIds([])
-        setTimeline([])
-        setSavedLineups([])
-        setQuarterPlans({})
+        if (!eventId) {
+          setHomeTeamState(TEAM.name)
+          setAwayTeamState("Opposition")
+          setHomeScoreState(0)
+          setAwayScoreState(0)
+          setMatchFormat("7v7")
+          setFormation("2-3-1")
+          setCurrentQuarterState(1)
+          setPeriodModeState("quarters")
+          setPeriodLengthState(10)
+          setPausedSeconds(0)
+          setSecondsState(0)
+          setRunningState(false)
+          setTimerStartedAt(null)
+          setLiveSecondsMap({})
+          setLineupMap({})
+          setBenchIds([])
+          setTimeline([])
+          setSavedLineups([])
+          setQuarterPlans({})
+        }
         return
       }
 
@@ -958,10 +1030,27 @@ function Dashboard({
   }, [])
 
   useEffect(() => {
-    if (!loading) {
-      void loadMatchState(activeMatchEventId)
-    }
+    if (!loading) void loadMatchState(activeMatchEventId)
   }, [activeMatchEventId, loading])
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        await flushOfflineQueue()
+      } catch (error) {
+        console.error("Offline queue flush failed:", error)
+      }
+    }
+
+    void run()
+
+    const onOnline = () => {
+      void run()
+    }
+
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
+  }, [])
 
   useEffect(() => {
     if (!running || !activeMatchEventId) return
@@ -983,7 +1072,6 @@ function Dashboard({
 
     tick()
     const interval = window.setInterval(tick, 1000)
-
     return () => window.clearInterval(interval)
   }, [running, activeMatchEventId, pausedSeconds, timerStartedAt, lineupMap])
 
@@ -1018,18 +1106,30 @@ function Dashboard({
       activeMatchEventId: string | null
     }>
   ) {
-    if (!supabase) return
-
     const next = {
       selectedDate: patch?.selectedDate ?? selectedDate,
       activeMatchEventId: patch?.activeMatchEventId ?? activeMatchEventId,
     }
 
-    await supabase.from("app_settings").upsert({
+    saveOfflineCache({
+      appSettings: {
+        selectedDate: next.selectedDate,
+        activeMatchEventId: next.activeMatchEventId,
+      },
+    })
+
+    const payload = {
       id: "main",
       selected_date: next.selectedDate,
       active_match_event_id: next.activeMatchEventId,
-    })
+    }
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_app_settings", payload))
+      return
+    }
+
+    await supabase.from("app_settings").upsert(payload)
   }
 
   async function persistMatchState(
@@ -1051,7 +1151,7 @@ function Dashboard({
       benchIds: string[]
     }>
   ) {
-    if (!supabase || !activeMatchEventId) return
+    if (!activeMatchEventId) return
 
     const next = {
       homeTeam: patch?.homeTeam ?? homeTeam,
@@ -1071,7 +1171,14 @@ function Dashboard({
       benchIds: patch?.benchIds ?? benchIds,
     }
 
-    await supabase.from("match_state").upsert({
+    saveOfflineCache({
+      matchStateByEventId: {
+        ...(loadOfflineCache().matchStateByEventId || {}),
+        [activeMatchEventId]: next,
+      },
+    })
+
+    const payload = {
       event_id: activeMatchEventId,
       home_team: next.homeTeam,
       away_team: next.awayTeam,
@@ -1089,7 +1196,14 @@ function Dashboard({
       lineup_json: JSON.stringify(next.lineupMap),
       bench_json: JSON.stringify(next.benchIds),
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_match_state", payload))
+      return
+    }
+
+    await supabase.from("match_state").upsert(payload)
   }
 
   async function handleSetRunning(nextRunning: boolean) {
@@ -1124,14 +1238,12 @@ function Dashboard({
   }
 
   async function savePlayers(nextPlayers: Player[]) {
-    if (!supabase) return
-
     const removedIds = players.filter((p) => !nextPlayers.some((n) => n.id === p.id)).map((p) => p.id)
-    if (removedIds.length > 0) {
-      await supabase.from("players").delete().in("id", removedIds)
-    }
 
-    const payload = nextPlayers.map((p, index) => ({
+    setPlayers(nextPlayers)
+    saveOfflineCache({ players: nextPlayers })
+
+    const rows = nextPlayers.map((p, index) => ({
       id: p.id,
       name: p.name,
       positions_json: JSON.stringify(p.positions),
@@ -1143,41 +1255,48 @@ function Dashboard({
       sort_order: index,
     }))
 
-    if (payload.length > 0) {
-      await supabase.from("players").upsert(payload)
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_players", { removedIds, rows }))
+      return
     }
 
-    setPlayers(nextPlayers)
+    if (removedIds.length > 0) {
+      await supabase.from("players").delete().in("id", removedIds)
+    }
+
+    if (rows.length > 0) {
+      await supabase.from("players").upsert(rows)
+    }
   }
 
   async function saveCoaches(nextCoaches: Coach[]) {
-    if (!supabase) return
-
     const removedIds = coaches
       .filter((coach) => !nextCoaches.some((n) => n.id === coach.id))
       .map((coach) => coach.id)
+
+    setCoaches(nextCoaches)
+    saveOfflineCache({ coaches: nextCoaches })
+
+    const rows = nextCoaches.map((coach) => ({
+      id: coach.id,
+      name: coach.name,
+      role: coach.role,
+      active: coach.active,
+    }))
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_coaches", { removedIds, rows }))
+      return
+    }
 
     if (removedIds.length > 0) {
       await supabase.from("coaches").delete().in("id", removedIds)
     }
 
-    if (nextCoaches.length > 0) {
-      const { error } = await supabase.from("coaches").upsert(
-        nextCoaches.map((coach) => ({
-          id: coach.id,
-          name: coach.name,
-          role: coach.role,
-          active: coach.active,
-        }))
-      )
-
-      if (error) {
-        alert(error.message)
-        return
-      }
+    if (rows.length > 0) {
+      const { error } = await supabase.from("coaches").upsert(rows)
+      if (error) alert(error.message)
     }
-
-    setCoaches(nextCoaches)
   }
 
   async function saveCoachAvailability(
@@ -1186,76 +1305,71 @@ function Dashboard({
     status: CoachAvailabilityStatus,
     notes = ""
   ) {
-    if (!supabase || !isAdmin) return
+    if (!isAdmin) return
 
     const existing = coachAvailability.find((item) => item.coachId === coachId && item.day === day)
 
     if (existing) {
+      const nextLocal = coachAvailability.map((item) =>
+        item.id === existing.id ? { ...item, status, notes } : item
+      )
+      setCoachAvailability(nextLocal)
+      saveOfflineCache({ coachAvailability: nextLocal })
+
+      if (!supabase || !isOnline()) {
+        enqueueSyncItem(
+          queueItem("upsert_coach_availability", {
+            mode: "update",
+            payload: { id: existing.id, status, notes },
+          })
+        )
+        return
+      }
+
       const { error } = await supabase
         .from("coach_availability")
         .update({ status, notes })
         .eq("id", existing.id)
 
-      if (error) {
-        alert(error.message)
-        return
-      }
-
-      setCoachAvailability((prev) =>
-        prev.map((item) => (item.id === existing.id ? { ...item, status, notes } : item))
-      )
+      if (error) alert(error.message)
       return
     }
 
     const id = safeId()
+    const newItem = { id, coachId, day, status, notes }
+    const nextLocal = [...coachAvailability, newItem]
+    setCoachAvailability(nextLocal)
+    saveOfflineCache({ coachAvailability: nextLocal })
 
-    const { error } = await supabase.from("coach_availability").insert({
+    const payload = {
       id,
       coach_id: coachId,
       day,
       status,
       notes,
-    })
+    }
 
-    if (error) {
-      alert(error.message)
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(
+        queueItem("upsert_coach_availability", {
+          mode: "insert",
+          payload,
+        })
+      )
       return
     }
 
-    setCoachAvailability((prev) => [...prev, { id, coachId, day, status, notes }])
+    const { error } = await supabase.from("coach_availability").insert(payload)
+    if (error) alert(error.message)
   }
 
   async function saveTrainingPlans(nextPlans: TrainingTemplate[]) {
-    if (!supabase) return
-
     const currentIds = allTrainingPlans.map((plan) => plan.id)
     const nextIds = nextPlans.map((plan) => plan.id)
-
     const removedIds = currentIds.filter((id) => !nextIds.includes(id))
-    if (removedIds.length > 0) {
-      await supabase.from("training_plans").delete().in("id", removedIds)
-    }
-
-    if (nextPlans.length > 0) {
-      const { error } = await supabase.from("training_plans").upsert(
-        nextPlans.map((plan) => ({
-          id: plan.id,
-          name: plan.name,
-          warm_up: plan.warmUp,
-          drill_1: plan.drill1,
-          drill_2: plan.drill2,
-          game: plan.game,
-          notes: plan.notes,
-        }))
-      )
-
-      if (error) {
-        alert(error.message)
-        return
-      }
-    }
 
     setDbTrainingPlans(nextPlans)
+    saveOfflineCache({ trainingPlans: nextPlans })
 
     const selected = nextPlans.find((plan) => plan.id === selectedTemplateId) || nextPlans[0]
     if (selected) {
@@ -1269,35 +1383,79 @@ function Dashboard({
         notes: selected.notes,
       })
     }
+
+    const rows = nextPlans.map((plan) => ({
+      id: plan.id,
+      name: plan.name,
+      warm_up: plan.warmUp,
+      drill_1: plan.drill1,
+      drill_2: plan.drill2,
+      game: plan.game,
+      notes: plan.notes,
+    }))
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_training_plans", { removedIds, rows }))
+      return
+    }
+
+    if (removedIds.length > 0) {
+      await supabase.from("training_plans").delete().in("id", removedIds)
+    }
+
+    if (rows.length > 0) {
+      const { error } = await supabase.from("training_plans").upsert(rows)
+      if (error) alert(error.message)
+    }
   }
 
   async function saveSessionRecord(record: TrainingSessionRecord) {
-    if (!supabase) return
+    const nextLocal = [record, ...sessionHistory]
+    setSessionHistory(nextLocal)
+    saveOfflineCache({ sessionHistory: nextLocal })
 
-    const { error } = await supabase.from("training_session_history").insert({
+    const payload = {
       id: record.id,
       session_date: record.date,
       plan_name: record.planName,
       notes: record.notes,
       blocks_json: JSON.stringify(record.blocks),
-    })
+    }
 
-    if (error) {
-      alert(error.message)
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("insert_session_record", payload))
       return
     }
 
-    setSessionHistory((prev) => [record, ...prev])
+    const { error } = await supabase.from("training_session_history").insert(payload)
+    if (error) alert(error.message)
   }
 
   async function savePlayerRating(playerId: string, rating: number, notes: string) {
-    if (!supabase || !activeMatchEventId || !isAdmin) return
+    if (!activeMatchEventId || !isAdmin) return
 
     const existing = playerRatings.find(
       (item) => item.eventId === activeMatchEventId && item.playerId === playerId
     )
 
     const nextId = existing?.id || safeId()
+
+    const nextItem = {
+      id: nextId,
+      eventId: activeMatchEventId,
+      playerId,
+      rating,
+      notes,
+    }
+
+    setPlayerRatings((prev) => {
+      const filtered = prev.filter(
+        (item) => !(item.eventId === activeMatchEventId && item.playerId === playerId)
+      )
+      const next = [nextItem, ...filtered]
+      saveOfflineCache({ playerRatings: next })
+      return next
+    })
 
     const payload = {
       id: nextId,
@@ -1307,146 +1465,126 @@ function Dashboard({
       notes,
     }
 
-    const { error } = await supabase.from("player_match_ratings").upsert(payload)
-
-    if (error) {
-      alert(error.message)
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_player_rating", payload))
       return
     }
 
-    setPlayerRatings((prev) => {
-      const filtered = prev.filter(
-        (item) => !(item.eventId === activeMatchEventId && item.playerId === playerId)
-      )
-
-      return [
-        {
-          id: nextId,
-          eventId: activeMatchEventId,
-          playerId,
-          rating,
-          notes,
-        },
-        ...filtered,
-      ]
-    })
+    const { error } = await supabase.from("player_match_ratings").upsert(payload)
+    if (error) alert(error.message)
   }
 
   async function saveLineups(nextLineups: SavedLineup[]) {
-    if (!supabase || !activeMatchEventId) return
-
-    await supabase.from("match_lineups").delete().eq("event_id", activeMatchEventId)
-
-    if (nextLineups.length > 0) {
-      await supabase.from("match_lineups").insert(
-        nextLineups.map((lineup) => ({
-          id: lineup.id,
-          event_id: activeMatchEventId,
-          name: lineup.name,
-          match_format: lineup.format,
-          formation: lineup.formation,
-          lineup_json: JSON.stringify(lineup.lineup),
-          bench_json: JSON.stringify(lineup.bench),
-          updated_at: new Date().toISOString(),
-        }))
-      )
-    }
+    if (!activeMatchEventId) return
 
     setSavedLineups(nextLineups)
+
+    const rows = nextLineups.map((lineup) => ({
+      id: lineup.id,
+      event_id: activeMatchEventId,
+      name: lineup.name,
+      match_format: lineup.format,
+      formation: lineup.formation,
+      lineup_json: JSON.stringify(lineup.lineup),
+      bench_json: JSON.stringify(lineup.bench),
+      updated_at: new Date().toISOString(),
+    }))
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_lineups", { eventId: activeMatchEventId, rows }))
+      return
+    }
+
+    await supabase.from("match_lineups").delete().eq("event_id", activeMatchEventId)
+    if (rows.length > 0) {
+      await supabase.from("match_lineups").insert(rows)
+    }
   }
 
   async function saveQuarterPlans(nextPlans: Record<number, QuarterPlan>) {
-    if (!supabase || !activeMatchEventId) return
-
-    await supabase.from("match_quarter_plans").delete().eq("event_id", activeMatchEventId)
-
-    const entries = Object.entries(nextPlans)
-    if (entries.length > 0) {
-      await supabase.from("match_quarter_plans").insert(
-        entries.map(([quarterNumber, plan]) => ({
-          event_id: activeMatchEventId,
-          quarter_number: Number(quarterNumber),
-          lineup_json: JSON.stringify(plan.lineup),
-          bench_json: JSON.stringify(plan.bench),
-        }))
-      )
-    }
+    if (!activeMatchEventId) return
 
     setQuarterPlans(nextPlans)
+
+    const rows = Object.entries(nextPlans).map(([quarterNumber, plan]) => ({
+      event_id: activeMatchEventId,
+      quarter_number: Number(quarterNumber),
+      lineup_json: JSON.stringify(plan.lineup),
+      bench_json: JSON.stringify(plan.bench),
+    }))
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_quarter_plans", { eventId: activeMatchEventId, rows }))
+      return
+    }
+
+    await supabase.from("match_quarter_plans").delete().eq("event_id", activeMatchEventId)
+    if (rows.length > 0) {
+      await supabase.from("match_quarter_plans").insert(rows)
+    }
   }
 
   async function saveTimeline(nextTimeline: TimelineItem[]) {
-    if (!supabase || !activeMatchEventId) return
-
-    await supabase.from("match_timeline_events").delete().eq("event_id", activeMatchEventId)
-
-    if (nextTimeline.length > 0) {
-      await supabase.from("match_timeline_events").insert(
-        nextTimeline.map((item, index) => ({
-          id: item.id,
-          event_id: activeMatchEventId,
-          minute: item.minute,
-          type: item.type,
-          text: item.text,
-          sort_order: index,
-        }))
-      )
-    }
+    if (!activeMatchEventId) return
 
     setTimeline(nextTimeline)
+
+    const rows = nextTimeline.map((item, index) => ({
+      id: item.id,
+      event_id: activeMatchEventId,
+      minute: item.minute,
+      type: item.type,
+      text: item.text,
+      sort_order: index,
+    }))
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("replace_timeline", { eventId: activeMatchEventId, rows }))
+      return
+    }
+
+    await supabase.from("match_timeline_events").delete().eq("event_id", activeMatchEventId)
+    if (rows.length > 0) {
+      await supabase.from("match_timeline_events").insert(rows)
+    }
   }
 
   async function saveAttendance(eventId: string, playerId: string, status: AttendanceStatus) {
-    if (!supabase) return
+    const existing = attendance.find((a) => a.eventId === eventId && a.playerId === playerId)
+    const nextId = existing?.id || safeId()
 
-    const { data: existingRow, error: fetchError } = await supabase
-      .from("event_attendance")
-      .select("id, event_id, player_id, status")
-      .eq("event_id", eventId)
-      .eq("player_id", playerId)
-      .maybeSingle()
-
-    if (fetchError) {
-      alert(fetchError.message)
-      return
+    const nextItem = {
+      id: nextId,
+      eventId,
+      playerId,
+      status,
     }
 
-    if (existingRow) {
-      const { error: updateError } = await supabase
-        .from("event_attendance")
-        .update({ status })
-        .eq("id", existingRow.id)
+    setAttendance((prev) => {
+      const withoutOld = prev.filter((a) => !(a.eventId === eventId && a.playerId === playerId))
+      const next = [...withoutOld, nextItem]
+      saveOfflineCache({ attendance: next })
+      return next
+    })
 
-      if (updateError) {
-        alert(updateError.message)
-        return
-      }
-
-      setAttendance((prev) =>
-        prev.map((item) => (item.id === existingRow.id ? { ...item, status } : item))
-      )
-      return
-    }
-
-    const newId = safeId()
-
-    const { error: insertError } = await supabase.from("event_attendance").insert({
-      id: newId,
+    const payload = {
+      id: nextId,
       event_id: eventId,
       player_id: playerId,
       status,
-    })
+    }
 
-    if (insertError) {
-      alert(insertError.message)
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_attendance", payload))
       return
     }
 
-    setAttendance((prev) => [...prev, { id: newId, eventId, playerId, status }])
+    const { error } = await supabase.from("event_attendance").upsert(payload)
+    if (error) alert(error.message)
   }
 
   async function addEvent() {
-    if (!supabase || !isAdmin) return
+    if (!isAdmin) return
     if (!eventTitle.trim()) {
       alert("Enter event title")
       return
@@ -1470,7 +1608,20 @@ function Dashboard({
       seasonId: activeSeasonId,
     }
 
-    const { error } = await supabase.from("events").upsert({
+    setEvents((prev) => {
+      const withoutOld = prev.filter((e) => e.id !== newEvent.id)
+      const next = [...withoutOld, newEvent].sort((a, b) => {
+        const dateCompare = a.date.localeCompare(b.date)
+        if (dateCompare !== 0) return dateCompare
+        const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
+        if (timeCompare !== 0) return timeCompare
+        return a.title.localeCompare(b.title)
+      })
+      saveOfflineCache({ events: next })
+      return next
+    })
+
+    const payload = {
       id: newEvent.id,
       date: newEvent.date,
       day: newEvent.date,
@@ -1483,23 +1634,17 @@ function Dashboard({
       training_plan_id: linkedPlan?.id || null,
       training_plan_name: linkedPlan?.name || "",
       season_id: activeSeasonId,
-    })
-
-    if (error) {
-      alert(error.message)
-      return
     }
 
-    setEvents((prev) => {
-      const withoutOld = prev.filter((e) => e.id !== newEvent.id)
-      return [...withoutOld, newEvent].sort((a, b) => {
-        const dateCompare = a.date.localeCompare(b.date)
-        if (dateCompare !== 0) return dateCompare
-        const timeCompare = (a.startTime || "").localeCompare(b.startTime || "")
-        if (timeCompare !== 0) return timeCompare
-        return a.title.localeCompare(b.title)
-      })
-    })
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_event", payload))
+    } else {
+      const { error } = await supabase.from("events").upsert(payload)
+      if (error) {
+        alert(error.message)
+        return
+      }
+    }
 
     setEventTitle("")
     setEventType("training")
@@ -1540,22 +1685,32 @@ function Dashboard({
   }
 
   async function deleteCalendarEvent(id: string) {
-    if (!supabase || !isAdmin) return
+    setEvents((prev) => {
+      const next = prev.filter((event) => event.id !== id)
+      saveOfflineCache({ events: next })
+      return next
+    })
 
-    const { error } = await supabase.from("events").delete().eq("id", id)
-    if (error) {
-      alert(error.message)
-      return
-    }
+    setAttendance((prev) => {
+      const next = prev.filter((item) => item.eventId !== id)
+      saveOfflineCache({ attendance: next })
+      return next
+    })
 
-    setEvents((prev) => prev.filter((event) => event.id !== id))
-    setAttendance((prev) => prev.filter((item) => item.eventId !== id))
     if (selectedEventId === id) setSelectedEventId(null)
 
     if (activeMatchEventId === id) {
       setActiveMatchEventId(null)
       void persistSettings({ activeMatchEventId: null })
     }
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("delete_event", { id }))
+      return
+    }
+
+    const { error } = await supabase.from("events").delete().eq("id", id)
+    if (error) alert(error.message)
   }
 
   async function handleChangeFormation(nextFormat: MatchFormat, nextFormation: string) {
@@ -1621,9 +1776,7 @@ function Dashboard({
   function handleDragStart(event: DragStartEvent) {
     const activeId = String(event.active.id)
     const parts = activeId.split("::")
-    if (parts.length === 4) {
-      setActiveDragPlayerId(parts[1])
-    }
+    if (parts.length === 4) setActiveDragPlayerId(parts[1])
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -1852,7 +2005,7 @@ function Dashboard({
   }
 
   async function saveMatchReport(coachNotes: string) {
-    if (!supabase || !activeMatchEvent || !isAdmin) return
+    if (!activeMatchEvent || !isAdmin) return
 
     const reportId = latestActiveMatchReport?.id || safeId()
 
@@ -1888,13 +2041,6 @@ function Dashboard({
       report_text: reportText,
     }
 
-    const { error } = await supabase.from("match_reports").upsert(payload)
-
-    if (error) {
-      alert(error.message)
-      return
-    }
-
     const nextReport: MatchReport = {
       id: reportId,
       eventId: activeMatchEvent.id,
@@ -1912,8 +2058,22 @@ function Dashboard({
 
     setMatchReports((prev) => {
       const filtered = prev.filter((item) => item.eventId !== activeMatchEvent.id)
-      return [nextReport, ...filtered]
+      const next = [nextReport, ...filtered]
+      saveOfflineCache({ matchReports: next })
+      return next
     })
+
+    if (!supabase || !isOnline()) {
+      enqueueSyncItem(queueItem("upsert_match_report", payload))
+      alert("Match report saved offline and will sync later")
+      return
+    }
+
+    const { error } = await supabase.from("match_reports").upsert(payload)
+    if (error) {
+      alert(error.message)
+      return
+    }
 
     alert("Match report saved")
   }
