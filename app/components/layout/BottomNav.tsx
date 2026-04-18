@@ -1,6 +1,7 @@
 "use client"
 
 import type { MainTab } from "../../lib/types"
+import { THEME } from "../../lib/theme"
 
 type Props = {
   tab: MainTab
@@ -27,7 +28,7 @@ export default function BottomNav({ tab, setTab }: Props) {
         zIndex: 100,
         borderRadius: 28,
         padding: 10,
-        background: "rgba(255,255,255,0.96)",
+        background: "rgba(255,255,255,0.94)",
         border: "1px solid #dbe3ef",
         boxShadow: "0 10px 30px rgba(15,23,42,0.16)",
         backdropFilter: "blur(12px)",
@@ -50,17 +51,21 @@ export default function BottomNav({ tab, setTab }: Props) {
               onClick={() => setTab(item.key)}
               style={{
                 border: "none",
-                background: active ? "#e8f0ff" : "transparent",
-                color: active ? "#123a9b" : "#475569",
+                background: active
+                  ? `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`
+                  : "transparent",
+                color: active ? "white" : "#475569",
                 borderRadius: 18,
                 padding: "10px 4px",
                 display: "grid",
                 justifyItems: "center",
                 gap: 4,
                 minWidth: 0,
+                cursor: "pointer",
+                boxShadow: active ? "0 6px 16px rgba(30,58,138,0.24)" : "none",
               }}
             >
-              <div style={{ fontSize: 24, lineHeight: 1 }}>{item.icon}</div>
+              <div style={{ fontSize: 22, lineHeight: 1 }}>{item.icon}</div>
               <div
                 style={{
                   fontSize: 11,
