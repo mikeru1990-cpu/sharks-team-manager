@@ -1,11 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
 import MatchReportGenerator from "../MatchReportGenerator"
 import PlayerFeedbackCard from "../PlayerFeedbackCard"
-import LineupBuilderModal from "../modals/LineupBuilderModal"
 import {
   cardStyle,
   type Coach,
@@ -74,9 +72,6 @@ type Props = {
   setRunning: (value: boolean) => void
   setSeconds: (value: number) => void
   setLiveSecondsMap: (value: Record<string, number>) => void
-
-  setLineupMapState: (value: Record<string, string | null>) => void
-  setBenchIdsState: (value: string[]) => void
 
   persistMatchState: (
     patch?: Partial<{
@@ -303,8 +298,6 @@ export default function MatchTabContent(props: Props) {
     setRunning,
     setSeconds,
     setLiveSecondsMap,
-    setLineupMapState,
-    setBenchIdsState,
     persistMatchState,
     handleSaveMinutes,
     handleChangeFormation,
@@ -337,8 +330,6 @@ export default function MatchTabContent(props: Props) {
     latestActiveMatchReport,
     saveMatchReport,
   } = props
-
-  const [showLineupBuilder, setShowLineupBuilder] = useState(false)
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -477,29 +468,6 @@ export default function MatchTabContent(props: Props) {
         </div>
       </div>
 
-      {isAdmin && activeMatchEvent ? (
-        <div style={cardStyle("#eff6ff")}>
-          <SectionTitle
-            title="Line-up Builder"
-            subtitle="Use the full-screen builder for a cleaner mobile line-up setup."
-          />
-          <button
-            onClick={() => setShowLineupBuilder(true)}
-            style={{
-              padding: "14px 18px",
-              borderRadius: 16,
-              border: "none",
-              background: "#1d4ed8",
-              color: "white",
-              fontWeight: 900,
-              fontSize: 16,
-            }}
-          >
-            Open Line-up Builder
-          </button>
-        </div>
-      ) : null}
-
       <MatchCenter
         isAdmin={isAdmin}
         matchTab={matchTab}
@@ -586,9 +554,6 @@ export default function MatchTabContent(props: Props) {
             ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}`
             : ""
         }
-        setLineupMapState={setLineupMapState}
-        setBenchIdsState={setBenchIdsState}
-        persistMatchState={persistMatchState}
       />
 
       {matchTab === "quarters" ? (
@@ -696,36 +661,6 @@ export default function MatchTabContent(props: Props) {
           latestReport={latestActiveMatchReport}
         />
       ) : null}
-
-      <LineupBuilderModal
-        open={showLineupBuilder}
-        title="Create line-up"
-        subtitle={
-          activeMatchEvent
-            ? `${activeMatchEvent.title}${activeMatchEvent.opponent ? ` • ${activeMatchEvent.opponent}` : ""}`
-            : ""
-        }
-        players={matchPlayers}
-        matchFormat={matchFormat}
-        formation={formation}
-        currentSlots={currentSlots}
-        lineupMap={lineupMap}
-        benchIds={benchIds}
-        lineupName={lineupName}
-        setLineupName={setLineupName}
-        onChangeFormation={handleChangeFormation}
-        onApplyLineup={async (nextLineupMap, nextBenchIds) => {
-          setLineupMapState(nextLineupMap)
-          setBenchIdsState(nextBenchIds)
-
-          await persistMatchState({
-            lineupMap: nextLineupMap,
-            benchIds: nextBenchIds,
-          })
-        }}
-        onSave={handleSaveLineup}
-        onClose={() => setShowLineupBuilder(false)}
-      />
     </div>
   )
 }
