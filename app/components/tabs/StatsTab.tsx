@@ -1,16 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import {
-  formatMinutes,
-  type LeagueResult,
-  type Player,
-  type PlayerMatchRating,
-  type TimelineItem,
-} from "../../lib/types"
 import { Badge, PageCard, SectionHeader } from "../ui"
-
-type StatsView = "overview" | "players" | "headToHead" | "history"
+import { THEME } from "../../lib/theme"
+import type {
+  LeagueResult,
+  Player,
+  PlayerMatchRating,
+  TimelineItem,
+} from "../../lib/types"
 
 type Props = {
   teamName: string
@@ -20,140 +17,103 @@ type Props = {
   timeline: TimelineItem[]
 }
 
-function normalizeTeamName(name: string) {
-  const value = name.trim()
-
-  const map: Record<string, string> = {
-    "U10 Lionesses 25/26": "Leonard Stanley U10 Lioness",
-    "U10 Lionesses": "Leonard Stanley U10 Lioness",
-    "Sharks Lioness": "Leonard Stanley U10 Lioness",
-    "Sharks Lionesses": "Leonard Stanley U10 Lioness",
-    "Leonard Stanley U10 Lioness 25/26": "Leonard Stanley U10 Lioness",
-    "Leonard Stanley U10 Lioness": "Leonard Stanley U10 Lioness",
-
-    "Tewkesbury Town Colts Youth U10": "Tewkesbury Town Colts",
-    "Tewkesbury Town Colts Youth": "Tewkesbury Town Colts",
-    "Tewkesbury Town Colts Youth U10 ": "Tewkesbury Town Colts",
-
-    "Stonehouse TownYouth U10": "Stonehouse Town",
-    "Stonehouse Town Youth U10": "Stonehouse Town",
-    "Stonehouse Town Youth": "Stonehouse Town",
-
-    "Rodborough Youth U10 Lioness": "Rodborough Lionesses",
-    "Rodborough Youth U10 Lionesses": "Rodborough Lionesses",
+function formatPrettyDate(date: string) {
+  try {
+    return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
+  } catch {
+    return date
   }
-
-  return map[value] || value
 }
 
 function StatCard({
   label,
   value,
-  sub,
+  tone = "default",
+  subtext,
 }: {
   label: string
   value: string | number
-  sub?: string
+  tone?: "default" | "blue" | "green" | "yellow" | "red"
+  subtext?: string
 }) {
+  const style =
+    tone === "blue"
+      ? {
+          background: "#dbeafe",
+          color: "#1d4ed8",
+          border: "1px solid #bfdbfe",
+        }
+      : tone === "green"
+      ? {
+          background: "#dcfce7",
+          color: "#166534",
+          border: "1px solid #86efac",
+        }
+      : tone === "yellow"
+      ? {
+          background: "#fef3c7",
+          color: "#92400e",
+          border: "1px solid #fcd34d",
+        }
+      : tone === "red"
+      ? {
+          background: "#fee2e2",
+          color: "#991b1b",
+          border: "1px solid #fecaca",
+        }
+      : {
+          background: "#f8fafc",
+          color: "#334155",
+          border: "1px solid #e2e8f0",
+        }
+
   return (
     <div
       style={{
-        padding: 18,
-        borderRadius: 20,
-        border: "1px solid #dbe3ef",
-        background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-        minWidth: 0,
+        ...style,
+        borderRadius: 18,
+        padding: 14,
+        display: "grid",
+        gap: 4,
       }}
     >
-      <div
-        style={{
-          color: "#667085",
-          fontWeight: 800,
-          fontSize: 13,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontSize: 30,
-          fontWeight: 900,
-          marginTop: 8,
-          lineHeight: 1,
-          color: "#0f172a",
-        }}
-      >
-        {value}
-      </div>
-      {sub ? (
-        <div
-          style={{
-            color: "#94a3b8",
-            fontSize: 12,
-            marginTop: 8,
-          }}
-        >
-          {sub}
-        </div>
+      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.9 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
+      {subtext ? (
+        <div style={{ fontSize: 12, opacity: 0.9 }}>{subtext}</div>
       ) : null}
     </div>
   )
 }
 
-function SegmentedTabs({
-  value,
-  onChange,
-}: {
-  value: StatsView
-  onChange: (value: StatsView) => void
-}) {
-  const tabs: Array<{ id: StatsView; label: string }> = [
-    { id: "overview", label: "Overview" },
-    { id: "players", label: "Players" },
-    { id: "headToHead", label: "Head-to-Head" },
-    { id: "history", label: "History" },
-  ]
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-        gap: 10,
-      }}
-    >
-      {tabs.map((tab) => {
-        const active = value === tab.id
-
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            style={{
-              minWidth: 0,
-              border: active ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
-              background: active ? "linear-gradient(180deg, #dbeafe 0%, #eff6ff 100%)" : "white",
-              color: active ? "#1e3a8a" : "#0f172a",
-              borderRadius: 999,
-              padding: "12px 8px",
-              fontWeight: 800,
-              fontSize: 12,
-              lineHeight: 1.1,
-              boxShadow: active ? "0 6px 16px rgba(29,78,216,0.10)" : "none",
-            }}
-          >
-            {tab.label}
-          </button>
-        )
-      })}
-    </div>
-  )
+function getResultTone(result: "W" | "D" | "L") {
+  if (result === "W") return "green"
+  if (result === "D") return "yellow"
+  return "red"
 }
 
-function resultBadgeTone(value: "W" | "D" | "L"): "green" | "yellow" | "red" {
-  if (value === "W") return "green"
-  if (value === "D") return "yellow"
-  return "red"
+function getScoreOutcome(result: LeagueResult, teamName: string): "W" | "D" | "L" {
+  const isHome = result.homeTeam === teamName
+  const teamGoals = isHome ? result.homeScore : result.awayScore
+  const oppGoals = isHome ? result.awayScore : result.homeScore
+
+  if (teamGoals > oppGoals) return "W"
+  if (teamGoals < oppGoals) return "L"
+  return "D"
+}
+
+function initials(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 }
 
 export default function StatsTab({
@@ -163,383 +123,397 @@ export default function StatsTab({
   ratings,
   timeline,
 }: Props) {
-  const [view, setView] = useState<StatsView>("overview")
+  const sortedResults = [...results].sort((a, b) => b.playedOn.localeCompare(a.playedOn))
 
-  const normalizedTeamName = normalizeTeamName(teamName)
+  const matchesPlayed = sortedResults.length
 
-  const teamResults = useMemo(() => {
-    return results
-      .filter((match) => {
-        const home = normalizeTeamName(match.homeTeam)
-        const away = normalizeTeamName(match.awayTeam)
-        return home === normalizedTeamName || away === normalizedTeamName
-      })
-      .slice()
-      .sort((a, b) => b.playedOn.localeCompare(a.playedOn))
-      .map((match) => {
-        const home = normalizeTeamName(match.homeTeam)
-        const away = normalizeTeamName(match.awayTeam)
-        const isHome = home === normalizedTeamName
-        const opponent = isHome ? away : home
-        const ourScore = isHome ? match.homeScore : match.awayScore
-        const theirScore = isHome ? match.awayScore : match.homeScore
-        const result = ourScore > theirScore ? "W" : ourScore < theirScore ? "L" : "D"
+  const summary = sortedResults.reduce(
+    (acc, result) => {
+      const isHome = result.homeTeam === teamName
+      const goalsFor = isHome ? result.homeScore : result.awayScore
+      const goalsAgainst = isHome ? result.awayScore : result.homeScore
+      const outcome = getScoreOutcome(result, teamName)
 
-        return {
-          ...match,
-          opponent,
-          ourScore,
-          theirScore,
-          result: result as "W" | "D" | "L",
-        }
-      })
-  }, [results, normalizedTeamName])
+      acc.goalsFor += goalsFor
+      acc.goalsAgainst += goalsAgainst
 
-  const totalGoals = useMemo(
-    () => timeline.filter((item) => item.type === "goal").length,
-    [timeline]
+      if (outcome === "W") acc.wins += 1
+      else if (outcome === "D") acc.draws += 1
+      else acc.losses += 1
+
+      return acc
+    },
+    {
+      wins: 0,
+      draws: 0,
+      losses: 0,
+      goalsFor: 0,
+      goalsAgainst: 0,
+    }
   )
 
-  const totalMinutes = useMemo(
-    () => Math.round(players.reduce((sum, player) => sum + (player.seasonSeconds || 0), 0) / 60),
-    [players]
-  )
+  const points = summary.wins * 3 + summary.draws
+  const goalDifference = summary.goalsFor - summary.goalsAgainst
 
-  const averageRating = useMemo(() => {
-    if (ratings.length === 0) return 0
-    return ratings.reduce((sum, item) => sum + Number(item.rating || 0), 0) / ratings.length
-  }, [ratings])
+  const form = sortedResults.slice(0, 5).map((result) => getScoreOutcome(result, teamName))
 
-  const recentForm = teamResults.slice(0, 5).map((item) => item.result)
+  const ratingsByPlayer = players
+    .map((player) => {
+      const playerRatings = ratings.filter((rating) => rating.playerId === player.id)
+      const average =
+        playerRatings.length > 0
+          ? playerRatings.reduce((sum, item) => sum + item.rating, 0) / playerRatings.length
+          : null
 
-  const topRatedPlayers = useMemo(() => {
-    const byPlayer: Record<string, number[]> = {}
-
-    for (const rating of ratings) {
-      if (!byPlayer[rating.playerId]) byPlayer[rating.playerId] = []
-      byPlayer[rating.playerId].push(Number(rating.rating || 0))
-    }
-
-    return players
-      .map((player) => {
-        const values = byPlayer[player.id] || []
-        const average =
-          values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0
-
-        return {
-          id: player.id,
-          name: player.name,
-          minutes: player.seasonSeconds || 0,
-          averageRating: average,
-          ratingCount: values.length,
-        }
-      })
-      .filter((player) => player.ratingCount > 0)
-      .sort((a, b) => {
-        if (b.averageRating !== a.averageRating) return b.averageRating - a.averageRating
-        return b.ratingCount - a.ratingCount
-      })
-  }, [players, ratings])
-
-  const headToHead = useMemo(() => {
-    const byOpponent: Record<
-      string,
-      {
-        opponent: string
-        played: number
-        won: number
-        drawn: number
-        lost: number
-        gf: number
-        ga: number
+      return {
+        player,
+        average,
+        count: playerRatings.length,
       }
-    > = {}
-
-    for (const match of teamResults) {
-      if (!byOpponent[match.opponent]) {
-        byOpponent[match.opponent] = {
-          opponent: match.opponent,
-          played: 0,
-          won: 0,
-          drawn: 0,
-          lost: 0,
-          gf: 0,
-          ga: 0,
-        }
-      }
-
-      const row = byOpponent[match.opponent]
-      row.played += 1
-      row.gf += match.ourScore
-      row.ga += match.theirScore
-
-      if (match.result === "W") row.won += 1
-      if (match.result === "D") row.drawn += 1
-      if (match.result === "L") row.lost += 1
-    }
-
-    return Object.values(byOpponent).sort((a, b) => {
-      if (b.played !== a.played) return b.played - a.played
-      return a.opponent.localeCompare(b.opponent)
     })
-  }, [teamResults])
+    .filter((item) => item.count > 0)
+    .sort((a, b) => {
+      const aAvg = a.average ?? 0
+      const bAvg = b.average ?? 0
+      if (bAvg !== aAvg) return bAvg - aAvg
+      return b.count - a.count
+    })
 
-  const winCount = teamResults.filter((item) => item.result === "W").length
-  const drawCount = teamResults.filter((item) => item.result === "D").length
-  const lossCount = teamResults.filter((item) => item.result === "L").length
-  const goalsFor = teamResults.reduce((sum, item) => sum + item.ourScore, 0)
-  const goalsAgainst = teamResults.reduce((sum, item) => sum + item.theirScore, 0)
+  const topRated = ratingsByPlayer.slice(0, 5)
+
+  const totalRatings = ratings.length
+  const averageTeamRating =
+    totalRatings > 0
+      ? (
+          ratings.reduce((sum, item) => sum + item.rating, 0) / totalRatings
+        ).toFixed(1)
+      : "—"
+
+  const recentResults = sortedResults.slice(0, 8)
+
+  const totalGoalsLogged = timeline.filter((item) => item.type === "goal").length
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 16,
-        width: "100%",
-        maxWidth: "100%",
-        overflowX: "hidden",
-      }}
-    >
-      <PageCard>
+    <div style={{ display: "grid", gap: 16 }}>
+      <PageCard tone="blue">
         <SectionHeader
-          title="Stats"
-          subtitle="Season overview, player summaries and match history."
+          title="Team Stats"
+          subtitle="Results, form, rating trends and season overview."
+          light
         />
-        <SegmentedTabs value={view} onChange={setView} />
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 14,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>PLAYED</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{matchesPlayed}</div>
+          </div>
+
+          <div
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              borderRadius: 18,
+              padding: 14,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>POINTS</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{points}</div>
+          </div>
+
+          <div
+            style={{
+              background: "rgba(250,204,21,0.16)",
+              border: "1px solid rgba(250,204,21,0.28)",
+              borderRadius: 18,
+              padding: 14,
+              color: "#fef08a",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.92 }}>AVG RATING</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{averageTeamRating}</div>
+          </div>
+        </div>
       </PageCard>
 
-      {view === "overview" && (
-        <>
-          <PageCard>
-            <SectionHeader title="Overview" subtitle={normalizedTeamName} />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 14,
-              }}
-            >
-              <StatCard label="Matches" value={teamResults.length} />
-              <StatCard label="Goals" value={goalsFor} />
-              <StatCard label="Against" value={goalsAgainst} />
-              <StatCard
-                label="Avg Rating"
-                value={ratings.length > 0 ? averageRating.toFixed(1) : "-"}
-              />
-            </div>
-          </PageCard>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 12,
+        }}
+      >
+        <StatCard label="Wins" value={summary.wins} tone="green" />
+        <StatCard label="Draws" value={summary.draws} tone="yellow" />
+        <StatCard label="Losses" value={summary.losses} tone="red" />
+        <StatCard label="Goal Difference" value={goalDifference >= 0 ? `+${goalDifference}` : goalDifference} tone="blue" />
+      </div>
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)",
+          gap: 16,
+        }}
+      >
+        <div style={{ display: "grid", gap: 16 }}>
           <PageCard>
-            <SectionHeader title="Results Breakdown" />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: 14,
-              }}
-            >
-              <StatCard label="Wins" value={winCount} />
-              <StatCard label="Draws" value={drawCount} />
-              <StatCard label="Losses" value={lossCount} />
-            </div>
-          </PageCard>
+            <SectionHeader
+              title="Recent Form"
+              subtitle="Last five results"
+            />
 
-          <PageCard>
-            <SectionHeader title="Squad Snapshot" />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 14,
-              }}
-            >
-              <StatCard label="Players" value={players.length} />
-              <StatCard label="Minutes" value={totalMinutes} sub="team total" />
-              <StatCard label="Ratings" value={ratings.length} />
-              <StatCard label="Timeline Goals" value={totalGoals} />
-            </div>
-          </PageCard>
-
-          <PageCard>
-            <SectionHeader title="Recent Form" />
-            {recentForm.length === 0 ? (
-              <div style={{ color: "#64748b" }}>No results recorded yet.</div>
+            {form.length === 0 ? (
+              <div
+                style={{
+                  borderRadius: 16,
+                  border: "1px dashed #cbd5e1",
+                  background: "#f8fafc",
+                  padding: 16,
+                  color: THEME.colors.textSecondary,
+                }}
+              >
+                No results saved yet.
+              </div>
             ) : (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {recentForm.map((item, index) => (
-                  <div key={`${item}-${index}`}>
-                    <Badge tone={resultBadgeTone(item)}>{item}</Badge>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {form.map((item, index) => (
+                  <div
+                    key={`${item}-${index}`}
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 16,
+                      display: "grid",
+                      placeItems: "center",
+                      fontWeight: 900,
+                      fontSize: 20,
+                      background:
+                        item === "W"
+                          ? "#dcfce7"
+                          : item === "D"
+                          ? "#fef3c7"
+                          : "#fee2e2",
+                      color:
+                        item === "W"
+                          ? "#166534"
+                          : item === "D"
+                          ? "#92400e"
+                          : "#991b1b",
+                      border:
+                        item === "W"
+                          ? "1px solid #86efac"
+                          : item === "D"
+                          ? "1px solid #fcd34d"
+                          : "1px solid #fecaca",
+                    }}
+                  >
+                    {item}
                   </div>
                 ))}
               </div>
             )}
           </PageCard>
-        </>
-      )}
 
-      {view === "players" && (
-        <PageCard>
-          <SectionHeader title="Player Stats" subtitle="Mobile-friendly player summaries." />
-          {topRatedPlayers.length === 0 ? (
-            <div style={{ color: "#64748b" }}>No player ratings saved yet.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {topRatedPlayers.map((player, index) => (
-                <div
-                  key={player.id}
-                  style={{
-                    padding: 16,
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-                    display: "grid",
-                    gap: 10,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                    }}
-                  >
+          <PageCard>
+            <SectionHeader
+              title="Recent Results"
+              subtitle="Latest saved fixtures and scorelines."
+            />
+
+            {recentResults.length === 0 ? (
+              <div
+                style={{
+                  borderRadius: 16,
+                  border: "1px dashed #cbd5e1",
+                  background: "#f8fafc",
+                  padding: 16,
+                  color: THEME.colors.textSecondary,
+                }}
+              >
+                No results recorded yet.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {recentResults.map((result) => {
+                  const outcome = getScoreOutcome(result, teamName)
+                  return (
                     <div
+                      key={result.id}
                       style={{
-                        fontWeight: 900,
-                        fontSize: 18,
-                        minWidth: 0,
-                        overflowWrap: "anywhere",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 18,
+                        padding: 14,
+                        background: "white",
+                        display: "grid",
+                        gap: 8,
                       }}
                     >
-                      {index + 1}. {player.name}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <Badge tone={getResultTone(outcome)}>{outcome}</Badge>
+                          <Badge>{formatPrettyDate(result.playedOn)}</Badge>
+                          {result.competition ? <Badge>{result.competition}</Badge> : null}
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 900,
+                          color: THEME.colors.textPrimary,
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        {result.homeTeam} {result.homeScore} - {result.awayScore} {result.awayTeam}
+                      </div>
+
+                      <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
+                        Opponent: {result.opponent || (result.homeTeam === teamName ? result.awayTeam : result.homeTeam)}
+                      </div>
                     </div>
+                  )
+                })}
+              </div>
+            )}
+          </PageCard>
+        </div>
 
-                    <Badge tone="blue">{player.averageRating.toFixed(1)}</Badge>
-                  </div>
+        <div style={{ display: "grid", gap: 16 }}>
+          <PageCard>
+            <SectionHeader
+              title="Season Totals"
+              subtitle="Quick team summary."
+            />
 
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Badge tone="default">{player.ratingCount} ratings</Badge>
-                    <Badge tone="default">{formatMinutes(player.minutes)}</Badge>
-                  </div>
-                </div>
-              ))}
+            <div style={{ display: "grid", gap: 10 }}>
+              <StatCard label="Goals For" value={summary.goalsFor} tone="green" />
+              <StatCard label="Goals Against" value={summary.goalsAgainst} tone="red" />
+              <StatCard label="Live Goals Logged" value={totalGoalsLogged} tone="blue" subtext="From active timeline feed" />
             </div>
-          )}
-        </PageCard>
-      )}
+          </PageCard>
 
-      {view === "headToHead" && (
-        <PageCard>
-          <SectionHeader title="Head-to-Head" subtitle="Opponent records without wide tables." />
-          {headToHead.length === 0 ? (
-            <div style={{ color: "#64748b" }}>No opponent history yet.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {headToHead.map((team) => (
-                <div
-                  key={team.opponent}
-                  style={{
-                    padding: 16,
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 900,
-                      fontSize: 18,
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {team.opponent}
-                  </div>
+          <PageCard>
+            <SectionHeader
+              title="Top Rated Players"
+              subtitle="Based on saved match feedback."
+            />
 
+            {topRated.length === 0 ? (
+              <div
+                style={{
+                  borderRadius: 16,
+                  border: "1px dashed #cbd5e1",
+                  background: "#f8fafc",
+                  padding: 16,
+                  color: THEME.colors.textSecondary,
+                }}
+              >
+                No player ratings yet.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {topRated.map((item, index) => (
                   <div
+                    key={item.player.id}
                     style={{
-                      display: "flex",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 18,
+                      padding: 12,
+                      background: index === 0 ? "#eff6ff" : "white",
+                      display: "grid",
+                      gridTemplateColumns: "auto minmax(0, 1fr) auto",
                       gap: 12,
-                      marginTop: 12,
-                      flexWrap: "wrap",
-                      color: "#475569",
-                      fontWeight: 500,
+                      alignItems: "center",
                     }}
                   >
-                    <span>P: {team.played}</span>
-                    <span>W: {team.won}</span>
-                    <span>D: {team.drawn}</span>
-                    <span>L: {team.lost}</span>
-                    <span>GF: {team.gf}</span>
-                    <span>GA: {team.ga}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </PageCard>
-      )}
-
-      {view === "history" && (
-        <PageCard>
-          <SectionHeader title="Match History" subtitle="Recent results in a clean vertical list." />
-          {teamResults.length === 0 ? (
-            <div style={{ color: "#64748b" }}>No match history saved yet.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 12 }}>
-              {teamResults.map((game) => (
-                <div
-                  key={game.id}
-                  style={{
-                    padding: 16,
-                    borderRadius: 18,
-                    border: "1px solid #e2e8f0",
-                    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
                     <div
                       style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        background: index === 0 ? THEME.colors.primary : "#f1f5f9",
+                        color: index === 0 ? "white" : THEME.colors.textPrimary,
                         fontWeight: 900,
-                        fontSize: 18,
-                        overflowWrap: "anywhere",
-                      }}
-                    >
-                      vs {game.opponent} • {game.ourScore}-{game.theirScore}
-                    </div>
-                    <div
-                      style={{
-                        color: "#64748b",
                         fontSize: 13,
-                        marginTop: 6,
-                        overflowWrap: "anywhere",
                       }}
                     >
-                      {game.playedOn}
-                      {game.competition ? ` • ${game.competition}` : ""}
+                      {initials(item.player.name)}
+                    </div>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          color: THEME.colors.textPrimary,
+                          fontSize: 15,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {item.player.name}
+                      </div>
+                      <div
+                        style={{
+                          color: THEME.colors.textSecondary,
+                          fontSize: 13,
+                          marginTop: 4,
+                        }}
+                      >
+                        {item.count} rating{item.count === 1 ? "" : "s"}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: "right" }}>
+                      <div
+                        style={{
+                          fontWeight: 900,
+                          fontSize: 22,
+                          color: THEME.colors.primary,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {item.average?.toFixed(1)}
+                      </div>
+                      <div
+                        style={{
+                          color: THEME.colors.textSecondary,
+                          fontSize: 12,
+                          marginTop: 4,
+                        }}
+                      >
+                        avg
+                      </div>
                     </div>
                   </div>
-
-                  <div style={{ flexShrink: 0 }}>
-                    <Badge tone={resultBadgeTone(game.result)}>{game.result}</Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </PageCard>
-      )}
+                ))}
+              </div>
+            )}
+          </PageCard>
+        </div>
+      </div>
     </div>
   )
 }
