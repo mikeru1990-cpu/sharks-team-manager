@@ -32,6 +32,56 @@ function statusLabel(status: CoachAvailabilityStatus) {
   return "Unavailable"
 }
 
+function StatBox({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string | number
+  tone?: "default" | "green" | "yellow" | "red"
+}) {
+  const style =
+    tone === "green"
+      ? {
+          background: "#dcfce7",
+          border: "1px solid #86efac",
+          color: "#166534",
+        }
+      : tone === "yellow"
+      ? {
+          background: "#fef3c7",
+          border: "1px solid #fcd34d",
+          color: "#92400e",
+        }
+      : tone === "red"
+      ? {
+          background: "#fee2e2",
+          border: "1px solid #fecaca",
+          color: "#991b1b",
+        }
+      : {
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          color: "#334155",
+        }
+
+  return (
+    <div
+      style={{
+        ...style,
+        borderRadius: 18,
+        padding: 14,
+        display: "grid",
+        gap: 4,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 800 }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+    </div>
+  )
+}
+
 export default function CoachesTabContent({
   isAdmin,
   selectedDate,
@@ -54,10 +104,17 @@ export default function CoachesTabContent({
           subtitle={`Snapshot for ${formatFullDate(selectedDate)}`}
         />
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-          <Badge tone="green">Available {availableCount}</Badge>
-          <Badge tone="red">Unavailable {unavailableCount}</Badge>
-          <Badge tone="yellow">Holiday {holidayCount}</Badge>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12,
+            marginBottom: 14,
+          }}
+        >
+          <StatBox label="Available" value={availableCount} tone="green" />
+          <StatBox label="Unavailable" value={unavailableCount} tone="red" />
+          <StatBox label="Holiday" value={holidayCount} tone="yellow" />
         </div>
 
         {selectedDateCoachAvailability.length > 0 ? (
@@ -70,7 +127,7 @@ export default function CoachesTabContent({
                   key={item.id}
                   style={{
                     padding: 14,
-                    borderRadius: 16,
+                    borderRadius: 18,
                     background: "white",
                     border: "1px solid #dbe3ef",
                     display: "grid",
