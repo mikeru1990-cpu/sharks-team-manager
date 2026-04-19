@@ -26,12 +26,36 @@ const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
 
 type Props = any
 
+function ShellSection({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      style={{
+        minWidth: 0,
+        display: "grid",
+        gap: 16,
+      }}
+    >
+      {children}
+    </section>
+  )
+}
+
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin, signOut } = props
 
   if (loading) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 24,
+          background: "linear-gradient(180deg, #f8fafc 0%, #eaf1ff 45%, #eef2ff 100%)",
+        }}
+      >
         <div style={{ ...cardStyle(), maxWidth: 840, margin: "0 auto" }}>
           Loading club data...
         </div>
@@ -44,8 +68,8 @@ export default function DashboardShell(props: Props) {
       style={{
         minHeight: "100vh",
         padding: 16,
-        paddingBottom: 120,
-        background: "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)",
+        paddingBottom: 124,
+        background: "linear-gradient(180deg, #f8fafc 0%, #eaf1ff 45%, #eef2ff 100%)",
         overflowX: "hidden",
         boxSizing: "border-box",
       }}
@@ -55,7 +79,7 @@ export default function DashboardShell(props: Props) {
           maxWidth: 980,
           margin: "0 auto",
           display: "grid",
-          gap: 16,
+          gap: 18,
           minWidth: 0,
         }}
       >
@@ -87,89 +111,103 @@ export default function DashboardShell(props: Props) {
         ) : null}
 
         {tab === "home" && (
-          <HomeTab
-            teamName={TEAM.name}
-            players={props.players}
-            events={props.events}
-            attendance={props.attendance}
-            results={props.leagueResults}
-            ratings={props.playerRatings}
-            activeMatchEventId={props.activeMatchEventId}
-            selectedDate={props.selectedDate}
-            onOpenTab={props.setTab}
-          />
+          <ShellSection>
+            <HomeTab
+              teamName={TEAM.name}
+              players={props.players}
+              events={props.events}
+              attendance={props.attendance}
+              results={props.leagueResults}
+              ratings={props.playerRatings}
+              activeMatchEventId={props.activeMatchEventId}
+              selectedDate={props.selectedDate}
+              onOpenTab={props.setTab}
+            />
+          </ShellSection>
         )}
 
         {tab === "players" && (
-          <PlayersManager
-            players={props.players}
-            isAdmin={props.isAdmin}
-            onSavePlayers={props.savePlayers}
-          />
+          <ShellSection>
+            <PlayersManager
+              players={props.players}
+              isAdmin={props.isAdmin}
+              onSavePlayers={props.savePlayers}
+            />
+          </ShellSection>
         )}
 
         {tab === "events" && (
-          <EventsTabContent
-            isAdmin={props.isAdmin}
-            selectedDate={props.selectedDate}
-            setSelectedDate={props.setSelectedDate}
-            events={props.events}
-            selectedDateEvents={props.selectedDateEvents}
-            selectedEvent={props.selectedEvent}
-            selectedEventId={props.selectedEventId}
-            setSelectedEventId={props.setSelectedEventId}
-            activeMatchEventId={props.activeMatchEventId}
-            setActiveMatchEventId={props.setActiveMatchEventId}
-            players={props.players}
-            attendance={props.attendance}
-            allTrainingPlans={props.allTrainingPlans}
-            selectedTemplateId={props.selectedTemplateId}
-            setSelectedTemplateId={props.setSelectedTemplateId}
-            trainingPlan={props.trainingPlan}
-            setTrainingPlan={props.setTrainingPlan}
-            selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
-            setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
-            activeSession={props.activeSession}
-            setActiveSession={props.setActiveSession}
-            sessionHistory={props.sessionHistory}
-            formatFullDate={props.formatFullDate}
-            statusStyle={props.statusStyle}
-            countAttendance={props.countAttendance}
-            getPlayerStatus={props.getPlayerStatus}
-            loadTrainingPlanFromEvent={props.loadTrainingPlanFromEvent}
-            persistSettings={props.persistSettings}
-            saveAttendance={props.saveAttendance}
-            saveTrainingPlans={props.saveTrainingPlans}
-            saveSessionRecord={props.saveSessionRecord}
-            openAddCalendarEvent={props.openAddCalendarEvent}
-            openEditCalendarEvent={props.openEditCalendarEvent}
-            deleteCalendarEvent={props.deleteCalendarEvent}
-          />
+          <ShellSection>
+            <EventsTabContent
+              isAdmin={props.isAdmin}
+              selectedDate={props.selectedDate}
+              setSelectedDate={props.setSelectedDate}
+              events={props.events}
+              selectedDateEvents={props.selectedDateEvents}
+              selectedEvent={props.selectedEvent}
+              selectedEventId={props.selectedEventId}
+              setSelectedEventId={props.setSelectedEventId}
+              activeMatchEventId={props.activeMatchEventId}
+              setActiveMatchEventId={props.setActiveMatchEventId}
+              players={props.players}
+              attendance={props.attendance}
+              allTrainingPlans={props.allTrainingPlans}
+              selectedTemplateId={props.selectedTemplateId}
+              setSelectedTemplateId={props.setSelectedTemplateId}
+              trainingPlan={props.trainingPlan}
+              setTrainingPlan={props.setTrainingPlan}
+              selectedDbTrainingPlanId={props.selectedDbTrainingPlanId}
+              setSelectedDbTrainingPlanId={props.setSelectedDbTrainingPlanId}
+              activeSession={props.activeSession}
+              setActiveSession={props.setActiveSession}
+              sessionHistory={props.sessionHistory}
+              formatFullDate={props.formatFullDate}
+              statusStyle={props.statusStyle}
+              countAttendance={props.countAttendance}
+              getPlayerStatus={props.getPlayerStatus}
+              loadTrainingPlanFromEvent={props.loadTrainingPlanFromEvent}
+              persistSettings={props.persistSettings}
+              saveAttendance={props.saveAttendance}
+              saveTrainingPlans={props.saveTrainingPlans}
+              saveSessionRecord={props.saveSessionRecord}
+              openAddCalendarEvent={props.openAddCalendarEvent}
+              openEditCalendarEvent={props.openEditCalendarEvent}
+              deleteCalendarEvent={props.deleteCalendarEvent}
+            />
+          </ShellSection>
         )}
 
         {tab === "coaches" && (
-          <CoachesTabContent
-            isAdmin={props.isAdmin}
-            selectedDate={props.selectedDate}
-            coaches={props.coaches}
-            coachAvailability={props.coachAvailability}
-            selectedDateCoachAvailability={props.selectedDateCoachAvailability || []}
-            formatFullDate={props.formatFullDate}
-            saveCoaches={props.saveCoaches}
-            saveCoachAvailability={props.saveCoachAvailability}
-          />
+          <ShellSection>
+            <CoachesTabContent
+              isAdmin={props.isAdmin}
+              selectedDate={props.selectedDate}
+              coaches={props.coaches}
+              coachAvailability={props.coachAvailability}
+              selectedDateCoachAvailability={props.selectedDateCoachAvailability || []}
+              formatFullDate={props.formatFullDate}
+              saveCoaches={props.saveCoaches}
+              saveCoachAvailability={props.saveCoachAvailability}
+            />
+          </ShellSection>
         )}
 
-        {tab === "match" && <MatchTabContent {...props} />}
+        {tab === "match" && (
+          <ShellSection>
+            <MatchTabContent {...props} />
+          </ShellSection>
+        )}
 
         {tab === "stats" && (
-          <StatsTab
-            teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name}
-            results={props.leagueResults}
-            players={props.players}
-            ratings={props.playerRatings}
-            timeline={props.timeline || []}
-          />
+          <ShellSection>
+            <StatsTab
+              teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name}
+              results={props.leagueResults}
+              players={props.players}
+              ratings={props.playerRatings}
+              timeline={props.timeline || []}
+            />
+          </ShellSection>
         )}
       </div>
 
