@@ -2,19 +2,31 @@
 
 import type { MainTab } from "../../lib/types"
 import { THEME } from "../../lib/theme"
+import {
+  HomeIcon,
+  CalendarIcon,
+  FootballIcon,
+  UsersIcon,
+  ChartIcon,
+  CapIcon,
+} from "../AppIcons"
 
 type Props = {
   tab: MainTab
   setTab: (tab: MainTab) => void
 }
 
-const items: Array<{ key: MainTab; label: string; icon: string }> = [
-  { key: "home", label: "Home", icon: "🏠" },
-  { key: "events", label: "Events", icon: "📅" },
-  { key: "match", label: "Match", icon: "⚽" },
-  { key: "players", label: "Players", icon: "👥" },
-  { key: "stats", label: "Stats", icon: "📊" },
-  { key: "coaches", label: "Coaches", icon: "🧢" },
+const items: Array<{
+  key: MainTab
+  label: string
+  icon: React.ReactNode
+}> = [
+  { key: "home", label: "Home", icon: <HomeIcon /> },
+  { key: "events", label: "Events", icon: <CalendarIcon /> },
+  { key: "match", label: "Match", icon: <FootballIcon /> },
+  { key: "players", label: "Players", icon: <UsersIcon /> },
+  { key: "stats", label: "Stats", icon: <ChartIcon /> },
+  { key: "coaches", label: "Coaches", icon: <CapIcon /> },
 ]
 
 export default function BottomNav({ tab, setTab }: Props) {
@@ -68,13 +80,15 @@ export default function BottomNav({ tab, setTab }: Props) {
             >
               <div
                 style={{
-                  fontSize: 21,
                   lineHeight: 1,
                   transform: active ? "translateY(-1px)" : "none",
+                  display: "grid",
+                  placeItems: "center",
                 }}
               >
                 {item.icon}
               </div>
+
               <div
                 style={{
                   fontSize: 11,
