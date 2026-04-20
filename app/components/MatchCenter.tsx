@@ -16,12 +16,7 @@ import type {
   SavedLineup,
   TimelineItem,
 } from "../lib/types"
-import {
-  TEAM,
-  formatClock,
-  formatMinutes,
-  initials,
-} from "../lib/types"
+import { TEAM, formatClock, formatMinutes, initials } from "../lib/types"
 import { canPlaySlot } from "../lib/rotation"
 import {
   Badge,
@@ -84,7 +79,7 @@ type Props = {
   setPeriodLength: (value: number) => Promise<void>
 }
 
-function statButtonStyle(active: boolean) {
+function tabButtonStyle(active: boolean) {
   return {
     border: active ? `1px solid ${THEME.colors.primary}` : "1px solid #cbd5e1",
     background: active ? "linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)" : "white",
@@ -97,7 +92,42 @@ function statButtonStyle(active: boolean) {
     width: "100%",
     minWidth: 0,
     whiteSpace: "nowrap" as const,
+    cursor: "pointer",
   }
+}
+
+function SummaryStat({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string | number
+  tone?: "default" | "blue" | "green" | "yellow"
+}) {
+  const style =
+    tone === "blue"
+      ? { background: "#dbeafe", color: "#1d4ed8", border: "1px solid #bfdbfe" }
+      : tone === "green"
+      ? { background: "#dcfce7", color: "#166534", border: "1px solid #86efac" }
+      : tone === "yellow"
+      ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fcd34d" }
+      : { background: "#f8fafc", color: "#334155", border: "1px solid #e2e8f0" }
+
+  return (
+    <div
+      style={{
+        ...style,
+        borderRadius: 18,
+        padding: 14,
+        display: "grid",
+        gap: 4,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 800 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
+    </div>
+  )
 }
 
 function MiniScoreButton({
@@ -115,10 +145,10 @@ function MiniScoreButton({
         background: "white",
         color: THEME.colors.textPrimary,
         borderRadius: 14,
-        width: 68,
-        height: 56,
+        width: 60,
+        height: 48,
         fontWeight: 900,
-        fontSize: 18,
+        fontSize: 17,
         cursor: "pointer",
         boxShadow: "0 4px 10px rgba(15,23,42,0.08)",
       }}
@@ -433,56 +463,6 @@ function TimelineBadge({ type }: { type: TimelineItem["type"] }) {
   return <Badge tone="default">{type}</Badge>
 }
 
-function SummaryStat({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string
-  value: string | number
-  tone?: "default" | "blue" | "green" | "yellow"
-}) {
-  const style =
-    tone === "blue"
-      ? {
-          background: "#dbeafe",
-          color: "#1d4ed8",
-          border: "1px solid #bfdbfe",
-        }
-      : tone === "green"
-      ? {
-          background: "#dcfce7",
-          color: "#166534",
-          border: "1px solid #86efac",
-        }
-      : tone === "yellow"
-      ? {
-          background: "#fef3c7",
-          color: "#92400e",
-          border: "1px solid #fcd34d",
-        }
-      : {
-          background: "#f8fafc",
-          color: "#334155",
-          border: "1px solid #e2e8f0",
-        }
-
-  return (
-    <div
-      style={{
-        ...style,
-        borderRadius: 16,
-        padding: 12,
-        display: "grid",
-        gap: 4,
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 900, lineHeight: 1 }}>{value}</div>
-    </div>
-  )
-}
-
 export default function MatchCenter(props: Props) {
   const {
     isAdmin,
@@ -538,9 +518,7 @@ export default function MatchCenter(props: Props) {
     .map((id) => players.find((p) => p.id === id))
     .filter(Boolean) as Player[]
 
-  const benchPlayers = benchIds
-    .map((id) => players.find((p) => p.id === id))
-    .filter(Boolean) as Player[]
+  const benchPlayers = benchIds.map((id) => players.find((p) => p.id === id)).filter(Boolean) as Player[]
 
   const activeDragPlayer = players.find((p) => p.id === activeDragPlayerId) || null
 
@@ -559,13 +537,7 @@ export default function MatchCenter(props: Props) {
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <PageCard tone="blue">
-        <div
-          style={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: 20,
-          }}
-        >
+        <div style={{ position: "relative", overflow: "hidden", borderRadius: 20 }}>
           <div
             style={{
               position: "absolute",
@@ -584,24 +556,25 @@ export default function MatchCenter(props: Props) {
             }}
           />
 
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <div style={{ color: "rgba(255,255,255,0.78)", fontWeight: 800, fontSize: 12 }}>
-              MATCH CENTER
-            </div>
-
-            {trackingTitle ? (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 15,
-                  fontWeight: 800,
-                  color: "rgba(255,255,255,0.96)",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {trackingTitle}
+          <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 16 }}>
+            <div>
+              <div style={{ color: "rgba(255,255,255,0.78)", fontWeight: 800, fontSize: 12 }}>
+                MATCH CENTER
               </div>
-            ) : null}
+              {trackingTitle ? (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: "rgba(255,255,255,0.96)",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {trackingTitle}
+                </div>
+              ) : null}
+            </div>
 
             <div
               style={{
@@ -609,11 +582,18 @@ export default function MatchCenter(props: Props) {
                 gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
                 gap: 12,
                 alignItems: "end",
-                marginTop: 12,
               }}
             >
               <TeamNameInput value={homeTeam} disabled={!isAdmin} onChange={setHomeTeam} />
-              <div style={{ fontSize: 16, fontWeight: 900, opacity: 0.82, color: "white", paddingBottom: 8 }}>
+              <div
+                style={{
+                  fontSize: 16,
+                  fontWeight: 900,
+                  opacity: 0.82,
+                  color: "white",
+                  paddingBottom: 8,
+                }}
+              >
                 VS
               </div>
               <TeamNameInput value={awayTeam} disabled={!isAdmin} onChange={setAwayTeam} align="right" />
@@ -625,21 +605,12 @@ export default function MatchCenter(props: Props) {
                 gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
                 gap: 14,
                 alignItems: "center",
-                marginTop: 18,
               }}
             >
               <div style={{ textAlign: "center", color: "white" }}>
                 <div style={{ fontSize: 58, fontWeight: 900, lineHeight: 1 }}>{homeScore}</div>
                 {isAdmin ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 8,
-                      marginTop: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                     <MiniScoreButton onClick={() => void setHomeScore(homeScore + 1)}>+1</MiniScoreButton>
                     <MiniScoreButton onClick={() => void setHomeScore(Math.max(0, homeScore - 1))}>-1</MiniScoreButton>
                   </div>
@@ -648,35 +619,19 @@ export default function MatchCenter(props: Props) {
 
               <div style={{ textAlign: "center", color: "white", minWidth: 110 }}>
                 <div style={{ fontSize: 14, fontWeight: 900, opacity: 0.9 }}>{periodLabel}</div>
-                <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1.05 }}>
-                  {formatClock(seconds)}
-                </div>
+                <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1.05 }}>{formatClock(seconds)}</div>
                 <div style={{ fontSize: 13, opacity: 0.85, marginTop: 6 }}>
                   {periodLength} min {periodName.toLowerCase()}
                 </div>
-                {running ? (
-                  <div style={{ marginTop: 8 }}>
-                    <Badge tone="green">Running</Badge>
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 8 }}>
-                    <Badge tone="default">Paused</Badge>
-                  </div>
-                )}
+                <div style={{ marginTop: 8 }}>
+                  <Badge tone={running ? "green" : "default"}>{running ? "Running" : "Paused"}</Badge>
+                </div>
               </div>
 
               <div style={{ textAlign: "center", color: "white" }}>
                 <div style={{ fontSize: 58, fontWeight: 900, lineHeight: 1 }}>{awayScore}</div>
                 {isAdmin ? (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: 8,
-                      marginTop: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                     <MiniScoreButton onClick={() => void setAwayScore(awayScore + 1)}>+1</MiniScoreButton>
                     <MiniScoreButton onClick={() => void setAwayScore(Math.max(0, awayScore - 1))}>-1</MiniScoreButton>
                   </div>
@@ -684,10 +639,22 @@ export default function MatchCenter(props: Props) {
               </div>
             </div>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <SummaryStat label="Format" value={matchFormat} tone="blue" />
+              <SummaryStat label="Formation" value={formation} />
+              <SummaryStat label="On Pitch" value={lineupPlayers.length} tone="green" />
+              <SummaryStat label="Bench" value={benchPlayers.length} tone="yellow" />
+            </div>
+
             {isAdmin ? (
               <div
                 style={{
-                  marginTop: 18,
                   display: "grid",
                   gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                   gap: 10,
@@ -717,11 +684,7 @@ export default function MatchCenter(props: Props) {
           ["quarters", periodsTabLabel],
           ["stats", "Stats"],
         ].map(([value, label]) => (
-          <button
-            key={value}
-            onClick={() => setMatchTab(value as MatchTab)}
-            style={statButtonStyle(matchTab === value)}
-          >
+          <button key={value} onClick={() => setMatchTab(value as MatchTab)} style={tabButtonStyle(matchTab === value)}>
             {label}
           </button>
         ))}
@@ -729,21 +692,9 @@ export default function MatchCenter(props: Props) {
 
       {matchTab === "overview" && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: 10,
-            }}
-          >
-            <SummaryStat label="Format" value={matchFormat} tone="blue" />
-            <SummaryStat label="Formation" value={formation} />
-            <SummaryStat label="On Pitch" value={lineupPlayers.length} tone="green" />
-            <SummaryStat label="Bench" value={benchPlayers.length} tone="yellow" />
-          </div>
-
           <PageCard>
-            <SectionHeader title="Match Settings" subtitle="Control game structure and timing." />
+            <SectionHeader title="Quick Controls" subtitle="Control game structure and live timing." />
+
             <div
               style={{
                 display: "grid",
@@ -815,35 +766,11 @@ export default function MatchCenter(props: Props) {
                   ))}
                 </select>
               </div>
-            </div>
-          </PageCard>
 
-          <PageCard tone="softGreen">
-            <SectionHeader title="Clock & Minutes" subtitle="Track live time and save player minutes." />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) auto",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <div style={{ color: "#065f46", fontWeight: 900, fontSize: 13 }}>{periodLabel}</div>
-                <div style={{ fontSize: 42, fontWeight: 900, marginTop: 6 }}>{formatClock(seconds)}</div>
-                <div style={{ marginTop: 4, fontWeight: 800, fontSize: 13 }}>
-                  {periodLength} min {periodName.toLowerCase()}
-                </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontWeight: 800, fontSize: 13 }}>Minutes</div>
+                <PrimaryButton onClick={() => void saveMinutes()}>Save Minutes</PrimaryButton>
               </div>
-
-              {isAdmin ? (
-                <div style={{ display: "grid", gap: 8, minWidth: 140 }}>
-                  <PrimaryButton onClick={() => setRunning(true)}>Start</PrimaryButton>
-                  <SecondaryButton onClick={() => setRunning(false)}>Pause</SecondaryButton>
-                  <SecondaryButton onClick={resetClock}>Reset</SecondaryButton>
-                  <PrimaryButton onClick={() => void saveMinutes()}>Save Minutes</PrimaryButton>
-                </div>
-              ) : null}
             </div>
           </PageCard>
 
@@ -886,15 +813,12 @@ export default function MatchCenter(props: Props) {
       {matchTab === "lineup" && (
         <div style={{ display: "grid", gap: 16 }}>
           <PageCard>
-            <SectionHeader
-              title="Formation & Saved Lineups"
-              subtitle="Set your shape, then save reusable match setups."
-            />
+            <SectionHeader title="Formation & Saved Lineups" subtitle="Set shape and save reusable match setups." />
 
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0,1fr))",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                 gap: 10,
                 marginBottom: 12,
               }}
@@ -1251,7 +1175,9 @@ export default function MatchCenter(props: Props) {
         <PageCard tone="softYellow">
           <SectionHeader
             title={periodMode === "quarters" ? "Quarter Summary" : "Half Summary"}
-            subtitle={`Use the planner section below to save, load, and auto-generate ${periodMode === "quarters" ? "quarter" : "half"} plans.`}
+            subtitle={`Use the planner section below to save, load, and auto-generate ${
+              periodMode === "quarters" ? "quarter" : "half"
+            } plans.`}
           />
         </PageCard>
       )}
