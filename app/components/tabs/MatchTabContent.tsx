@@ -4,18 +4,18 @@ import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
 import MatchReportGenerator from "../MatchReportGenerator"
 import PlayerFeedbackCard from "../PlayerFeedbackCard"
-import {
-  cardStyle,
-  type Coach,
-  type MatchFormat,
-  type MatchReport,
-  type MatchTab,
-  type PitchSlot,
-  type Player,
-  type PlayerMatchRating,
-  type QuarterPlan,
-  type SavedLineup,
-  type TimelineItem,
+import { PageCard, SectionHeader, Badge } from "../ui"
+import type {
+  Coach,
+  MatchFormat,
+  MatchReport,
+  MatchTab,
+  PitchSlot,
+  Player,
+  PlayerMatchRating,
+  QuarterPlan,
+  SavedLineup,
+  TimelineItem,
 } from "../../lib/types"
 import type { EventWithPlan, PeriodMode } from "../../lib/dashboardTypes"
 
@@ -128,21 +128,6 @@ type Props = {
   saveMatchReport: (coachNotes: string) => Promise<void>
 }
 
-function SectionTitle({
-  title,
-  subtitle,
-}: {
-  title: string
-  subtitle?: string
-}) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 22, fontWeight: 900 }}>{title}</div>
-      {subtitle ? <div style={{ color: "#64748b", marginTop: 4 }}>{subtitle}</div> : null}
-    </div>
-  )
-}
-
 function StatPill({
   label,
   value,
@@ -154,35 +139,19 @@ function StatPill({
 }) {
   const toneStyle =
     tone === "success"
-      ? {
-          background: "#dcfce7",
-          border: "1px solid #86efac",
-          color: "#166534",
-        }
+      ? { background: "#dcfce7", border: "1px solid #86efac", color: "#166534" }
       : tone === "warning"
-      ? {
-          background: "#fef3c7",
-          border: "1px solid #fcd34d",
-          color: "#92400e",
-        }
+      ? { background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" }
       : tone === "danger"
-      ? {
-          background: "#fee2e2",
-          border: "1px solid #fecaca",
-          color: "#991b1b",
-        }
-      : {
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          color: "#334155",
-        }
+      ? { background: "#fee2e2", border: "1px solid #fecaca", color: "#991b1b" }
+      : { background: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155" }
 
   return (
     <div
       style={{
         ...toneStyle,
-        padding: "10px 12px",
-        borderRadius: 14,
+        padding: "12px 14px",
+        borderRadius: 16,
         fontWeight: 800,
       }}
     >
@@ -200,23 +169,15 @@ function InfoBanner({
 }) {
   const style =
     tone === "danger"
-      ? {
-          background: "#fee2e2",
-          border: "1px solid #fecaca",
-          color: "#991b1b",
-        }
-      : {
-          background: "#fff7ed",
-          border: "1px solid #fdba74",
-          color: "#9a3412",
-        }
+      ? { background: "#fee2e2", border: "1px solid #fecaca", color: "#991b1b" }
+      : { background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412" }
 
   return (
     <div
       style={{
         ...style,
         padding: 12,
-        borderRadius: 12,
+        borderRadius: 14,
         fontWeight: 800,
       }}
     >
@@ -331,15 +292,18 @@ export default function MatchTabContent(props: Props) {
     saveMatchReport,
   } = props
 
+  const matchEvents = events.filter((event) => event.type === "match")
+
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={cardStyle()}>
-        <SectionTitle
+      <PageCard>
+        <SectionHeader
           title="Match Hub"
-          subtitle="Select a match, manage the day, and record feedback and reports."
+          subtitle="Choose a match, manage the day, and record feedback."
+          action={activeMatchEvent ? <Badge tone="blue">Active Match</Badge> : undefined}
         />
 
-        {events.filter((event) => event.type === "match").length === 0 ? (
+        {matchEvents.length === 0 ? (
           <div style={{ color: "#64748b" }}>No match events created yet.</div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
@@ -356,11 +320,11 @@ export default function MatchTabContent(props: Props) {
                 border: "1px solid #cbd5e1",
                 fontSize: 16,
                 width: "100%",
+                background: "white",
               }}
             >
               <option value="">Choose match event</option>
-              {events
-                .filter((event) => event.type === "match")
+              {matchEvents
                 .slice()
                 .sort((a, b) => {
                   const dateCompare = a.date.localeCompare(b.date)
@@ -401,72 +365,44 @@ export default function MatchTabContent(props: Props) {
             )}
           </div>
         )}
-      </div>
+      </PageCard>
 
-      <div style={cardStyle()}>
-        <SectionTitle title="Matchday Snapshot" />
+      {activeMatchEvent ? (
+        <PageCard>
+          <SectionHeader title="Matchday Snapshot" subtitle={`Overview for ${formatFullDate(matchDateForCoachView)}`} />
 
-        {!activeMatchEvent ? (
-          <div style={{ color: "#64748b" }}>No active match event selected.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: 10,
-              }}
-            >
-              <StatPill label="Available" value={matchPlayers.length} tone="success" />
-              <StatPill label="Maybe" value={maybePlayers.length} tone="warning" />
-              <StatPill label="Unavailable" value={unavailablePlayers.length} tone="danger" />
-              <StatPill label="Coaches" value={availableCoaches.length} />
-            </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <StatPill label="Available" value={matchPlayers.length} tone="success" />
+            <StatPill label="Maybe" value={maybePlayers.length} tone="warning" />
+            <StatPill label="Unavailable" value={unavailablePlayers.length} tone="danger" />
+            <StatPill label="Coaches" value={availableCoaches.length} />
+          </div>
 
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             {noAvailableKeeper ? (
-              <InfoBanner
-                tone="danger"
-                text="Warning: no available goalkeeper is marked for this match."
-              />
+              <InfoBanner tone="danger" text="Warning: no available goalkeeper is marked for this match." />
             ) : null}
-
             {noAvailableCoaches ? (
               <InfoBanner tone="danger" text="Warning: no coaches are available for this day." />
             ) : null}
-
             {!headCoachAvailable ? (
               <InfoBanner tone="warning" text="Warning: no Head Coach is marked as available." />
             ) : null}
-
-            {unavailablePlayers.length > 0 ? (
-              <div
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  color: "#475569",
-                }}
-              >
-                Unavailable players: {unavailablePlayers.map((p) => p.name).join(", ")}
-              </div>
-            ) : null}
           </div>
-        )}
-      </div>
 
-      <div style={cardStyle("#eff6ff")}>
-        <SectionTitle
-          title="Coach Availability"
-          subtitle={`Showing coach availability for ${formatFullDate(matchDateForCoachView)}`}
-        />
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <StatPill label="Available" value={availableCoaches.length} tone="success" />
-          <StatPill label="Unavailable" value={unavailableCoachesList.length} tone="danger" />
-          <StatPill label="Holiday" value={holidayCoachesList.length} tone="warning" />
-        </div>
-      </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <StatPill label="Available coaches" value={availableCoaches.length} tone="success" />
+            <StatPill label="Unavailable coaches" value={unavailableCoachesList.length} tone="danger" />
+            <StatPill label="Holiday coaches" value={holidayCoachesList.length} tone="warning" />
+          </div>
+        </PageCard>
+      ) : null}
 
       <MatchCenter
         isAdmin={isAdmin}
@@ -578,20 +514,13 @@ export default function MatchTabContent(props: Props) {
         />
       ) : null}
 
-      <div style={cardStyle()}>
-        <SectionTitle
-          title="Player Feedback"
-          subtitle="Development-focused notes instead of match ratings."
-        />
+      <PageCard>
+        <SectionHeader title="Player Feedback" subtitle="Development-focused notes instead of match ratings." />
 
         {!activeMatchEvent ? (
-          <div style={{ color: "#64748b" }}>
-            Choose an active match event to record player feedback.
-          </div>
+          <div style={{ color: "#64748b" }}>Choose an active match event to record player feedback.</div>
         ) : matchPlayers.length === 0 ? (
-          <div style={{ color: "#64748b" }}>
-            No available players for the selected match.
-          </div>
+          <div style={{ color: "#64748b" }}>No available players for the selected match.</div>
         ) : (
           <div style={{ display: "grid", gap: 14 }}>
             {matchPlayers.map((player) => {
@@ -634,15 +563,15 @@ export default function MatchTabContent(props: Props) {
             })}
           </div>
         )}
-      </div>
+      </PageCard>
 
       {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? (
-        <div style={cardStyle("#fef3c7")}>
-          <SectionTitle title="Player of the Match" />
+        <PageCard tone="softYellow">
+          <SectionHeader title="Player of the Match" />
           <div style={{ color: "#92400e", fontWeight: 800 }}>
             {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}
           </div>
-        </div>
+        </PageCard>
       ) : null}
 
       {activeMatchEvent ? (
