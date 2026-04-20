@@ -6,6 +6,7 @@ import {
   PageCard,
   PrimaryButton,
   SectionHeader,
+  SecondaryButton,
 } from "../ui"
 import type {
   EventAttendance,
@@ -53,24 +54,24 @@ function StatTile({
     tone === "blue"
       ? {
           background: "#dbeafe",
-          border: "1px solid #bfdbfe",
+          border: "1px solid rgba(59,130,246,0.24)",
           color: "#1d4ed8",
         }
       : tone === "green"
       ? {
           background: "#dcfce7",
-          border: "1px solid #86efac",
+          border: "1px solid rgba(34,197,94,0.28)",
           color: "#166534",
         }
       : tone === "yellow"
       ? {
           background: "#fef3c7",
-          border: "1px solid #fcd34d",
+          border: "1px solid rgba(250,204,21,0.34)",
           color: "#92400e",
         }
       : {
           background: "#f8fafc",
-          border: "1px solid #e2e8f0",
+          border: "1px solid rgba(15,23,42,0.08)",
           color: "#334155",
         }
 
@@ -78,14 +79,15 @@ function StatTile({
     <div
       style={{
         ...style,
-        borderRadius: 18,
-        padding: 14,
+        borderRadius: 20,
+        padding: 16,
         display: "grid",
-        gap: 4,
+        gap: 6,
+        boxShadow: "0 6px 14px rgba(15,23,42,0.05)",
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.85 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.88 }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
     </div>
   )
 }
@@ -107,20 +109,33 @@ function QuickAction({
       style={{
         border: "1px solid #dbe3ef",
         background: "white",
-        borderRadius: 20,
-        padding: 16,
+        borderRadius: 22,
+        padding: 18,
         textAlign: "left",
         display: "grid",
-        gap: 8,
+        gap: 10,
         cursor: "pointer",
-        boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
+        boxShadow: "0 8px 20px rgba(15,23,42,0.05)",
       }}
     >
-      <div style={{ fontSize: 24, lineHeight: 1 }}>{icon}</div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: THEME.colors.textPrimary }}>
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 14,
+          background: "#eff6ff",
+          display: "grid",
+          placeItems: "center",
+          fontSize: 22,
+          lineHeight: 1,
+        }}
+      >
+        {icon}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 900, color: THEME.colors.textPrimary }}>
         {title}
       </div>
-      <div style={{ fontSize: 13, color: THEME.colors.textSecondary, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 14, color: THEME.colors.textSecondary, lineHeight: 1.45 }}>
         {subtitle}
       </div>
     </button>
@@ -149,6 +164,25 @@ function EmptyState({
       <div style={{ fontWeight: 800, color: THEME.colors.textPrimary }}>{title}</div>
       <div style={{ fontSize: 14 }}>{subtitle}</div>
     </div>
+  )
+}
+
+function FeatureCard({
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  title: string
+  subtitle: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <PageCard>
+      <SectionHeader title={title} subtitle={subtitle} action={action} />
+      {children}
+    </PageCard>
   )
 }
 
@@ -208,21 +242,21 @@ export default function HomeTab({
       ? (ratings.reduce((sum, item) => sum + item.rating, 0) / ratings.length).toFixed(1)
       : "—"
 
-  const playerOfTheMatchCount: Record<string, number> = {}
+  const playerScoreMap: Record<string, number> = {}
   for (const rating of ratings) {
-    playerOfTheMatchCount[rating.playerId] = (playerOfTheMatchCount[rating.playerId] || 0) + rating.rating
+    playerScoreMap[rating.playerId] = (playerScoreMap[rating.playerId] || 0) + rating.rating
   }
 
   const topPlayerId =
-    Object.entries(playerOfTheMatchCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+    Object.entries(playerScoreMap).sort((a, b) => b[1] - a[1])[0]?.[0] || null
   const topPlayer = players.find((player) => player.id === topPlayerId) || null
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 20 }}>
       <PageCard tone="blue">
         <SectionHeader
           title={teamName}
-          subtitle="Matchday snapshot, team summary and quick access."
+          subtitle="Matchday snapshot, squad summary and quick access."
           light
           action={
             <div style={{ minWidth: 140 }}>
@@ -236,44 +270,44 @@ export default function HomeTab({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-            gap: 10,
-            marginTop: 8,
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 12,
+            marginTop: 10,
           }}
         >
           <div
             style={{
               background: "rgba(255,255,255,0.12)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 20,
+              padding: 16,
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>SQUAD</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4 }}>{totalPlayers}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6 }}>{totalPlayers}</div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>registered players</div>
           </div>
 
           <div
             style={{
               background: "rgba(250,204,21,0.16)",
-              border: "1px solid rgba(250,204,21,0.28)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(250,204,21,0.24)",
+              borderRadius: 20,
+              padding: 16,
               color: "#fef08a",
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.92 }}>AVG RATING</div>
-            <div style={{ fontSize: 28, fontWeight: 900, marginTop: 4 }}>{avgRating}</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>across saved match feedback</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6 }}>{avgRating}</div>
+            <div style={{ fontSize: 13, marginTop: 4 }}>saved player feedback</div>
           </div>
 
           <div
             style={{
               background: "rgba(255,255,255,0.12)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 20,
+              padding: 16,
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>ACTIVE MATCH</div>
@@ -281,7 +315,7 @@ export default function HomeTab({
               {activeMatch ? activeMatch.title : "No active match"}
             </div>
             <div style={{ fontSize: 13, opacity: 0.9, marginTop: 4 }}>
-              {activeMatch ? formatPrettyDate(activeMatch.date) : "Select one in Match tab"}
+              {activeMatch ? formatPrettyDate(activeMatch.date) : "Choose one in Match tab"}
             </div>
           </div>
         </div>
@@ -310,25 +344,25 @@ export default function HomeTab({
         <QuickAction
           icon="📅"
           title="Events"
-          subtitle="Create training sessions, matches and view daily planning."
+          subtitle="Create training sessions, fixtures and manage attendance."
           onClick={() => onOpenTab("events")}
         />
         <QuickAction
           icon="⚽"
           title="Match Centre"
-          subtitle="Manage lineups, live timeline, minutes and match reports."
+          subtitle="Manage lineups, timeline, minutes and reports."
           onClick={() => onOpenTab("match")}
         />
         <QuickAction
           icon="👥"
           title="Players"
-          subtitle="Update squad list, goalkeeper roles and leadership badges."
+          subtitle="Update squad members, goalkeepers and leadership roles."
           onClick={() => onOpenTab("players")}
         />
         <QuickAction
           icon="📊"
           title="Stats"
-          subtitle="Review results, ratings and player trends."
+          subtitle="Review results, team trends and player feedback."
           onClick={() => onOpenTab("stats")}
         />
       </div>
@@ -336,22 +370,20 @@ export default function HomeTab({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.15fr) minmax(0, 0.85fr)",
+          gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)",
           gap: 16,
         }}
       >
         <div style={{ display: "grid", gap: 16 }}>
-          <PageCard>
-            <SectionHeader
-              title="Next Event"
-              subtitle="Your next key activity for the squad."
-              action={
-                <div style={{ minWidth: 110 }}>
-                  <PrimaryButton onClick={() => onOpenTab("events")}>Open</PrimaryButton>
-                </div>
-              }
-            />
-
+          <FeatureCard
+            title="Next Event"
+            subtitle="Your next key activity for the squad."
+            action={
+              <div style={{ minWidth: 100 }}>
+                <SecondaryButton onClick={() => onOpenTab("events")}>Open</SecondaryButton>
+              </div>
+            }
+          >
             {!todayOrNextEvent ? (
               <EmptyState
                 title="No events scheduled"
@@ -376,36 +408,40 @@ export default function HomeTab({
                   {todayOrNextEvent.startTime ? <Badge>{todayOrNextEvent.startTime}</Badge> : null}
                 </div>
 
-                <div style={{ fontSize: 22, fontWeight: 900, color: THEME.colors.textPrimary }}>
+                <div style={{ fontSize: 24, fontWeight: 900, color: THEME.colors.textPrimary }}>
                   {todayOrNextEvent.title}
                 </div>
 
                 {todayOrNextEvent.opponent ? (
                   <div style={{ color: THEME.colors.textSecondary, fontSize: 15 }}>
-                    Opponent: <strong style={{ color: THEME.colors.textPrimary }}>{todayOrNextEvent.opponent}</strong>
+                    Opponent:{" "}
+                    <strong style={{ color: THEME.colors.textPrimary }}>
+                      {todayOrNextEvent.opponent}
+                    </strong>
                   </div>
                 ) : null}
 
                 {todayOrNextEvent.location ? (
                   <div style={{ color: THEME.colors.textSecondary, fontSize: 15 }}>
-                    Location: <strong style={{ color: THEME.colors.textPrimary }}>{todayOrNextEvent.location}</strong>
+                    Location:{" "}
+                    <strong style={{ color: THEME.colors.textPrimary }}>
+                      {todayOrNextEvent.location}
+                    </strong>
                   </div>
                 ) : null}
               </div>
             )}
-          </PageCard>
+          </FeatureCard>
 
-          <PageCard>
-            <SectionHeader
-              title="Upcoming Matches"
-              subtitle="Nearest fixtures in your current season."
-              action={
-                <div style={{ minWidth: 110 }}>
-                  <PrimaryButton onClick={() => onOpenTab("match")}>Match Tab</PrimaryButton>
-                </div>
-              }
-            />
-
+          <FeatureCard
+            title="Upcoming Matches"
+            subtitle="Nearest fixtures in your current season."
+            action={
+              <div style={{ minWidth: 110 }}>
+                <SecondaryButton onClick={() => onOpenTab("match")}>Match Tab</SecondaryButton>
+              </div>
+            }
+          >
             {upcomingMatches.length === 0 ? (
               <EmptyState
                 title="No matches yet"
@@ -422,7 +458,8 @@ export default function HomeTab({
                       padding: 14,
                       background: "white",
                       display: "grid",
-                      gap: 6,
+                      gap: 8,
+                      boxShadow: "0 6px 14px rgba(15,23,42,0.04)",
                     }}
                   >
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -431,9 +468,11 @@ export default function HomeTab({
                       {match.startTime ? <Badge>{match.startTime}</Badge> : null}
                     </div>
 
-                    <div style={{ fontWeight: 900, fontSize: 16 }}>{match.title}</div>
+                    <div style={{ fontWeight: 900, fontSize: 17, color: THEME.colors.textPrimary }}>
+                      {match.title}
+                    </div>
 
-                    <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
+                    <div style={{ color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 1.45 }}>
                       {match.opponent ? `vs ${match.opponent}` : "Opponent not set"}
                       {match.location ? ` • ${match.location}` : ""}
                     </div>
@@ -441,16 +480,14 @@ export default function HomeTab({
                 ))}
               </div>
             )}
-          </PageCard>
+          </FeatureCard>
         </div>
 
         <div style={{ display: "grid", gap: 16 }}>
-          <PageCard>
-            <SectionHeader
-              title="Top Performer"
-              subtitle="Based on saved match feedback."
-            />
-
+          <FeatureCard
+            title="Top Performer"
+            subtitle="Based on saved match feedback."
+          >
             {topPlayer ? (
               <div
                 style={{
@@ -479,14 +516,12 @@ export default function HomeTab({
                 subtitle="Save some match feedback to surface a standout performer."
               />
             )}
-          </PageCard>
+          </FeatureCard>
 
-          <PageCard>
-            <SectionHeader
-              title="Recent Results"
-              subtitle="Latest saved scorelines."
-            />
-
+          <FeatureCard
+            title="Recent Results"
+            subtitle="Latest saved scorelines."
+          >
             {recentResults.length === 0 ? (
               <EmptyState
                 title="No results saved"
@@ -506,14 +541,29 @@ export default function HomeTab({
                       gap: 6,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <div style={{ fontWeight: 800, color: THEME.colors.textPrimary }}>
                         {result.opponent || "Opponent"}
                       </div>
                       <Badge>{formatPrettyDate(result.playedOn)}</Badge>
                     </div>
 
-                    <div style={{ fontSize: 18, fontWeight: 900 }}>
+                    <div
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 900,
+                        color: THEME.colors.textPrimary,
+                        lineHeight: 1.25,
+                      }}
+                    >
                       {result.homeTeam} {result.homeScore} - {result.awayScore} {result.awayTeam}
                     </div>
 
@@ -526,7 +576,7 @@ export default function HomeTab({
                 ))}
               </div>
             )}
-          </PageCard>
+          </FeatureCard>
         </div>
       </div>
     </div>
