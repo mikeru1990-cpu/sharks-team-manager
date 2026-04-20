@@ -28,38 +28,42 @@ export function PageCard({
           background: `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
           color: "white",
           border: "1px solid rgba(255,255,255,0.10)",
+          boxShadow: "0 18px 40px rgba(15,23,42,0.18)",
         }
       : tone === "softBlue"
       ? {
-          background: "#eff6ff",
+          background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)",
           color: THEME.colors.textPrimary,
           border: "1px solid #bfdbfe",
+          boxShadow: "0 10px 24px rgba(30,64,175,0.06)",
         }
       : tone === "softGreen"
       ? {
-          background: "#ecfdf5",
+          background: "linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)",
           color: THEME.colors.textPrimary,
           border: "1px solid #bbf7d0",
+          boxShadow: "0 10px 24px rgba(22,101,52,0.05)",
         }
       : tone === "softYellow"
       ? {
-          background: "#fefce8",
+          background: "linear-gradient(135deg, #fefce8 0%, #ffffff 100%)",
           color: THEME.colors.textPrimary,
           border: "1px solid #fde68a",
+          boxShadow: "0 10px 24px rgba(146,64,14,0.05)",
         }
       : {
           background: THEME.colors.surface,
           color: THEME.colors.textPrimary,
           border: `1px solid ${THEME.colors.border}`,
+          boxShadow: "0 10px 28px rgba(15,23,42,0.05)",
         }
 
   return (
     <div
       style={{
         ...toneStyle,
-        borderRadius: THEME.radius.card,
+        borderRadius: 24,
         padding: 16,
-        boxShadow: THEME.shadow.card,
       }}
     >
       {children}
@@ -75,9 +79,10 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
     <div
       style={{
         fontSize: 20,
-        fontWeight: 800,
+        fontWeight: 900,
         color: THEME.colors.textPrimary,
         marginBottom: 8,
+        lineHeight: 1.15,
       }}
     >
       {children}
@@ -86,7 +91,7 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 /* =========================
-   SECTION HEADER (FIXED)
+   SECTION HEADER
 ========================= */
 export function SectionHeader({
   title,
@@ -106,17 +111,18 @@ export function SectionHeader({
         justifyContent: "space-between",
         alignItems: subtitle ? "flex-start" : "center",
         gap: 12,
-        marginBottom: 12,
+        marginBottom: 14,
         flexWrap: "wrap",
       }}
     >
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div
           style={{
-            fontSize: 20,
-            fontWeight: 800,
+            fontSize: 21,
+            fontWeight: 900,
             color: light ? "white" : THEME.colors.textPrimary,
-            lineHeight: 1.2,
+            lineHeight: 1.15,
+            letterSpacing: "-0.01em",
           }}
         >
           {title}
@@ -125,11 +131,10 @@ export function SectionHeader({
         {subtitle ? (
           <div
             style={{
-              marginTop: 4,
-              color: light
-                ? "rgba(255,255,255,0.82)"
-                : THEME.colors.textSecondary,
+              marginTop: 5,
+              color: light ? "rgba(255,255,255,0.84)" : THEME.colors.textSecondary,
               fontSize: 14,
+              lineHeight: 1.45,
             }}
           >
             {subtitle}
@@ -137,9 +142,36 @@ export function SectionHeader({
         ) : null}
       </div>
 
-      {action ? <div>{action}</div> : null}
+      {action ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          {action}
+        </div>
+      ) : null}
     </div>
   )
+}
+
+/* =========================
+   BUTTON BASE
+========================= */
+function baseButtonStyle(disabled: boolean) {
+  return {
+    padding: "12px 16px",
+    borderRadius: 16,
+    fontWeight: 800,
+    fontSize: 15,
+    cursor: disabled ? "not-allowed" : "pointer",
+    width: "100%",
+    transition: "all 0.2s ease",
+    boxSizing: "border-box" as const,
+  }
 }
 
 /* =========================
@@ -159,14 +191,13 @@ export function PrimaryButton({
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: disabled ? "#94a3b8" : THEME.colors.primary,
+        ...baseButtonStyle(disabled),
+        background: disabled
+          ? "#94a3b8"
+          : `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
         color: "white",
         border: "none",
-        padding: "12px 16px",
-        borderRadius: THEME.radius.button,
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-        width: "100%",
+        boxShadow: disabled ? "none" : "0 10px 20px rgba(30,58,138,0.18)",
       }}
     >
       {children}
@@ -188,14 +219,11 @@ export function SecondaryButton({
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: disabled ? "#e2e8f0" : THEME.colors.secondary,
-        color: "#111827",
-        border: "none",
-        padding: "12px 16px",
-        borderRadius: THEME.radius.button,
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-        width: "100%",
+        ...baseButtonStyle(disabled),
+        background: disabled ? "#e2e8f0" : "white",
+        color: disabled ? "#94a3b8" : THEME.colors.textPrimary,
+        border: "1px solid #cbd5e1",
+        boxShadow: disabled ? "none" : "0 6px 14px rgba(15,23,42,0.05)",
       }}
     >
       {children}
@@ -217,14 +245,11 @@ export function DangerButton({
       onClick={onClick}
       disabled={disabled}
       style={{
-        background: disabled ? "#e2e8f0" : "#fee2e2",
+        ...baseButtonStyle(disabled),
+        background: disabled ? "#e2e8f0" : "#fff1f2",
         color: disabled ? "#94a3b8" : "#b91c1c",
         border: disabled ? "1px solid #cbd5e1" : "1px solid #fecaca",
-        padding: "12px 16px",
-        borderRadius: THEME.radius.button,
-        fontWeight: 700,
-        cursor: disabled ? "not-allowed" : "pointer",
-        width: "100%",
+        boxShadow: disabled ? "none" : "0 6px 14px rgba(185,28,28,0.06)",
       }}
     >
       {children}
@@ -280,7 +305,7 @@ export function Badge({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "4px 8px",
+        padding: "5px 9px",
         borderRadius: 999,
         fontSize: 12,
         fontWeight: 800,
