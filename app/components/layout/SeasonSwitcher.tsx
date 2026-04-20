@@ -1,6 +1,8 @@
 "use client"
 
 import type { SeasonItem } from "../../lib/dashboardTypes"
+import { THEME } from "../../lib/theme"
+import { PrimaryButton, SectionHeader } from "../ui"
 
 type Props = {
   seasons: SeasonItem[]
@@ -15,6 +17,8 @@ export default function SeasonSwitcher({
   onChange,
   onCreate,
 }: Props) {
+  const activeSeason = seasons.find((s) => s.id === activeSeasonId) || null
+
   return (
     <div
       style={{
@@ -23,30 +27,65 @@ export default function SeasonSwitcher({
         borderRadius: 24,
         padding: 16,
         boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 12,
-        flexWrap: "wrap",
+        display: "grid",
+        gap: 14,
       }}
     >
-      <div>
+      <SectionHeader
+        title="Season"
+        subtitle={activeSeason ? `Currently viewing ${activeSeason.name}` : "No active season selected"}
+        action={
+          <div style={{ minWidth: 130 }}>
+            <PrimaryButton onClick={onCreate}>New Season</PrimaryButton>
+          </div>
+        }
+      />
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          gap: 12,
+          alignItems: "center",
+        }}
+      >
         <div
           style={{
-            fontSize: 12,
-            fontWeight: 800,
-            color: "#64748b",
-            textTransform: "uppercase",
+            borderRadius: 18,
+            padding: 14,
+            background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)",
+            border: "1px solid #dbeafe",
+            display: "grid",
+            gap: 4,
           }}
         >
-          Active Season
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: THEME.colors.textSecondary,
+              textTransform: "uppercase",
+            }}
+          >
+            Active Season
+          </div>
+          <div
+            style={{
+              fontSize: 22,
+              fontWeight: 900,
+              color: THEME.colors.textPrimary,
+              lineHeight: 1.1,
+            }}
+          >
+            {activeSeason?.name || "No season"}
+          </div>
+          {activeSeason ? (
+            <div style={{ color: THEME.colors.textSecondary, fontSize: 13 }}>
+              {activeSeason.startDate} → {activeSeason.endDate}
+            </div>
+          ) : null}
         </div>
-        <div style={{ marginTop: 4, fontSize: 22, fontWeight: 900 }}>
-          {seasons.find((s) => s.id === activeSeasonId)?.name || "No season"}
-        </div>
-      </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <select
           value={activeSeasonId}
           onChange={(e) => onChange(e.target.value)}
@@ -57,7 +96,8 @@ export default function SeasonSwitcher({
             background: "white",
             fontSize: 15,
             fontWeight: 700,
-            minWidth: 180,
+            minWidth: 200,
+            color: THEME.colors.textPrimary,
           }}
         >
           {seasons.map((season) => (
@@ -66,21 +106,6 @@ export default function SeasonSwitcher({
             </option>
           ))}
         </select>
-
-        <button
-          onClick={onCreate}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 16,
-            border: "none",
-            background: "#06245c",
-            color: "white",
-            fontWeight: 800,
-            fontSize: 16,
-          }}
-        >
-          New Season
-        </button>
       </div>
     </div>
   )
