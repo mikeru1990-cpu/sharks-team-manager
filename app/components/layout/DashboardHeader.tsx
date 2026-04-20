@@ -1,6 +1,7 @@
 "use client"
 
 import { THEME } from "../../lib/theme"
+import { Badge } from "../ui"
 
 type Props = {
   teamName?: string
@@ -26,19 +27,19 @@ export default function DashboardHeader({
       style={{
         background: `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
         color: "white",
-        borderRadius: 24,
+        borderRadius: 28,
         padding: 20,
         position: "relative",
         overflow: "hidden",
         border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow: "0 12px 30px rgba(15,23,42,0.18)",
+        boxShadow: "0 18px 42px rgba(15,23,42,0.20)",
       }}
     >
       <div
         style={{
           position: "absolute",
           inset: 0,
-          opacity: 0.18,
+          opacity: 0.16,
           backgroundImage: `
             repeating-linear-gradient(
               135deg,
@@ -48,10 +49,37 @@ export default function DashboardHeader({
               transparent 10px
             )
           `,
+          pointerEvents: "none",
         }}
       />
 
-      <div style={{ position: "relative", zIndex: 2, display: "grid", gap: 14 }}>
+      <div
+        style={{
+          position: "absolute",
+          right: -40,
+          top: -40,
+          width: 180,
+          height: 180,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.06)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          left: -20,
+          bottom: -55,
+          width: 140,
+          height: 140,
+          borderRadius: "50%",
+          background: "rgba(250,204,21,0.12)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div style={{ position: "relative", zIndex: 2, display: "grid", gap: 16 }}>
         <div
           style={{
             display: "flex",
@@ -61,19 +89,53 @@ export default function DashboardHeader({
             flexWrap: "wrap",
           }}
         >
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, opacity: 0.82 }}>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 900,
+                opacity: 0.82,
+                letterSpacing: "0.08em",
+              }}
+            >
               SHARKS FOOTBALL
             </div>
-            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6, lineHeight: 1.1 }}>
+
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 900,
+                marginTop: 6,
+                lineHeight: 1.05,
+                letterSpacing: "-0.02em",
+              }}
+            >
               {teamName}
+            </div>
+
+            <div
+              style={{
+                marginTop: 8,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <Badge tone="blue">{isAdmin ? "Admin Mode" : "Coach View"}</Badge>
+
+              {typeof availablePlayersCount === "number" &&
+              typeof totalPlayersCount === "number" ? (
+                <Badge tone="yellow">
+                  Players {availablePlayersCount}/{totalPlayersCount}
+                </Badge>
+              ) : null}
             </div>
           </div>
 
           <button
             onClick={() => void onSignOut()}
             style={{
-              border: "none",
+              border: "1px solid rgba(255,255,255,0.18)",
               borderRadius: 16,
               padding: "12px 16px",
               background: "rgba(255,255,255,0.14)",
@@ -82,59 +144,39 @@ export default function DashboardHeader({
               fontSize: 15,
               cursor: "pointer",
               backdropFilter: "blur(8px)",
+              boxShadow: "0 8px 18px rgba(15,23,42,0.10)",
             }}
           >
             Sign Out
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              background: "rgba(255,255,255,0.14)",
-              fontWeight: 800,
-              fontSize: 13,
-            }}
-          >
-            {isAdmin ? "Admin Mode" : "Coach View"}
-          </div>
-
-          {typeof availablePlayersCount === "number" && typeof totalPlayersCount === "number" ? (
-            <div
-              style={{
-                padding: "8px 12px",
-                borderRadius: 999,
-                background: "rgba(250,204,21,0.18)",
-                color: "#fef08a",
-                fontWeight: 800,
-                fontSize: 13,
-              }}
-            >
-              Players {availablePlayersCount}/{totalPlayersCount}
-            </div>
-          ) : null}
-        </div>
-
         {(nextEventTitle || nextEventDateLabel) ? (
           <div
             style={{
-              padding: 14,
-              borderRadius: 18,
+              padding: 16,
+              borderRadius: 20,
               background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,255,255,0.10)",
               display: "grid",
-              gap: 4,
+              gap: 5,
               backdropFilter: "blur(8px)",
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.76 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 900,
+                opacity: 0.76,
+                letterSpacing: "0.07em",
+              }}
+            >
               NEXT EVENT
             </div>
-            <div style={{ fontSize: 17, fontWeight: 900 }}>
+            <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.2 }}>
               {nextEventTitle || "No upcoming event"}
             </div>
-            <div style={{ fontSize: 14, opacity: 0.9 }}>
+            <div style={{ fontSize: 14, opacity: 0.92 }}>
               {nextEventDateLabel || ""}
             </div>
           </div>
