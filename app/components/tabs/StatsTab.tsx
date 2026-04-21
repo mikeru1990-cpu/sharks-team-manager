@@ -1,13 +1,8 @@
 "use client"
 
-import { Badge, PageCard, SectionHeader } from "../ui"
 import { THEME } from "../../lib/theme"
-import type {
-  LeagueResult,
-  Player,
-  PlayerMatchRating,
-  TimelineItem,
-} from "../../lib/types"
+import { Badge, PageCard, SectionHeader } from "../ui"
+import type { LeagueResult, Player, PlayerMatchRating, TimelineItem } from "../../lib/types"
 
 type Props = {
   teamName: string
@@ -16,6 +11,8 @@ type Props = {
   ratings: PlayerMatchRating[]
   timeline: TimelineItem[]
 }
+
+type Outcome = "W" | "D" | "L"
 
 function formatPrettyDate(date: string) {
   try {
@@ -29,91 +26,115 @@ function formatPrettyDate(date: string) {
   }
 }
 
+function getTeamScore(result: LeagueResult, teamName: string) {
+  const isHome = normalize(result.homeTeam) === normalize(teamName)
+  return isHome ? result.homeScore : result.awayScore
+}
+
+function getOpponentScore(result: LeagueResult, teamName: string) {
+  const isHome = normalize(result.homeTeam) === normalize(teamName)
+  return isHome ? result.awayScore : result.homeScore
+}
+
+function getOpponentName(result: LeagueResult, teamName: string) {
+  const isHome = normalize(result.homeTeam) === normalize(teamName)
+  return isHome ? result.awayTeam : result.homeTeam
+}
+
+function normalize(value?: string) {
+  return (value || "").trim().toLowerCase()
+}
+
+function getOutcome(result: LeagueResult, teamName: string): Outcome {
+  const scored = getTeamScore(result, teamName)
+  const conceded = getOpponentScore(result, teamName)
+  if (scored > conceded) return "W"
+  if (scored < conceded) return "L"
+  return "D"
+}
+
+function outcomeTone(outcome: Outcome): "green" | "yellow" | "red" {
+  if (outcome === "W") return "green"
+  if (outcome === "D") return "yellow"
+  return "red"
+}
+
 function StatCard({
   label,
   value,
+  helper,
   tone = "default",
-  subtext,
 }: {
   label: string
   value: string | number
-  tone?: "default" | "blue" | "green" | "yellow" | "red"
-  subtext?: string
+  helper?: string
+  tone?: "default" | "blue" | "green" | "yellow"
 }) {
-  const style =
+  const toneStyle =
     tone === "blue"
       ? {
           background: "#dbeafe",
-          color: "#1d4ed8",
           border: "1px solid #bfdbfe",
+          color: "#1d4ed8",
         }
       : tone === "green"
       ? {
           background: "#dcfce7",
-          color: "#166534",
           border: "1px solid #86efac",
+          color: "#166534",
         }
       : tone === "yellow"
       ? {
           background: "#fef3c7",
-          color: "#92400e",
           border: "1px solid #fcd34d",
-        }
-      : tone === "red"
-      ? {
-          background: "#fee2e2",
-          color: "#991b1b",
-          border: "1px solid #fecaca",
+          color: "#92400e",
         }
       : {
           background: "#f8fafc",
-          color: "#334155",
           border: "1px solid #e2e8f0",
+          color: "#334155",
         }
 
   return (
     <div
       style={{
-        ...style,
-        borderRadius: 18,
-        padding: 14,
+        ...toneStyle,
+        borderRadius: 20,
+        padding: 16,
         display: "grid",
-        gap: 4,
+        gap: 6,
+        boxShadow: "0 6px 14px rgba(15,23,42,0.05)",
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.9 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
-      {subtext ? (
-        <div style={{ fontSize: 12, opacity: 0.9 }}>{subtext}</div>
-      ) : null}
+      <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
+      {helper ? <div style={{ fontSize: 13, opacity: 0.9 }}>{helper}</div> : null}
     </div>
   )
 }
 
-function getResultTone(result: "W" | "D" | "L") {
-  if (result === "W") return "green"
-  if (result === "D") return "yellow"
-  return "red"
-}
-
-function getScoreOutcome(result: LeagueResult, teamName: string): "W" | "D" | "L" {
-  const isHome = result.homeTeam === teamName
-  const teamGoals = isHome ? result.homeScore : result.awayScore
-  const oppGoals = isHome ? result.awayScore : result.homeScore
-
-  if (teamGoals > oppGoals) return "W"
-  if (teamGoals < oppGoals) return "L"
-  return "D"
-}
-
-function initials(value: string) {
-  return value
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase()
+function InsightCard({
+  title,
+  body,
+}: {
+  title: string
+  body: string
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: 18,
+        border: "1px solid #e2e8f0",
+        background: "white",
+        padding: 16,
+        display: "grid",
+        gap: 6,
+      }}
+    >
+      <div style={{ fontWeight: 900, fontSize: 16, color: THEME.colors.textPrimary }}>{title}</div>
+      <div style={{ color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 1.5 }}>{body}</div>
+    </div>
+  )
 }
 
 export default function StatsTab({
@@ -121,80 +142,94 @@ export default function StatsTab({
   results,
   players,
   ratings,
-  timeline,
 }: Props) {
-  const sortedResults = [...results].sort((a, b) => b.playedOn.localeCompare(a.playedOn))
+  const validResults = results
+    .filter(
+      (item) =>
+        typeof item.homeScore === "number" &&
+        typeof item.awayScore === "number" &&
+        item.homeTeam &&
+        item.awayTeam
+    )
+    .slice()
+    .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
 
-  const matchesPlayed = sortedResults.length
+  const played = validResults.length
+  const wins = validResults.filter((item) => getOutcome(item, teamName) === "W").length
+  const draws = validResults.filter((item) => getOutcome(item, teamName) === "D").length
+  const losses = validResults.filter((item) => getOutcome(item, teamName) === "L").length
 
-  const summary = sortedResults.reduce(
-    (acc, result) => {
-      const isHome = result.homeTeam === teamName
-      const goalsFor = isHome ? result.homeScore : result.awayScore
-      const goalsAgainst = isHome ? result.awayScore : result.homeScore
-      const outcome = getScoreOutcome(result, teamName)
+  const goalsFor = validResults.reduce((sum, item) => sum + getTeamScore(item, teamName), 0)
+  const goalsAgainst = validResults.reduce((sum, item) => sum + getOpponentScore(item, teamName), 0)
+  const goalDifference = goalsFor - goalsAgainst
+  const points = wins * 3 + draws
 
-      acc.goalsFor += goalsFor
-      acc.goalsAgainst += goalsAgainst
+  const lastFive = validResults.slice(-5)
+  const form = lastFive.map((item) => getOutcome(item, teamName))
 
-      if (outcome === "W") acc.wins += 1
-      else if (outcome === "D") acc.draws += 1
-      else acc.losses += 1
-
-      return acc
-    },
-    {
-      wins: 0,
-      draws: 0,
-      losses: 0,
-      goalsFor: 0,
-      goalsAgainst: 0,
-    }
-  )
-
-  const points = summary.wins * 3 + summary.draws
-  const goalDifference = summary.goalsFor - summary.goalsAgainst
-
-  const form = sortedResults.slice(0, 5).map((result) => getScoreOutcome(result, teamName))
-
-  const ratingsByPlayer = players
-    .map((player) => {
-      const playerRatings = ratings.filter((rating) => rating.playerId === player.id)
-      const average =
-        playerRatings.length > 0
-          ? playerRatings.reduce((sum, item) => sum + item.rating, 0) / playerRatings.length
-          : null
-
-      return {
-        player,
-        average,
-        count: playerRatings.length,
-      }
-    })
-    .filter((item) => item.count > 0)
-    .sort((a, b) => {
-      const aAvg = a.average ?? 0
-      const bAvg = b.average ?? 0
-      if (bAvg !== aAvg) return bAvg - aAvg
-      return b.count - a.count
-    })
-
-  const topRated = ratingsByPlayer.slice(0, 5)
-
-  const totalRatings = ratings.length
-  const averageTeamRating =
-    totalRatings > 0
-      ? (
-          ratings.reduce((sum, item) => sum + item.rating, 0) / totalRatings
-        ).toFixed(1)
+  const avgRating =
+    ratings.length > 0
+      ? (ratings.reduce((sum, item) => sum + item.rating, 0) / ratings.length).toFixed(1)
       : "—"
 
-  const recentResults = sortedResults.slice(0, 8)
+  const playerScoreMap: Record<string, number> = {}
+  for (const rating of ratings) {
+    playerScoreMap[rating.playerId] = (playerScoreMap[rating.playerId] || 0) + rating.rating
+  }
 
-  const totalGoalsLogged = timeline.filter((item) => item.type === "goal").length
+  const topPlayerId =
+    Object.entries(playerScoreMap).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+  const topPlayer = players.find((player) => player.id === topPlayerId) || null
+
+  const biggestWin =
+    validResults
+      .filter((item) => getOutcome(item, teamName) === "W")
+      .slice()
+      .sort(
+        (a, b) =>
+          getTeamScore(b, teamName) -
+            getOpponentScore(b, teamName) -
+            (getTeamScore(a, teamName) - getOpponentScore(a, teamName)) || b.playedOn.localeCompare(a.playedOn)
+      )[0] || null
+
+  const toughestLoss =
+    validResults
+      .filter((item) => getOutcome(item, teamName) === "L")
+      .slice()
+      .sort(
+        (a, b) =>
+          getOpponentScore(b, teamName) -
+            getTeamScore(b, teamName) -
+            (getOpponentScore(a, teamName) - getTeamScore(a, teamName)) || b.playedOn.localeCompare(a.playedOn)
+      )[0] || null
+
+  const scoringTrend =
+    played === 0 ? "No matches logged yet."
+    : goalsFor / played >= 2
+    ? "Attack output is trending well with regular scoring."
+    : goalsFor / played >= 1
+    ? "Attack is producing chances, with room for more consistency."
+    : "Scoring is still a challenge — focus on chance creation and finishing."
+
+  const defensiveTrend =
+    played === 0 ? "No defensive data yet."
+    : goalsAgainst / played <= 1.5
+    ? "Defensive record is holding up well."
+    : goalsAgainst / played <= 3
+    ? "Defensive performance is mixed but improving is realistic."
+    : "Conceding rate is high — shape and recovery runs may need attention."
+
+  const formInsight =
+    form.length === 0
+      ? "No recent form data available yet."
+      : form.filter((item) => item === "W").length >= 3
+      ? "Recent form is strong, with momentum building."
+      : form.filter((item) => item === "L").length >= 3
+      ? "Recent results have been tough, but this is a good point to focus on clear improvement targets."
+      : "Recent form is mixed, showing both progress and inconsistency."
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 20 }}>
       <PageCard tone="blue">
         <SectionHeader
           title="Team Stats"
@@ -205,46 +240,46 @@ export default function StatsTab({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-            gap: 10,
-            marginTop: 8,
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 12,
+            marginTop: 10,
           }}
         >
           <div
             style={{
               background: "rgba(255,255,255,0.12)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 20,
+              padding: 16,
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>PLAYED</div>
-            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{matchesPlayed}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6 }}>{played}</div>
           </div>
 
           <div
             style={{
               background: "rgba(255,255,255,0.12)",
-              border: "1px solid rgba(255,255,255,0.16)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 20,
+              padding: 16,
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.82 }}>POINTS</div>
-            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{points}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6 }}>{points}</div>
           </div>
 
           <div
             style={{
               background: "rgba(250,204,21,0.16)",
-              border: "1px solid rgba(250,204,21,0.28)",
-              borderRadius: 18,
-              padding: 14,
+              border: "1px solid rgba(250,204,21,0.24)",
+              borderRadius: 20,
+              padding: 16,
               color: "#fef08a",
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.92 }}>AVG RATING</div>
-            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 4 }}>{averageTeamRating}</div>
+            <div style={{ fontSize: 30, fontWeight: 900, marginTop: 6 }}>{avgRating}</div>
           </div>
         </div>
       </PageCard>
@@ -256,264 +291,210 @@ export default function StatsTab({
           gap: 12,
         }}
       >
-        <StatCard label="Wins" value={summary.wins} tone="green" />
-        <StatCard label="Draws" value={summary.draws} tone="yellow" />
-        <StatCard label="Losses" value={summary.losses} tone="red" />
+        <StatCard label="Wins" value={wins} tone="green" />
+        <StatCard label="Draws" value={draws} tone="yellow" />
+        <StatCard label="Losses" value={losses} />
         <StatCard label="Goal Difference" value={goalDifference >= 0 ? `+${goalDifference}` : goalDifference} tone="blue" />
+      </div>
+
+      <PageCard>
+        <SectionHeader
+          title="Season Breakdown"
+          subtitle="A quick summary of team output this season."
+        />
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <StatCard label="Goals For" value={goalsFor} tone="green" helper="Total scored" />
+          <StatCard label="Goals Against" value={goalsAgainst} tone="yellow" helper="Total conceded" />
+          <StatCard label="Squad Size" value={players.length} helper="Registered players" />
+          <StatCard label="Rated Performances" value={ratings.length} tone="blue" helper="Saved feedback entries" />
+        </div>
+      </PageCard>
+
+      <PageCard>
+        <SectionHeader
+          title="Recent Form"
+          subtitle="Last five logged results."
+        />
+
+        {form.length === 0 ? (
+          <div style={{ color: THEME.colors.textSecondary }}>No recent form yet.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {form.map((item, index) => (
+                <Badge key={index} tone={outcomeTone(item)}>
+                  {item}
+                </Badge>
+              ))}
+            </div>
+
+            <div style={{ color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
+              {formInsight}
+            </div>
+          </div>
+        )}
+      </PageCard>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: 16,
+        }}
+      >
+        <PageCard>
+          <SectionHeader title="Coaching Insights" subtitle="Quick narrative summary from results." />
+          <div style={{ display: "grid", gap: 10 }}>
+            <InsightCard title="Attack" body={scoringTrend} />
+            <InsightCard title="Defence" body={defensiveTrend} />
+          </div>
+        </PageCard>
+
+        <PageCard>
+          <SectionHeader title="Top Performer" subtitle="Based on saved match ratings." />
+          {topPlayer ? (
+            <div
+              style={{
+                borderRadius: 18,
+                padding: 16,
+                background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)",
+                border: "1px solid #dbeafe",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 22, fontWeight: 900 }}>{topPlayer.name}</div>
+              <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
+                Positions: {topPlayer.positions.join(" / ")}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {topPlayer.mainGK ? <Badge tone="blue">Main GK</Badge> : null}
+                {topPlayer.backupGK ? <Badge tone="blue">Backup GK</Badge> : null}
+                {topPlayer.captain ? <Badge tone="yellow">Captain</Badge> : null}
+                {topPlayer.viceCaptain ? <Badge tone="yellow">Vice Captain</Badge> : null}
+              </div>
+            </div>
+          ) : (
+            <div style={{ color: THEME.colors.textSecondary }}>
+              No rating data saved yet.
+            </div>
+          )}
+        </PageCard>
       </div>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 0.9fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
           gap: 16,
         }}
       >
-        <div style={{ display: "grid", gap: 16 }}>
-          <PageCard>
-            <SectionHeader
-              title="Recent Form"
-              subtitle="Last five results"
-            />
-
-            {form.length === 0 ? (
-              <div
-                style={{
-                  borderRadius: 16,
-                  border: "1px dashed #cbd5e1",
-                  background: "#f8fafc",
-                  padding: 16,
-                  color: THEME.colors.textSecondary,
-                }}
-              >
-                No results saved yet.
+        <PageCard>
+          <SectionHeader title="Best Result" subtitle="Strongest winning margin so far." />
+          {biggestWin ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 900, fontSize: 18 }}>
+                {biggestWin.homeTeam} {biggestWin.homeScore} - {biggestWin.awayScore} {biggestWin.awayTeam}
               </div>
-            ) : (
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {form.map((item, index) => (
-                  <div
-                    key={`${item}-${index}`}
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 16,
-                      display: "grid",
-                      placeItems: "center",
-                      fontWeight: 900,
-                      fontSize: 20,
-                      background:
-                        item === "W"
-                          ? "#dcfce7"
-                          : item === "D"
-                          ? "#fef3c7"
-                          : "#fee2e2",
-                      color:
-                        item === "W"
-                          ? "#166534"
-                          : item === "D"
-                          ? "#92400e"
-                          : "#991b1b",
-                      border:
-                        item === "W"
-                          ? "1px solid #86efac"
-                          : item === "D"
-                          ? "1px solid #fcd34d"
-                          : "1px solid #fecaca",
-                    }}
-                  >
-                    {item}
-                  </div>
-                ))}
+              <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
+                {formatPrettyDate(biggestWin.playedOn)}
               </div>
-            )}
-          </PageCard>
-
-          <PageCard>
-            <SectionHeader
-              title="Recent Results"
-              subtitle="Latest saved fixtures and scorelines."
-            />
-
-            {recentResults.length === 0 ? (
-              <div
-                style={{
-                  borderRadius: 16,
-                  border: "1px dashed #cbd5e1",
-                  background: "#f8fafc",
-                  padding: 16,
-                  color: THEME.colors.textSecondary,
-                }}
-              >
-                No results recorded yet.
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {recentResults.map((result) => {
-                  const outcome = getScoreOutcome(result, teamName)
-                  return (
-                    <div
-                      key={result.id}
-                      style={{
-                        border: "1px solid #e2e8f0",
-                        borderRadius: 18,
-                        padding: 14,
-                        background: "white",
-                        display: "grid",
-                        gap: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: 10,
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <Badge tone={getResultTone(outcome)}>{outcome}</Badge>
-                          <Badge>{formatPrettyDate(result.playedOn)}</Badge>
-                          {result.competition ? <Badge>{result.competition}</Badge> : null}
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: 18,
-                          fontWeight: 900,
-                          color: THEME.colors.textPrimary,
-                          lineHeight: 1.25,
-                        }}
-                      >
-                        {result.homeTeam} {result.homeScore} - {result.awayScore} {result.awayTeam}
-                      </div>
-
-                      <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
-                        Opponent: {result.opponent || (result.homeTeam === teamName ? result.awayTeam : result.homeTeam)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </PageCard>
-        </div>
-
-        <div style={{ display: "grid", gap: 16 }}>
-          <PageCard>
-            <SectionHeader
-              title="Season Totals"
-              subtitle="Quick team summary."
-            />
-
-            <div style={{ display: "grid", gap: 10 }}>
-              <StatCard label="Goals For" value={summary.goalsFor} tone="green" />
-              <StatCard label="Goals Against" value={summary.goalsAgainst} tone="red" />
-              <StatCard label="Live Goals Logged" value={totalGoalsLogged} tone="blue" subtext="From active timeline feed" />
+              <Badge tone="green">{getOpponentName(biggestWin, teamName)}</Badge>
             </div>
-          </PageCard>
+          ) : (
+            <div style={{ color: THEME.colors.textSecondary }}>No wins logged yet.</div>
+          )}
+        </PageCard>
 
-          <PageCard>
-            <SectionHeader
-              title="Top Rated Players"
-              subtitle="Based on saved match feedback."
-            />
-
-            {topRated.length === 0 ? (
-              <div
-                style={{
-                  borderRadius: 16,
-                  border: "1px dashed #cbd5e1",
-                  background: "#f8fafc",
-                  padding: 16,
-                  color: THEME.colors.textSecondary,
-                }}
-              >
-                No player ratings yet.
+        <PageCard>
+          <SectionHeader title="Toughest Result" subtitle="Largest losing margin so far." />
+          {toughestLoss ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontWeight: 900, fontSize: 18 }}>
+                {toughestLoss.homeTeam} {toughestLoss.homeScore} - {toughestLoss.awayScore} {toughestLoss.awayTeam}
               </div>
-            ) : (
-              <div style={{ display: "grid", gap: 10 }}>
-                {topRated.map((item, index) => (
+              <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
+                {formatPrettyDate(toughestLoss.playedOn)}
+              </div>
+              <Badge tone="red">{getOpponentName(toughestLoss, teamName)}</Badge>
+            </div>
+          ) : (
+            <div style={{ color: THEME.colors.textSecondary }}>No losses logged yet.</div>
+          )}
+        </PageCard>
+      </div>
+
+      <PageCard>
+        <SectionHeader
+          title="All Logged Results"
+          subtitle="Season result list used for this summary."
+        />
+
+        {validResults.length === 0 ? (
+          <div style={{ color: THEME.colors.textSecondary }}>No result data available yet.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {[...validResults].reverse().map((result) => {
+              const outcome = getOutcome(result, teamName)
+              return (
+                <div
+                  key={result.id}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 18,
+                    padding: 14,
+                    background: "white",
+                    display: "grid",
+                    gap: 6,
+                  }}
+                >
                   <div
-                    key={item.player.id}
                     style={{
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 18,
-                      padding: 12,
-                      background: index === 0 ? "#eff6ff" : "white",
-                      display: "grid",
-                      gridTemplateColumns: "auto minmax(0, 1fr) auto",
-                      gap: 12,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 10,
                       alignItems: "center",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <div
-                      style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: "50%",
-                        display: "grid",
-                        placeItems: "center",
-                        background: index === 0 ? THEME.colors.primary : "#f1f5f9",
-                        color: index === 0 ? "white" : THEME.colors.textPrimary,
-                        fontWeight: 900,
-                        fontSize: 13,
-                      }}
-                    >
-                      {initials(item.player.name)}
+                    <div style={{ fontWeight: 800, color: THEME.colors.textPrimary }}>
+                      {getOpponentName(result, teamName)}
                     </div>
-
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontWeight: 900,
-                          color: THEME.colors.textPrimary,
-                          fontSize: 15,
-                          lineHeight: 1.2,
-                        }}
-                      >
-                        {item.player.name}
-                      </div>
-                      <div
-                        style={{
-                          color: THEME.colors.textSecondary,
-                          fontSize: 13,
-                          marginTop: 4,
-                        }}
-                      >
-                        {item.count} rating{item.count === 1 ? "" : "s"}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: "right" }}>
-                      <div
-                        style={{
-                          fontWeight: 900,
-                          fontSize: 22,
-                          color: THEME.colors.primary,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {item.average?.toFixed(1)}
-                      </div>
-                      <div
-                        style={{
-                          color: THEME.colors.textSecondary,
-                          fontSize: 12,
-                          marginTop: 4,
-                        }}
-                      >
-                        avg
-                      </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <Badge tone={outcomeTone(outcome)}>{outcome}</Badge>
+                      <Badge>{formatPrettyDate(result.playedOn)}</Badge>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </PageCard>
-        </div>
-      </div>
+
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 900,
+                      color: THEME.colors.textPrimary,
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {result.homeTeam} {result.homeScore} - {result.awayScore} {result.awayTeam}
+                  </div>
+
+                  {result.competition ? (
+                    <div style={{ color: THEME.colors.textSecondary, fontSize: 13 }}>
+                      {result.competition}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </PageCard>
     </div>
   )
 }
