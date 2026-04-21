@@ -67,14 +67,22 @@ function StatTile({
       : { background: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155" }
 
   return (
-    <div style={{ ...style, borderRadius: 20, padding: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 800 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 900 }}>{value}</div>
+    <div
+      style={{
+        ...style,
+        borderRadius: 20,
+        padding: 16,
+        display: "grid",
+        gap: 6,
+        boxShadow: "0 6px 14px rgba(15,23,42,0.05)",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.88 }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
     </div>
   )
 }
 
-/* ✅ UPDATED QUICK ACTION (ICON COMPONENT) */
 function QuickAction({
   title,
   subtitle,
@@ -115,9 +123,7 @@ function QuickAction({
         {icon}
       </div>
 
-      <div style={{ fontSize: 18, fontWeight: 900 }}>
-        {title}
-      </div>
+      <div style={{ fontSize: 18, fontWeight: 900 }}>{title}</div>
 
       <div style={{ fontSize: 14, color: THEME.colors.textSecondary }}>
         {subtitle}
@@ -143,15 +149,22 @@ export default function HomeTab({
   results,
   ratings,
   activeMatchEventId,
-  selectedDate,
   onOpenTab,
 }: Props) {
-  const sortedEvents = [...events].sort((a, b) => a.date.localeCompare(b.date))
+  const sortedEvents = [...events].sort((a, b) => {
+    const dateCompare = a.date.localeCompare(b.date)
+    if (dateCompare !== 0) return dateCompare
+    return (a.startTime || "").localeCompare(b.startTime || "")
+  })
+
+  const today = new Date().toISOString().split("T")[0]
 
   const nextEvent =
-    sortedEvents.find((e) => e.date >= selectedDate) || sortedEvents[0]
+    sortedEvents.find((e) => e.date >= today) || sortedEvents[0] || null
 
-  const upcomingMatches = sortedEvents.filter((e) => e.type === "match").slice(0, 3)
+  const upcomingMatches = sortedEvents
+    .filter((e) => e.type === "match" && e.date >= today)
+    .slice(0, 3)
 
   const totalPlayers = players.length
 
@@ -183,7 +196,6 @@ export default function HomeTab({
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {/* HERO */}
       <PageCard tone="blue">
         <SectionHeader
           title={teamName}
@@ -207,7 +219,6 @@ export default function HomeTab({
         </div>
       </PageCard>
 
-      {/* AVAILABILITY */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
         <StatTile label="Available" value={available} tone="green" />
         <StatTile label="Maybe" value={maybe} tone="yellow" />
@@ -215,7 +226,6 @@ export default function HomeTab({
         <StatTile label="Results" value={results.length} tone="blue" />
       </div>
 
-      {/* ✅ QUICK ACTIONS (NOW ICON COMPONENTS) */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
         <QuickAction
           icon={<CalendarIcon />}
@@ -246,7 +256,6 @@ export default function HomeTab({
         />
       </div>
 
-      {/* NEXT EVENT */}
       <PageCard>
         <SectionHeader title="Next Event" />
 
@@ -261,19 +270,29 @@ export default function HomeTab({
         )}
       </PageCard>
 
-      {/* UPCOMING MATCHES */}
       <PageCard>
         <SectionHeader title="Upcoming Matches" />
 
         {upcomingMatches.length === 0 ? (
           <EmptyState title="No matches" subtitle="Create a match event" />
         ) : (
-          upcomingMatches.map((m) => (
-            <div key={m.id}>
-              <strong>{m.title}</strong>
-              <div>{formatPrettyDate(m.date)}</div>
-            </div>
-          ))
+          <div style={{ display: "grid", gap: 10 }}>
+            {upcomingMatches.map((m) => (
+              <div
+                key={m.id}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 16,
+                  padding: 12,
+                  background: "#fff",
+                }}
+              >
+                <strong>{m.title}</strong>
+                <div>{formatPrettyDate(m.date)}</div>
+                {m.opponent ? <div>vs {m.opponent}</div> : null}
+              </div>
+            ))}
+          </div>
         )}
       </PageCard>
     </div>
