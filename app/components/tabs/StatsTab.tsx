@@ -26,30 +26,32 @@ function formatPrettyDate(date: string) {
   }
 }
 
-function getTeamScore(result: LeagueResult, teamName: string) {
-  const isHome = normalize(result.homeTeam) === normalize(teamName)
-  return isHome ? result.homeScore : result.awayScore
-}
-
-function getOpponentScore(result: LeagueResult, teamName: string) {
-  const isHome = normalize(result.homeTeam) === normalize(teamName)
-  return isHome ? result.awayScore : result.homeScore
-}
-
-function getOpponentName(result: LeagueResult, teamName: string) {
-  const isHome = normalize(result.homeTeam) === normalize(teamName)
-  return isHome ? result.awayTeam : result.homeTeam
-}
-
 function normalize(value?: string) {
   return (value || "").trim().toLowerCase()
 }
 
+function isOurTeamHome(result: LeagueResult, teamName: string) {
+  return normalize(result.homeTeam) === normalize(teamName)
+}
+
+function getTeamScore(result: LeagueResult, teamName: string) {
+  return isOurTeamHome(result, teamName) ? result.homeScore : result.awayScore
+}
+
+function getOpponentScore(result: LeagueResult, teamName: string) {
+  return isOurTeamHome(result, teamName) ? result.awayScore : result.homeScore
+}
+
+function getOpponentName(result: LeagueResult, teamName: string) {
+  return isOurTeamHome(result, teamName) ? result.awayTeam : result.homeTeam
+}
+
 function getOutcome(result: LeagueResult, teamName: string): Outcome {
-  const scored = getTeamScore(result, teamName)
-  const conceded = getOpponentScore(result, teamName)
-  if (scored > conceded) return "W"
-  if (scored < conceded) return "L"
+  const ourScore = getTeamScore(result, teamName)
+  const theirScore = getOpponentScore(result, teamName)
+
+  if (ourScore > theirScore) return "W"
+  if (ourScore < theirScore) return "L"
   return "D"
 }
 
@@ -57,6 +59,10 @@ function outcomeTone(outcome: Outcome): "green" | "yellow" | "red" {
   if (outcome === "W") return "green"
   if (outcome === "D") return "yellow"
   return "red"
+}
+
+function getWinningMargin(result: LeagueResult, teamName: string) {
+  return getTeamScore(result, teamName) - getOpponentScore(result, teamName)
 }
 
 function StatCard({
@@ -131,8 +137,12 @@ function InsightCard({
         gap: 6,
       }}
     >
-      <div style={{ fontWeight: 900, fontSize: 16, color: THEME.colors.textPrimary }}>{title}</div>
-      <div style={{ color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 1.5 }}>{body}</div>
+      <div style={{ fontWeight: 900, fontSize: 16, color: THEME.colors.textPrimary }}>
+        {title}
+      </div>
+      <div style={{ color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 1.5 }}>
+        {body}
+      </div>
     </div>
   )
 }
@@ -148,8 +158,8 @@ export default function StatsTab({
       (item) =>
         typeof item.homeScore === "number" &&
         typeof item.awayScore === "number" &&
-        item.homeTeam &&
-        item.awayTeam
+        !!item.homeTeam &&
+        !!item.awayTeam
     )
     .slice()
     .sort((a, b) => a.playedOn.localeCompare(b.playedOn))
@@ -165,7 +175,7 @@ export default function StatsTab({
   const points = wins * 3 + draws
 
   const lastFive = validResults.slice(-5)
-  const form = lastFive.map((item) => getOutcome(item, teamName))
+  const form = [...lastFive].reverse().map((item) => getOutcome(item, teamName))
 
   const avgRating =
     ratings.length > 0
@@ -185,39 +195,39 @@ export default function StatsTab({
     validResults
       .filter((item) => getOutcome(item, teamName) === "W")
       .slice()
-      .sort(
-        (a, b) =>
-          getTeamScore(b, teamName) -
-            getOpponentScore(b, teamName) -
-            (getTeamScore(a, teamName) - getOpponentScore(a, teamName)) || b.playedOn.localeCompare(a.playedOn)
-      )[0] || null
+      .sort((a, b) => {
+        const marginDiff = getWinningMargin(b, teamName) - getWinningMargin(a, teamName)
+        if (marginDiff !== 0) return marginDiff
+        return b.playedOn.localeCompare(a.playedOn)
+      })[0] || null
 
   const toughestLoss =
     validResults
       .filter((item) => getOutcome(item, teamName) === "L")
       .slice()
-      .sort(
-        (a, b) =>
-          getOpponentScore(b, teamName) -
-            getTeamScore(b, teamName) -
-            (getOpponentScore(a, teamName) - getTeamScore(a, teamName)) || b.playedOn.localeCompare(a.playedOn)
-      )[0] || null
+      .sort((a, b) => {
+        const marginDiff = getWinningMargin(a, teamName) - getWinningMargin(b, teamName)
+        if (marginDiff !== 0) return marginDiff
+        return b.playedOn.localeCompare(a.playedOn)
+      })[0] || null
 
   const scoringTrend =
-    played === 0 ? "No matches logged yet."
-    : goalsFor / played >= 2
-    ? "Attack output is trending well with regular scoring."
-    : goalsFor / played >= 1
-    ? "Attack is producing chances, with room for more consistency."
-    : "Scoring is still a challenge — focus on chance creation and finishing."
+    played === 0
+      ? "No matches logged yet."
+      : goalsFor / played >= 2
+      ? "Attack output is trending well with regular scoring."
+      : goalsFor / played >= 1
+      ? "Attack is producing chances, with room for more consistency."
+      : "Scoring is still a challenge — focus on chance creation and finishing."
 
   const defensiveTrend =
-    played === 0 ? "No defensive data yet."
-    : goalsAgainst / played <= 1.5
-    ? "Defensive record is holding up well."
-    : goalsAgainst / played <= 3
-    ? "Defensive performance is mixed but improving is realistic."
-    : "Conceding rate is high — shape and recovery runs may need attention."
+    played === 0
+      ? "No defensive data yet."
+      : goalsAgainst / played <= 1.5
+      ? "Defensive record is holding up well."
+      : goalsAgainst / played <= 3
+      ? "Defensive performance is mixed but improving is realistic."
+      : "Conceding rate is high — shape and recovery runs may need attention."
 
   const formInsight =
     form.length === 0
@@ -294,7 +304,11 @@ export default function StatsTab({
         <StatCard label="Wins" value={wins} tone="green" />
         <StatCard label="Draws" value={draws} tone="yellow" />
         <StatCard label="Losses" value={losses} />
-        <StatCard label="Goal Difference" value={goalDifference >= 0 ? `+${goalDifference}` : goalDifference} tone="blue" />
+        <StatCard
+          label="Goal Difference"
+          value={goalDifference >= 0 ? `+${goalDifference}` : goalDifference}
+          tone="blue"
+        />
       </div>
 
       <PageCard>
@@ -311,17 +325,24 @@ export default function StatsTab({
           }}
         >
           <StatCard label="Goals For" value={goalsFor} tone="green" helper="Total scored" />
-          <StatCard label="Goals Against" value={goalsAgainst} tone="yellow" helper="Total conceded" />
+          <StatCard
+            label="Goals Against"
+            value={goalsAgainst}
+            tone="yellow"
+            helper="Total conceded"
+          />
           <StatCard label="Squad Size" value={players.length} helper="Registered players" />
-          <StatCard label="Rated Performances" value={ratings.length} tone="blue" helper="Saved feedback entries" />
+          <StatCard
+            label="Rated Performances"
+            value={ratings.length}
+            tone="blue"
+            helper="Saved feedback entries"
+          />
         </div>
       </PageCard>
 
       <PageCard>
-        <SectionHeader
-          title="Recent Form"
-          subtitle="Last five logged results."
-        />
+        <SectionHeader title="Recent Form" subtitle="Last five logged results." />
 
         {form.length === 0 ? (
           <div style={{ color: THEME.colors.textSecondary }}>No recent form yet.</div>
@@ -350,7 +371,10 @@ export default function StatsTab({
         }}
       >
         <PageCard>
-          <SectionHeader title="Coaching Insights" subtitle="Quick narrative summary from results." />
+          <SectionHeader
+            title="Coaching Insights"
+            subtitle="Quick narrative summary from results."
+          />
           <div style={{ display: "grid", gap: 10 }}>
             <InsightCard title="Attack" body={scoringTrend} />
             <InsightCard title="Defence" body={defensiveTrend} />
@@ -382,9 +406,7 @@ export default function StatsTab({
               </div>
             </div>
           ) : (
-            <div style={{ color: THEME.colors.textSecondary }}>
-              No rating data saved yet.
-            </div>
+            <div style={{ color: THEME.colors.textSecondary }}>No rating data saved yet.</div>
           )}
         </PageCard>
       </div>
@@ -401,7 +423,8 @@ export default function StatsTab({
           {biggestWin ? (
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 18 }}>
-                {biggestWin.homeTeam} {biggestWin.homeScore} - {biggestWin.awayScore} {biggestWin.awayTeam}
+                {biggestWin.homeTeam} {biggestWin.homeScore} - {biggestWin.awayScore}{" "}
+                {biggestWin.awayTeam}
               </div>
               <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
                 {formatPrettyDate(biggestWin.playedOn)}
@@ -418,7 +441,8 @@ export default function StatsTab({
           {toughestLoss ? (
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 18 }}>
-                {toughestLoss.homeTeam} {toughestLoss.homeScore} - {toughestLoss.awayScore} {toughestLoss.awayTeam}
+                {toughestLoss.homeTeam} {toughestLoss.homeScore} - {toughestLoss.awayScore}{" "}
+                {toughestLoss.awayTeam}
               </div>
               <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
                 {formatPrettyDate(toughestLoss.playedOn)}
@@ -443,6 +467,7 @@ export default function StatsTab({
           <div style={{ display: "grid", gap: 10 }}>
             {[...validResults].reverse().map((result) => {
               const outcome = getOutcome(result, teamName)
+
               return (
                 <div
                   key={result.id}
