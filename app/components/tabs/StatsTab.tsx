@@ -27,11 +27,33 @@ function formatPrettyDate(date: string) {
 }
 
 function normalize(value?: string) {
-  return (value || "").trim().toLowerCase()
+  return (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+}
+
+function isOurTeamName(value?: string) {
+  const text = normalize(value)
+  return (
+    text.includes("leonard stanley") &&
+    text.includes("u10") &&
+    text.includes("lionesses")
+  )
 }
 
 function isOurTeamHome(result: LeagueResult, teamName: string) {
-  return normalize(result.homeTeam) === normalize(teamName)
+  const home = normalize(result.homeTeam)
+  const away = normalize(result.awayTeam)
+  const propName = normalize(teamName)
+
+  if (home === propName) return true
+  if (away === propName) return false
+
+  if (isOurTeamName(result.homeTeam)) return true
+  if (isOurTeamName(result.awayTeam)) return false
+
+  return home.includes("lionesses")
 }
 
 function getTeamScore(result: LeagueResult, teamName: string) {
@@ -325,19 +347,9 @@ export default function StatsTab({
           }}
         >
           <StatCard label="Goals For" value={goalsFor} tone="green" helper="Total scored" />
-          <StatCard
-            label="Goals Against"
-            value={goalsAgainst}
-            tone="yellow"
-            helper="Total conceded"
-          />
+          <StatCard label="Goals Against" value={goalsAgainst} tone="yellow" helper="Total conceded" />
           <StatCard label="Squad Size" value={players.length} helper="Registered players" />
-          <StatCard
-            label="Rated Performances"
-            value={ratings.length}
-            tone="blue"
-            helper="Saved feedback entries"
-          />
+          <StatCard label="Rated Performances" value={ratings.length} tone="blue" helper="Saved feedback entries" />
         </div>
       </PageCard>
 
@@ -371,10 +383,7 @@ export default function StatsTab({
         }}
       >
         <PageCard>
-          <SectionHeader
-            title="Coaching Insights"
-            subtitle="Quick narrative summary from results."
-          />
+          <SectionHeader title="Coaching Insights" subtitle="Quick narrative summary from results." />
           <div style={{ display: "grid", gap: 10 }}>
             <InsightCard title="Attack" body={scoringTrend} />
             <InsightCard title="Defence" body={defensiveTrend} />
@@ -423,8 +432,7 @@ export default function StatsTab({
           {biggestWin ? (
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 18 }}>
-                {biggestWin.homeTeam} {biggestWin.homeScore} - {biggestWin.awayScore}{" "}
-                {biggestWin.awayTeam}
+                {biggestWin.homeTeam} {biggestWin.homeScore} - {biggestWin.awayScore} {biggestWin.awayTeam}
               </div>
               <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
                 {formatPrettyDate(biggestWin.playedOn)}
@@ -441,8 +449,7 @@ export default function StatsTab({
           {toughestLoss ? (
             <div style={{ display: "grid", gap: 8 }}>
               <div style={{ fontWeight: 900, fontSize: 18 }}>
-                {toughestLoss.homeTeam} {toughestLoss.homeScore} - {toughestLoss.awayScore}{" "}
-                {toughestLoss.awayTeam}
+                {toughestLoss.homeTeam} {toughestLoss.homeScore} - {toughestLoss.awayScore} {toughestLoss.awayTeam}
               </div>
               <div style={{ color: THEME.colors.textSecondary, fontSize: 14 }}>
                 {formatPrettyDate(toughestLoss.playedOn)}
@@ -456,10 +463,7 @@ export default function StatsTab({
       </div>
 
       <PageCard>
-        <SectionHeader
-          title="All Logged Results"
-          subtitle="Season result list used for this summary."
-        />
+        <SectionHeader title="All Logged Results" subtitle="Season result list used for this summary." />
 
         {validResults.length === 0 ? (
           <div style={{ color: THEME.colors.textSecondary }}>No result data available yet.</div>
