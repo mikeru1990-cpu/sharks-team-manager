@@ -85,20 +85,31 @@ function StatTile({
       : { background: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155" }
 
   return (
-    <div
-      style={{
-        ...style,
-        borderRadius: 20,
-        padding: 16,
-        display: "grid",
-        gap: 6,
-        boxShadow: "0 6px 14px rgba(15,23,42,0.05)",
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 800, opacity: 0.88 }}>{label}</div>
+    <div style={{ ...style, borderRadius: 20, padding: 16, display: "grid", gap: 6 }}>
+      <div style={{ fontSize: 12, fontWeight: 800 }}>{label}</div>
       <div style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.05 }}>{value}</div>
     </div>
   )
+}
+
+function attendanceButtonStyle(active: boolean, tone: "available" | "maybe" | "unavailable") {
+  const activeStyles =
+    tone === "available"
+      ? { background: "#dcfce7", border: "1px solid #86efac", color: "#166534" }
+      : tone === "maybe"
+      ? { background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" }
+      : { background: "#fee2e2", border: "1px solid #fecaca", color: "#991b1b" }
+
+  return {
+    ...(active
+      ? activeStyles
+      : { background: "white", border: "1px solid #cbd5e1", color: "#334155" }),
+    borderRadius: 999,
+    padding: "9px 12px",
+    fontWeight: 900,
+    fontSize: 12,
+    cursor: "pointer",
+  } as const
 }
 
 export default function EventsTabContent({
@@ -112,8 +123,11 @@ export default function EventsTabContent({
   setSelectedEventId,
   activeMatchEventId,
   setActiveMatchEventId,
+  players,
   formatFullDate,
   countAttendance,
+  getPlayerStatus,
+  saveAttendance,
   openAddCalendarEvent,
   openEditCalendarEvent,
   deleteCalendarEvent,
@@ -157,13 +171,7 @@ export default function EventsTabContent({
         />
       </PageCard>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
         <StatTile label="Total Events" value={totalEvents} tone="blue" />
         <StatTile label="Upcoming" value={upcomingCount} tone="green" />
         <StatTile label="Today" value={todayCount} tone="yellow" />
@@ -172,20 +180,9 @@ export default function EventsTabContent({
       </div>
 
       <PageCard>
-        <SectionHeader
-          title="Day Planner"
-          subtitle="Choose a day to view events and attendance."
-        />
+        <SectionHeader title="Day Planner" subtitle="Choose a day to view events and attendance." />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
-            gap: 10,
-            alignItems: "center",
-            marginBottom: 14,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center", marginBottom: 14 }}>
           <input
             type="date"
             value={selectedDate}
@@ -207,23 +204,12 @@ export default function EventsTabContent({
           ) : null}
         </div>
 
-        <div style={{ color: "#475569", fontWeight: 700 }}>
-          {formatFullDate(selectedDate)}
-        </div>
+        <div style={{ color: "#475569", fontWeight: 700 }}>{formatFullDate(selectedDate)}</div>
       </PageCard>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-          gap: 16,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
         <PageCard>
-          <SectionHeader
-            title="Selected Day Events"
-            subtitle="Everything scheduled for the chosen date."
-          />
+          <SectionHeader title="Selected Day Events" subtitle="Everything scheduled for the chosen date." />
 
           {selectedDateEvents.length === 0 ? (
             <div style={{ color: "#64748b" }}>No events on this date.</div>
@@ -267,14 +253,14 @@ export default function EventsTabContent({
                     </div>
 
                     {event.opponent ? (
-                      <div style={{ color: "#1d4ed8", fontWeight: 800 }}>
-                        vs {event.opponent}
-                      </div>
+                      <div style={{ color: "#1d4ed8", fontWeight: 800 }}>vs {event.opponent}</div>
                     ) : null}
 
                     {(event.type === "training" || event.type === "match") && (
                       <div style={{ color: "#64748b", fontSize: 13 }}>
-                        Available: {countAttendance(event.id, "available")} • Maybe: {countAttendance(event.id, "maybe")} • Unavailable: {countAttendance(event.id, "unavailable")}
+                        Available: {countAttendance(event.id, "available")} • Maybe:{" "}
+                        {countAttendance(event.id, "maybe")} • Unavailable:{" "}
+                        {countAttendance(event.id, "unavailable")}
                       </div>
                     )}
                   </button>
@@ -285,43 +271,24 @@ export default function EventsTabContent({
         </PageCard>
 
         <PageCard>
-          <SectionHeader
-            title="Next Event"
-            subtitle="Closest upcoming activity."
-          />
+          <SectionHeader title="Next Event" subtitle="Closest upcoming activity." />
 
           {!nextEvent ? (
             <div style={{ color: "#64748b" }}>No next event yet.</div>
           ) : (
-            <div
-              style={{
-                border: "1px solid #dbeafe",
-                background: "#f8fbff",
-                borderRadius: 18,
-                padding: 16,
-                display: "grid",
-                gap: 10,
-              }}
-            >
+            <div style={{ border: "1px solid #dbeafe", background: "#f8fbff", borderRadius: 18, padding: 16, display: "grid", gap: 10 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Badge tone={nextEvent.type === "match" ? "blue" : "green"}>
-                  {nextEvent.type}
-                </Badge>
+                <Badge tone={nextEvent.type === "match" ? "blue" : "green"}>{nextEvent.type}</Badge>
                 <StatusBadge status={getStatus(nextEvent.date)} />
                 <Badge>{formatPrettyDate(nextEvent.date)}</Badge>
                 {nextEvent.startTime ? <Badge>{nextEvent.startTime}</Badge> : null}
               </div>
 
               <div style={{ fontSize: 20, fontWeight: 900 }}>{nextEvent.title}</div>
-
-              <div style={{ color: "#475569" }}>
-                {nextEvent.location || "Location not set"}
-              </div>
+              <div style={{ color: "#475569" }}>{nextEvent.location || "Location not set"}</div>
 
               {nextEvent.opponent ? (
-                <div style={{ color: "#1d4ed8", fontWeight: 800 }}>
-                  vs {nextEvent.opponent}
-                </div>
+                <div style={{ color: "#1d4ed8", fontWeight: 800 }}>vs {nextEvent.opponent}</div>
               ) : null}
             </div>
           )}
@@ -347,16 +314,7 @@ export default function EventsTabContent({
             }
           />
 
-          <div
-            style={{
-              border: "1px solid #e2e8f0",
-              background: "white",
-              borderRadius: 20,
-              padding: 16,
-              display: "grid",
-              gap: 8,
-            }}
-          >
+          <div style={{ border: "1px solid #e2e8f0", background: "white", borderRadius: 20, padding: 16, display: "grid", gap: 8 }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Badge tone={selectedEvent.type === "match" ? "blue" : "green"}>
                 {selectedEvent.type.toUpperCase()}
@@ -367,29 +325,72 @@ export default function EventsTabContent({
             </div>
 
             <div style={{ fontSize: 22, fontWeight: 900 }}>{selectedEvent.title}</div>
-
-            {selectedEvent.location ? (
-              <div style={{ color: "#475569" }}>{selectedEvent.location}</div>
-            ) : null}
-
-            {selectedEvent.opponent ? (
-              <div style={{ color: "#1d4ed8", fontWeight: 800 }}>
-                vs {selectedEvent.opponent}
-              </div>
-            ) : null}
-
-            {selectedEvent.notes ? (
-              <div style={{ color: "#64748b", lineHeight: 1.5 }}>{selectedEvent.notes}</div>
-            ) : null}
+            {selectedEvent.location ? <div style={{ color: "#475569" }}>{selectedEvent.location}</div> : null}
+            {selectedEvent.opponent ? <div style={{ color: "#1d4ed8", fontWeight: 800 }}>vs {selectedEvent.opponent}</div> : null}
+            {selectedEvent.notes ? <div style={{ color: "#64748b", lineHeight: 1.5 }}>{selectedEvent.notes}</div> : null}
           </div>
         </PageCard>
       ) : null}
 
+      {selectedEvent ? (
+        <PageCard>
+          <SectionHeader
+            title="Player Availability"
+            subtitle={`Set availability for ${selectedEvent.title}.`}
+          />
+
+          {players.length === 0 ? (
+            <div style={{ color: "#64748b" }}>No players found.</div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {players.map((player) => {
+                const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
+
+                return (
+                  <div
+                    key={player.id}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 18,
+                      padding: 14,
+                      background: "white",
+                      display: "grid",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 900, fontSize: 16 }}>{player.name}</div>
+                      <div style={{ color: "#64748b", fontSize: 13, marginTop: 3 }}>
+                        {player.positions?.join(" / ") || "Player"}
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(["available", "maybe", "unavailable"] as const).map((status) => (
+                        <button
+                          key={status}
+                          disabled={!isAdmin}
+                          onClick={() => void saveAttendance(selectedEvent.id, player.id, status)}
+                          style={attendanceButtonStyle(currentStatus === status, status)}
+                        >
+                          {status === "available"
+                            ? "Available"
+                            : status === "maybe"
+                            ? "Maybe"
+                            : "Unavailable"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </PageCard>
+      ) : null}
+
       <PageCard>
-        <SectionHeader
-          title="All Events"
-          subtitle="Full event list in date order."
-        />
+        <SectionHeader title="All Events" subtitle="Full event list in date order." />
 
         {sorted.length === 0 ? (
           <div style={{ color: "#64748b" }}>No events yet.</div>
@@ -416,15 +417,7 @@ export default function EventsTabContent({
                     gap: 8,
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 10,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <Badge tone={event.type === "match" ? "blue" : "green"}>
                         {event.type === "match" ? "Match" : "Training"}
@@ -438,15 +431,10 @@ export default function EventsTabContent({
                   </div>
 
                   <div style={{ fontSize: 18, fontWeight: 900 }}>{event.title}</div>
-
-                  <div style={{ color: "#64748b" }}>
-                    {event.location || "Location not set"}
-                  </div>
+                  <div style={{ color: "#64748b" }}>{event.location || "Location not set"}</div>
 
                   {event.type === "match" && event.opponent ? (
-                    <div style={{ fontWeight: 800, color: "#1e3a8a" }}>
-                      vs {event.opponent}
-                    </div>
+                    <div style={{ fontWeight: 800, color: "#1e3a8a" }}>vs {event.opponent}</div>
                   ) : null}
                 </div>
               )
