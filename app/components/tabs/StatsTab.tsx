@@ -6,9 +6,11 @@ import LeagueTable from "../LeagueTable"
 import type { LeagueResult, Player, PlayerMatchRating } from "../../lib/types"
 
 type Props = {
+  teamName?: string
   results: LeagueResult[]
   players: Player[]
   ratings: PlayerMatchRating[]
+  timeline?: any[]
 }
 
 const TEAM_NAME = "Leonard Stanley U10 Lionesses"
