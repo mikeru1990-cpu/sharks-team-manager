@@ -17,4 +17,5 @@ const config = {
   plugins: [],
 }
 
+// Tailwind configuration for Sharks Team Manager
 export default config
