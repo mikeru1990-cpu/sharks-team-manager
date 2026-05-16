@@ -12,6 +12,7 @@ import SeasonModal from "./modals/SeasonModal"
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
 import SeasonSwitcher from "./layout/SeasonSwitcher"
+import DashboardOverview from "./dashboard/DashboardOverview"
 
 import {
   TEAM,
@@ -36,7 +37,7 @@ function ShellSection({
       style={{
         minWidth: 0,
         display: "grid",
-        gap: 16,
+        gap: 20,
       }}
     >
       {children}
@@ -53,11 +54,23 @@ export default function DashboardShell(props: Props) {
         style={{
           minHeight: "100vh",
           padding: 24,
-          background: "linear-gradient(180deg, #f8fafc 0%, #eaf1ff 45%, #eef2ff 100%)",
+          background:
+            "linear-gradient(180deg, #020617 0%, #0f172a 40%, #111827 100%)",
         }}
       >
-        <div style={{ ...cardStyle(), maxWidth: 840, margin: "0 auto" }}>
-          Loading club data...
+        <div
+          style={{
+            ...cardStyle(),
+            maxWidth: 840,
+            margin: "0 auto",
+            borderRadius: 28,
+            padding: 28,
+            background: "rgba(255,255,255,0.95)",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
+            fontWeight: 700,
+          }}
+        >
+          Loading Sharks Coaching Console...
         </div>
       </main>
     )
@@ -67,19 +80,20 @@ export default function DashboardShell(props: Props) {
     <main
       style={{
         minHeight: "100vh",
-        padding: 16,
-        paddingBottom: 124,
-        background: "linear-gradient(180deg, #f8fafc 0%, #eaf1ff 45%, #eef2ff 100%)",
+        padding: 18,
+        paddingBottom: 140,
+        background:
+          "radial-gradient(circle at top, #1e3a8a 0%, #0f172a 30%, #020617 100%)",
         overflowX: "hidden",
         boxSizing: "border-box",
       }}
     >
       <div
         style={{
-          maxWidth: 980,
+          maxWidth: 1120,
           margin: "0 auto",
           display: "grid",
-          gap: 18,
+          gap: 24,
           minWidth: 0,
         }}
       >
@@ -112,6 +126,79 @@ export default function DashboardShell(props: Props) {
 
         {tab === "home" && (
           <ShellSection>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {[
+                {
+                  label: "Available",
+                  value: props.availableCount || 0,
+                  color: "#22c55e",
+                },
+                {
+                  label: "Maybe",
+                  value: props.maybeCount || 0,
+                  color: "#f59e0b",
+                },
+                {
+                  label: "Unavailable",
+                  value: props.unavailableCount || 0,
+                  color: "#ef4444",
+                },
+                {
+                  label: "Squad Size",
+                  value: props.players?.length || 0,
+                  color: "#3b82f6",
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    borderRadius: 24,
+                    padding: 22,
+                    background: "rgba(15,23,42,0.82)",
+                    border: `1px solid ${item.color}55`,
+                    boxShadow: `0 10px 30px ${item.color}22`,
+                    backdropFilter: "blur(12px)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: "#cbd5e1",
+                      marginBottom: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {item.label}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 40,
+                      fontWeight: 900,
+                      color: "white",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <DashboardOverview
+              players={props.players}
+              events={props.events}
+              attendance={props.attendance}
+              results={props.leagueResults}
+              ratings={props.playerRatings}
+            />
+
             <HomeTab
               teamName={TEAM.name}
               players={props.players}
