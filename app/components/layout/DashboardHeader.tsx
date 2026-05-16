@@ -22,33 +22,44 @@ export default function DashboardHeader({
   availablePlayersCount,
   totalPlayersCount,
 }: Props) {
+  const readiness =
+    typeof availablePlayersCount === "number" &&
+    typeof totalPlayersCount === "number" &&
+    totalPlayersCount > 0
+      ? Math.round((availablePlayersCount / totalPlayersCount) * 100)
+      : null
+
+  const readinessColor =
+    readiness === null
+      ? "#94a3b8"
+      : readiness >= 75
+      ? "#22c55e"
+      : readiness >= 50
+      ? "#f59e0b"
+      : "#ef4444"
+
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
-        color: "white",
-        borderRadius: 28,
-        padding: 20,
         position: "relative",
         overflow: "hidden",
-        border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow: "0 18px 42px rgba(15,23,42,0.20)",
+        borderRadius: 34,
+        padding: 28,
+        background:
+          "linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 50%, rgba(30,64,175,0.88) 100%)",
+        border: "1px solid rgba(148,163,184,0.14)",
+        boxShadow:
+          "0 30px 70px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+        backdropFilter: "blur(18px)",
       }}
     >
       <div
         style={{
           position: "absolute",
           inset: 0,
-          opacity: 0.16,
-          backgroundImage: `
-            repeating-linear-gradient(
-              135deg,
-              rgba(255,255,255,0.12) 0px,
-              rgba(255,255,255,0.12) 2px,
-              transparent 2px,
-              transparent 10px
-            )
-          `,
+          opacity: 0.12,
+          backgroundImage:
+            "radial-gradient(circle at 20% 20%, rgba(96,165,250,0.9) 0%, transparent 30%), radial-gradient(circle at 80% 30%, rgba(59,130,246,0.6) 0%, transparent 30%)",
           pointerEvents: "none",
         }}
       />
@@ -56,131 +67,243 @@ export default function DashboardHeader({
       <div
         style={{
           position: "absolute",
-          right: -40,
-          top: -40,
-          width: 180,
-          height: 180,
+          top: -80,
+          right: -80,
+          width: 260,
+          height: 260,
           borderRadius: "50%",
-          background: "rgba(255,255,255,0.06)",
+          background: "rgba(59,130,246,0.16)",
+          filter: "blur(10px)",
           pointerEvents: "none",
         }}
       />
 
       <div
         style={{
-          position: "absolute",
-          left: -20,
-          bottom: -55,
-          width: 140,
-          height: 140,
-          borderRadius: "50%",
-          background: "rgba(250,204,21,0.12)",
-          pointerEvents: "none",
+          position: "relative",
+          zIndex: 2,
+          display: "grid",
+          gap: 24,
         }}
-      />
-
-      <div style={{ position: "relative", zIndex: 2, display: "grid", gap: 16 }}>
+      >
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            gap: 12,
+            gap: 18,
             flexWrap: "wrap",
           }}
         >
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, display: "grid", gap: 12 }}>
             <div
               style={{
-                fontSize: 12,
-                fontWeight: 900,
-                opacity: 0.82,
-                letterSpacing: "0.08em",
-              }}
-            >
-              SHARKS FOOTBALL
-            </div>
-
-            <div
-              style={{
-                fontSize: 30,
-                fontWeight: 900,
-                marginTop: 6,
-                lineHeight: 1.05,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {teamName}
-            </div>
-
-            <div
-              style={{
-                marginTop: 8,
                 display: "flex",
-                gap: 8,
+                gap: 10,
+                alignItems: "center",
                 flexWrap: "wrap",
               }}
             >
-              <Badge tone="blue">{isAdmin ? "Admin Mode" : "Coach View"}</Badge>
+              <div
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#dbeafe",
+                  fontSize: 11,
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                }}
+              >
+                SHARKS COACHING CONSOLE
+              </div>
 
-              {typeof availablePlayersCount === "number" &&
-              typeof totalPlayersCount === "number" ? (
-                <Badge tone="yellow">
-                  Players {availablePlayersCount}/{totalPlayersCount}
-                </Badge>
-              ) : null}
+              <Badge tone="blue">
+                {isAdmin ? "ADMIN MODE" : "COACH VIEW"}
+              </Badge>
+            </div>
+
+            <div>
+              <div
+                style={{
+                  fontSize: 38,
+                  fontWeight: 900,
+                  color: "white",
+                  lineHeight: 1,
+                  letterSpacing: "-0.04em",
+                }}
+              >
+                {teamName}
+              </div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  color: "#cbd5e1",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  maxWidth: 620,
+                  lineHeight: 1.5,
+                }}
+              >
+                Operational coaching dashboard with live squad readiness,
+                matchday intelligence, player analytics and rotation control.
+              </div>
             </div>
           </div>
 
           <button
             onClick={() => void onSignOut()}
             style={{
-              border: "1px solid rgba(255,255,255,0.18)",
-              borderRadius: 16,
-              padding: "12px 16px",
-              background: "rgba(255,255,255,0.14)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 18,
+              padding: "14px 18px",
+              background: "rgba(255,255,255,0.08)",
               color: "white",
               fontWeight: 800,
-              fontSize: 15,
+              fontSize: 14,
               cursor: "pointer",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 8px 18px rgba(15,23,42,0.10)",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
             }}
           >
             Sign Out
           </button>
         </div>
 
-        {(nextEventTitle || nextEventDateLabel) ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 16,
+          }}
+        >
           <div
             style={{
-              padding: 16,
-              borderRadius: 20,
-              background: "rgba(255,255,255,0.10)",
-              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 24,
+              padding: 20,
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              backdropFilter: "blur(10px)",
               display: "grid",
-              gap: 5,
-              backdropFilter: "blur(8px)",
+              gap: 8,
             }}
           >
             <div
               style={{
-                fontSize: 12,
+                fontSize: 11,
+                letterSpacing: "0.1em",
                 fontWeight: 900,
-                opacity: 0.76,
-                letterSpacing: "0.07em",
+                color: "#93c5fd",
               }}
             >
               NEXT EVENT
             </div>
-            <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.2 }}>
+
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 900,
+                color: "white",
+                lineHeight: 1.15,
+              }}
+            >
               {nextEventTitle || "No upcoming event"}
             </div>
-            <div style={{ fontSize: 14, opacity: 0.92 }}>
-              {nextEventDateLabel || ""}
+
+            <div
+              style={{
+                color: "#cbd5e1",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {nextEventDateLabel || "Select a fixture or training session"}
             </div>
           </div>
-        ) : null}
+
+          <div
+            style={{
+              borderRadius: 24,
+              padding: 20,
+              background: "rgba(255,255,255,0.08)",
+              border: `1px solid ${readinessColor}44`,
+              backdropFilter: "blur(10px)",
+              display: "grid",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.1em",
+                fontWeight: 900,
+                color: "#93c5fd",
+              }}
+            >
+              SQUAD READINESS
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 40,
+                  fontWeight: 900,
+                  color: readinessColor,
+                  lineHeight: 1,
+                }}
+              >
+                {readiness ?? 0}%
+              </div>
+
+              <div
+                style={{
+                  color: "#cbd5e1",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                match ready
+              </div>
+            </div>
+
+            <div
+              style={{
+                color: "#e2e8f0",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {availablePlayersCount ?? 0} available from {totalPlayersCount ?? 0} players
+            </div>
+
+            <div
+              style={{
+                height: 8,
+                borderRadius: 999,
+                overflow: "hidden",
+                background: "rgba(255,255,255,0.08)",
+              }}
+            >
+              <div
+                style={{
+                  width: `${readiness ?? 0}%`,
+                  height: "100%",
+                  background: readinessColor,
+                  borderRadius: 999,
+                  boxShadow: `0 0 18px ${readinessColor}`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
