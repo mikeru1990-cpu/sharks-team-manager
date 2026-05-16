@@ -4,9 +4,12 @@ import SectionHeader from "../ui/SectionHeader"
 
 import type {
   EventAttendance,
-  EventWithPlan,
   LeagueResult,
   Player,
+} from "../../lib/types"
+
+import type {
+  EventWithPlan,
 } from "../../lib/dashboardTypes"
 
 type Props = {
