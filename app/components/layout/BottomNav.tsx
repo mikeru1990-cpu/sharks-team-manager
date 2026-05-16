@@ -34,23 +34,26 @@ export default function BottomNav({ tab, setTab }: Props) {
     <div
       style={{
         position: "fixed",
-        left: 12,
-        right: 12,
-        bottom: 12,
+        left: "50%",
+        transform: "translateX(-50%)",
+        bottom: 18,
+        width: "min(94vw, 760px)",
         zIndex: 100,
-        borderRadius: 30,
-        padding: 10,
-        background: "rgba(255,255,255,0.94)",
-        border: "1px solid #dbe3ef",
-        boxShadow: "0 14px 32px rgba(15,23,42,0.16)",
-        backdropFilter: "blur(14px)",
+        borderRadius: 34,
+        padding: 12,
+        background: "rgba(2,6,23,0.82)",
+        border: "1px solid rgba(148,163,184,0.16)",
+        boxShadow:
+          "0 25px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
       }}
     >
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-          gap: 6,
+          gap: 8,
           alignItems: "stretch",
         }}
       >
@@ -62,28 +65,48 @@ export default function BottomNav({ tab, setTab }: Props) {
               key={item.key}
               onClick={() => setTab(item.key)}
               style={{
-                border: active ? "none" : "1px solid transparent",
+                border: active
+                  ? "1px solid rgba(96,165,250,0.55)"
+                  : "1px solid transparent",
                 background: active
-                  ? `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`
-                  : "transparent",
-                color: active ? "white" : "#475569",
-                borderRadius: 20,
-                padding: "10px 4px 9px",
+                  ? `linear-gradient(135deg, ${THEME.colors.primary} 0%, #1d4ed8 100%)`
+                  : "rgba(255,255,255,0.02)",
+                color: active ? "white" : "#cbd5e1",
+                borderRadius: 24,
+                padding: "12px 4px 10px",
                 display: "grid",
                 justifyItems: "center",
-                gap: 4,
+                alignContent: "center",
+                gap: 6,
                 minWidth: 0,
                 cursor: "pointer",
-                boxShadow: active ? "0 8px 18px rgba(30,58,138,0.24)" : "none",
-                transition: "all 0.18s ease",
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.22s ease",
+                boxShadow: active
+                  ? "0 12px 30px rgba(37,99,235,0.42)"
+                  : "none",
               }}
             >
+              {active && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 100%)",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+
               <div
                 style={{
                   lineHeight: 1,
-                  transform: active ? "translateY(-1px)" : "none",
+                  transform: active ? "translateY(-2px) scale(1.05)" : "none",
                   display: "grid",
                   placeItems: "center",
+                  transition: "all 0.2s ease",
                 }}
               >
                 {item.icon}
@@ -92,9 +115,10 @@ export default function BottomNav({ tab, setTab }: Props) {
               <div
                 style={{
                   fontSize: 11,
-                  fontWeight: 800,
+                  fontWeight: active ? 900 : 700,
                   whiteSpace: "nowrap",
-                  opacity: active ? 1 : 0.94,
+                  letterSpacing: 0.2,
+                  opacity: active ? 1 : 0.86,
                 }}
               >
                 {item.label}
