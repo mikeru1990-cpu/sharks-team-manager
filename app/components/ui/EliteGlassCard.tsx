@@ -1,6 +1,6 @@
 "use client"
 
-import { eliteTheme } from "@/app/lib/eliteTheme"
+import { eliteTheme } from "../../lib/eliteTheme"
 import type { ReactNode } from "react"
 
 type Props = {
