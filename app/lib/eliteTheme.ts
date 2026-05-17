@@ -27,6 +27,9 @@ export const eliteTheme = {
 
     danger:
       "linear-gradient(135deg, rgba(239,68,68,0.22), rgba(239,68,68,0.08))",
+
+    primary:
+      "linear-gradient(135deg, rgba(56,189,248,1) 0%, rgba(14,165,233,1) 100%)",
   },
 
   shadows: {
@@ -46,6 +49,7 @@ export const eliteTheme = {
     md: 22,
     lg: 32,
     xl: 40,
+    full: 999,
   },
 
   typography: {
