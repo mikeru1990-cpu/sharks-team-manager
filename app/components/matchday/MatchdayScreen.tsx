@@ -11,6 +11,7 @@ import MatchStatsPanel from "./MatchStatsPanel"
 import EventCreationSheet from "./EventCreationSheet"
 import MatchRecoveryPanel from "./MatchRecoveryPanel"
 import QuarterAutomationPanel from "./QuarterAutomationPanel"
+import LiveSyncPanel from "./LiveSyncPanel"
 import SubstitutionPanel from "./SubstitutionPanel"
 import PlayerWorkloadPanel from "./PlayerWorkloadPanel"
 import OperationalScreenHeader from "../layout/OperationalScreenHeader"
@@ -54,6 +55,8 @@ export default function MatchdayScreen() {
       <SubstitutionPanel />
 
       <PlayerWorkloadPanel />
+
+      <LiveSyncPanel />
 
       <MatchRecoveryPanel />
 
