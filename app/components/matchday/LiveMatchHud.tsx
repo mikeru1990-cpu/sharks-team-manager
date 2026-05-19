@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, Timer, Trophy } from "lucide-react"
+import { Activity, Pause, Play, Timer, Trophy } from "lucide-react"
 import { eliteTheme } from "../../lib/eliteTheme"
 
 type Props = {
@@ -9,6 +9,7 @@ type Props = {
   minute?: number
   period?: string
   status?: string
+  isLive?: boolean
 }
 
 export default function LiveMatchHud({
@@ -17,6 +18,7 @@ export default function LiveMatchHud({
   minute = 54,
   period = "Quarter 3",
   status = "High Pressure",
+  isLive = true,
 }: Props) {
   return (
     <div
@@ -96,21 +98,55 @@ export default function LiveMatchHud({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 14px",
-            borderRadius: eliteTheme.radius.full,
-            background: "rgba(34,197,94,0.14)",
-            border: "1px solid rgba(34,197,94,0.24)",
-            color: eliteTheme.colors.text,
-            fontWeight: 800,
-            fontSize: 13,
-            boxShadow: eliteTheme.shadows.glowGreen,
-            whiteSpace: "nowrap",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 10,
           }}
         >
-          <Activity size={14} />
-          {status}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: eliteTheme.radius.full,
+              background: isLive
+                ? "rgba(34,197,94,0.14)"
+                : "rgba(148,163,184,0.14)",
+              border: isLive
+                ? "1px solid rgba(34,197,94,0.24)"
+                : "1px solid rgba(148,163,184,0.24)",
+              color: eliteTheme.colors.text,
+              fontWeight: 800,
+              fontSize: 13,
+              boxShadow: isLive
+                ? eliteTheme.shadows.glowGreen
+                : eliteTheme.shadows.medium,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Activity size={14} />
+            {status}
+          </div>
+
+          <button
+            style={{
+              border: "none",
+              borderRadius: eliteTheme.radius.full,
+              background: eliteTheme.gradients.primary,
+              color: eliteTheme.colors.text,
+              padding: "10px 16px",
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              boxShadow: eliteTheme.shadows.glowBlue,
+            }}
+          >
+            {isLive ? <Pause size={16} /> : <Play size={16} />}
+            {isLive ? "Pause Match" : "Resume Match"}
+          </button>
         </div>
       </div>
     </div>
