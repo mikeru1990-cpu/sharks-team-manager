@@ -4,6 +4,7 @@ import LiveMatchHud from "./LiveMatchHud"
 import QuickActionDock from "./QuickActionDock"
 import MatchMomentumPanel from "./MatchMomentumPanel"
 import MatchTimerPanel from "./MatchTimerPanel"
+import TacticalDragBoard from "./TacticalDragBoard"
 import LiveLineupBoard from "./LiveLineupBoard"
 import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
@@ -41,6 +42,8 @@ export default function MatchdayScreen() {
       <MatchMomentumPanel />
 
       <FormationBoard />
+
+      <TacticalDragBoard />
 
       <LiveLineupBoard />
 
