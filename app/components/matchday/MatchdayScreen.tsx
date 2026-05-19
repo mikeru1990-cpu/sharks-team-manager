@@ -8,6 +8,7 @@ import TacticalDragBoard from "./TacticalDragBoard"
 import LiveLineupBoard from "./LiveLineupBoard"
 import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
+import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import EventCreationSheet from "./EventCreationSheet"
 import MatchRecoveryPanel from "./MatchRecoveryPanel"
 import MatchOrchestrationPanel from "./MatchOrchestrationPanel"
@@ -52,6 +53,8 @@ export default function MatchdayScreen() {
       <LiveLineupBoard />
 
       <MatchStatsPanel />
+
+      <PlayerAnalyticsPanel />
 
       <EventCreationSheet />
 
