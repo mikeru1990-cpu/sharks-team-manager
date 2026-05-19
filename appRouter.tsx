@@ -1,11 +1,11 @@
 "use client"
 
-import HomeMissionControl from "../home/HomeMissionControl"
-import MatchdayScreen from "../matchday/MatchdayScreen"
-import PlayersScreen from "../players/PlayersScreen"
-import EventsScreen from "../events/EventsScreen"
+import HomeMissionControl from "./app/components/home/HomeMissionControl"
+import MatchdayScreen from "./app/components/matchday/MatchdayScreen"
+import PlayersScreen from "./app/components/players/PlayersScreen"
+import EventsScreen from "./app/components/events/EventsScreen"
 
-import type { MainTab } from "../../lib/types"
+import type { MainTab } from "./app/lib/types"
 
 type Props = {
   activeTab: MainTab
@@ -18,7 +18,7 @@ export default function AppRouter({
     case "home":
       return <HomeMissionControl />
 
-    case "matchday":
+    case "match":
       return <MatchdayScreen />
 
     case "players":
@@ -31,4 +31,3 @@ export default function AppRouter({
       return <HomeMissionControl />
   }
 }
-```
