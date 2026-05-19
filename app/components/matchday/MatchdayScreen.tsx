@@ -10,6 +10,7 @@ import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
 import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import OperationalAlertsPanel from "./OperationalAlertsPanel"
+import TacticalSuggestionsPanel from "./TacticalSuggestionsPanel"
 import EventCreationSheet from "./EventCreationSheet"
 import MatchRecoveryPanel from "./MatchRecoveryPanel"
 import MatchOrchestrationPanel from "./MatchOrchestrationPanel"
@@ -58,6 +59,8 @@ export default function MatchdayScreen() {
       <PlayerAnalyticsPanel />
 
       <OperationalAlertsPanel />
+
+      <TacticalSuggestionsPanel />
 
       <EventCreationSheet />
 
