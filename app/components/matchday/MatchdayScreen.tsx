@@ -9,6 +9,7 @@ import LiveLineupBoard from "./LiveLineupBoard"
 import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
 import RealTimeScoringEngine from "./RealTimeScoringEngine"
+import NeuralMatchPredictionEngine from "./NeuralMatchPredictionEngine"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -70,6 +71,8 @@ export default function MatchdayScreen() {
       <LiveOrchestrationMemory />
 
       <EliteCoachingIntelligence />
+
+      <NeuralMatchPredictionEngine />
 
       <AutomatedTacticalDecisions />
 
