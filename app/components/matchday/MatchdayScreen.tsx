@@ -11,6 +11,7 @@ import MatchStatsPanel from "./MatchStatsPanel"
 import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import OperationalAlertsPanel from "./OperationalAlertsPanel"
 import TacticalSuggestionsPanel from "./TacticalSuggestionsPanel"
+import MatchIntelligenceEngine from "./MatchIntelligenceEngine"
 import EventCreationSheet from "./EventCreationSheet"
 import MatchRecoveryPanel from "./MatchRecoveryPanel"
 import MatchOrchestrationPanel from "./MatchOrchestrationPanel"
@@ -47,6 +48,8 @@ export default function MatchdayScreen() {
       <MatchMomentumPanel />
 
       <MatchOrchestrationPanel />
+
+      <MatchIntelligenceEngine />
 
       <FormationBoard />
 
