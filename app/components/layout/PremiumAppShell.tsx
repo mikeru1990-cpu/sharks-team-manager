@@ -18,7 +18,7 @@ export default function PremiumAppShell({
 }: Props) {
   const tabs: MainTab[] = [
     "home",
-    "matchday",
+    "match",
     "players",
     "events",
   ]
