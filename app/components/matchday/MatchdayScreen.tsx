@@ -10,6 +10,7 @@ import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
 import EventCreationSheet from "./EventCreationSheet"
 import MatchRecoveryPanel from "./MatchRecoveryPanel"
+import MatchOrchestrationPanel from "./MatchOrchestrationPanel"
 import QuarterAutomationPanel from "./QuarterAutomationPanel"
 import LiveSyncPanel from "./LiveSyncPanel"
 import SubstitutionPanel from "./SubstitutionPanel"
@@ -41,6 +42,8 @@ export default function MatchdayScreen() {
       <QuarterAutomationPanel />
 
       <MatchMomentumPanel />
+
+      <MatchOrchestrationPanel />
 
       <FormationBoard />
 
