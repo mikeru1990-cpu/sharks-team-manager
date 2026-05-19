@@ -12,6 +12,7 @@ import RealTimeScoringEngine from "./RealTimeScoringEngine"
 import NeuralMatchPredictionEngine from "./NeuralMatchPredictionEngine"
 import AutonomousDecisionCore from "./AutonomousDecisionCore"
 import AdvancedTacticalSimulator from "./AdvancedTacticalSimulator"
+import StrategicPressureAnalyzer from "./StrategicPressureAnalyzer"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -77,6 +78,8 @@ export default function MatchdayScreen() {
       <NeuralMatchPredictionEngine />
 
       <AdvancedTacticalSimulator />
+
+      <StrategicPressureAnalyzer />
 
       <AutonomousDecisionCore />
 
