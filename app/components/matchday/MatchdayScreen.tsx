@@ -3,6 +3,7 @@
 import LiveMatchHud from "./LiveMatchHud"
 import QuickActionDock from "./QuickActionDock"
 import MatchMomentumPanel from "./MatchMomentumPanel"
+import MatchTimerPanel from "./MatchTimerPanel"
 import OperationalScreenHeader from "../layout/OperationalScreenHeader"
 import OperationalCard from "../ui/OperationalCard"
 
@@ -24,6 +25,8 @@ export default function MatchdayScreen() {
       />
 
       <QuickActionDock />
+
+      <MatchTimerPanel />
 
       <MatchMomentumPanel />
 
