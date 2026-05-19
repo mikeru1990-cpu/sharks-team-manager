@@ -6,6 +6,7 @@ import MatchMomentumPanel from "./MatchMomentumPanel"
 import MatchTimerPanel from "./MatchTimerPanel"
 import LiveLineupBoard from "./LiveLineupBoard"
 import SubstitutionPanel from "./SubstitutionPanel"
+import PlayerWorkloadPanel from "./PlayerWorkloadPanel"
 import OperationalScreenHeader from "../layout/OperationalScreenHeader"
 import OperationalCard from "../ui/OperationalCard"
 
@@ -35,6 +36,8 @@ export default function MatchdayScreen() {
       <LiveLineupBoard />
 
       <SubstitutionPanel />
+
+      <PlayerWorkloadPanel />
 
       <OperationalCard
         title="Live Timeline"
