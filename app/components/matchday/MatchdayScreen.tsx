@@ -8,6 +8,7 @@ import TacticalDragBoard from "./TacticalDragBoard"
 import LiveLineupBoard from "./LiveLineupBoard"
 import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
+import RealTimeScoringEngine from "./RealTimeScoringEngine"
 import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import OperationalAlertsPanel from "./OperationalAlertsPanel"
 import TacticalSuggestionsPanel from "./TacticalSuggestionsPanel"
@@ -61,6 +62,8 @@ export default function MatchdayScreen() {
       <LiveLineupBoard />
 
       <MatchStatsPanel />
+
+      <RealTimeScoringEngine />
 
       <PlayerAnalyticsPanel />
 
