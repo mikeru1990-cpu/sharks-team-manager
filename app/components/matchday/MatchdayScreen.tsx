@@ -13,6 +13,7 @@ import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
 import TacticalLearningCore from "./TacticalLearningCore"
+import LiveOrchestrationMemory from "./LiveOrchestrationMemory"
 import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import OperationalAlertsPanel from "./OperationalAlertsPanel"
 import TacticalSuggestionsPanel from "./TacticalSuggestionsPanel"
@@ -64,6 +65,8 @@ export default function MatchdayScreen() {
       <AdaptiveTacticalMatrix />
 
       <TacticalLearningCore />
+
+      <LiveOrchestrationMemory />
 
       <AutomatedTacticalDecisions />
 
