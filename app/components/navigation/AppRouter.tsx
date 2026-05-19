@@ -16,7 +16,7 @@ export default function AppRouter({ activeTab }: Props) {
     case "home":
       return <HomeMissionControl />
 
-    case "matchday":
+    case "match":
       return <MatchdayScreen />
 
     case "players":
