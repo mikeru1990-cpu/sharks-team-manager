@@ -10,6 +10,7 @@ import FormationBoard from "./FormationBoard"
 import MatchStatsPanel from "./MatchStatsPanel"
 import RealTimeScoringEngine from "./RealTimeScoringEngine"
 import OperationalStateEngine from "./OperationalStateEngine"
+import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import PlayerAnalyticsPanel from "./PlayerAnalyticsPanel"
 import OperationalAlertsPanel from "./OperationalAlertsPanel"
 import TacticalSuggestionsPanel from "./TacticalSuggestionsPanel"
@@ -55,6 +56,8 @@ export default function MatchdayScreen() {
       <MatchIntelligenceEngine />
 
       <OperationalStateEngine />
+
+      <TacticalRecoverySystem />
 
       <AutomatedTacticalDecisions />
 
