@@ -1,6 +1,6 @@
 "use client"
 
-import { GaugeCircle, Sparkline, Trophy } from "lucide-react"
+import { GaugeCircle, Sparkles, Trophy } from "lucide-react"
 import OperationalCard from "../ui/OperationalCard"
 import { eliteTheme } from "../../lib/eliteTheme"
 
@@ -14,7 +14,7 @@ const scoring = [
   {
     title: "Momentum Score",
     value: "+14",
-    icon: Sparkline,
+    icon: Sparkles,
     color: "#22c55e",
   },
   {
