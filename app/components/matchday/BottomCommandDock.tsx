@@ -76,7 +76,7 @@ export default function BottomCommandDock() {
             <Icon size={18} />
             <span style={{ fontSize: 11 }}>{item.label}</span>
           </button>
-        )}
+        )
       })}
     </div>
   )
