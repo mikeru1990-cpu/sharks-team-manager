@@ -3,6 +3,7 @@
 import { Activity, Brain, ShieldAlert, Timer, Zap } from "lucide-react"
 import FloatingIntelligenceOverlay from "./FloatingIntelligenceOverlay"
 import BottomCommandDock from "./BottomCommandDock"
+import SwipeWorkspaceShell from "./SwipeWorkspaceShell"
 
 const alerts = [
   {
@@ -20,13 +21,6 @@ const alerts = [
     text: "Emily workload spike detected",
     level: "alert",
   },
-]
-
-const tacticalTabs = [
-  "Tactical",
-  "Players",
-  "Match",
-  "Intelligence",
 ]
 
 export default function TacticalCockpitLayout() {
@@ -126,32 +120,7 @@ export default function TacticalCockpitLayout() {
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            overflowX: "auto",
-          }}
-        >
-          {tacticalTabs.map((tab, index) => (
-            <div
-              key={tab}
-              style={{
-                padding: "12px 18px",
-                borderRadius: 999,
-                whiteSpace: "nowrap",
-                background:
-                  index === 0
-                    ? "linear-gradient(135deg,#2563eb,#7c3aed)"
-                    : "rgba(15,23,42,0.72)",
-                border: "1px solid rgba(148,163,184,0.12)",
-                fontWeight: 800,
-              }}
-            >
-              {tab}
-            </div>
-          ))}
-        </div>
+        <SwipeWorkspaceShell />
 
         <div
           style={{
@@ -196,116 +165,6 @@ export default function TacticalCockpitLayout() {
               </div>
             )
           })}
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              borderRadius: 22,
-              padding: 18,
-              background: "rgba(15,23,42,0.82)",
-              border: "1px solid rgba(148,163,184,0.12)",
-            }}
-          >
-            <div style={{ fontWeight: 900, marginBottom: 12 }}>
-              Tactical State
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div>Shape: Compact Mid Press</div>
-              <div>Width: Narrow</div>
-              <div>Transition Mode: Fast</div>
-              <div>Press Trigger: Active</div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderRadius: 22,
-              padding: 18,
-              background: "rgba(15,23,42,0.82)",
-              border: "1px solid rgba(148,163,184,0.12)",
-            }}
-          >
-            <div style={{ fontWeight: 900, marginBottom: 12 }}>
-              Intelligence Feed
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>Predicted possession swing in 4 mins</div>
-              <div>Right-side overload probability rising</div>
-              <div>Press efficiency increasing</div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 24,
-            padding: 18,
-            background: "rgba(15,23,42,0.82)",
-            border: "1px solid rgba(148,163,184,0.12)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
-            }}
-          >
-            <div style={{ fontWeight: 900 }}>Invisible Intelligence Layer</div>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: "#22c55e",
-                fontWeight: 800,
-              }}
-            >
-              <Brain size={16} />
-              12 Systems Active
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 10,
-            }}
-          >
-            {[
-              "Prediction",
-              "Learning",
-              "Tempo",
-              "Pressing",
-              "Spatial",
-              "Chemistry",
-            ].map((item) => (
-              <div
-                key={item}
-                style={{
-                  padding: 12,
-                  borderRadius: 14,
-                  background: "rgba(2,6,23,0.72)",
-                  textAlign: "center",
-                  fontWeight: 700,
-                }}
-              >
-                {item}
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </>
