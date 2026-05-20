@@ -2,6 +2,7 @@
 
 import { Activity, Brain, ShieldAlert, Timer, Zap } from "lucide-react"
 import FloatingIntelligenceOverlay from "./FloatingIntelligenceOverlay"
+import BottomCommandDock from "./BottomCommandDock"
 
 const alerts = [
   {
@@ -32,12 +33,14 @@ export default function TacticalCockpitLayout() {
   return (
     <>
       <FloatingIntelligenceOverlay />
+      <BottomCommandDock />
 
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           gap: 16,
+          paddingBottom: 120,
         }}
       >
         <div
