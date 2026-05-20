@@ -1,9 +1,10 @@
 "use client"
 
-import { Activity, Brain, ShieldAlert, Timer, Zap } from "lucide-react"
+import { Activity, ShieldAlert, Zap } from "lucide-react"
 import FloatingIntelligenceOverlay from "./FloatingIntelligenceOverlay"
 import BottomCommandDock from "./BottomCommandDock"
 import SwipeWorkspaceShell from "./SwipeWorkspaceShell"
+import TacticalSideSheet from "./TacticalSideSheet"
 
 const alerts = [
   {
@@ -121,6 +122,8 @@ export default function TacticalCockpitLayout() {
         </div>
 
         <SwipeWorkspaceShell />
+
+        <TacticalSideSheet />
 
         <div
           style={{
