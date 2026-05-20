@@ -18,6 +18,7 @@ import EliteMatchCommandCenter from "./EliteMatchCommandCenter"
 import RealtimeDecisionRadar from "./RealtimeDecisionRadar"
 import AdaptiveFormationBalancer from "./AdaptiveFormationBalancer"
 import TacticalSynchronizationGrid from "./TacticalSynchronizationGrid"
+import EliteTransitionControl from "./EliteTransitionControl"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -74,6 +75,7 @@ export default function MatchdayScreen() {
       <RealtimeDecisionRadar />
       <AdaptiveFormationBalancer />
       <TacticalSynchronizationGrid />
+      <EliteTransitionControl />
       <AutonomousDecisionCore />
       <AutomatedTacticalDecisions />
       <FormationBoard />
