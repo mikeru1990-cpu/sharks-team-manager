@@ -15,6 +15,7 @@ import AdvancedTacticalSimulator from "./AdvancedTacticalSimulator"
 import StrategicPressureAnalyzer from "./StrategicPressureAnalyzer"
 import AdaptiveGameFlowEngine from "./AdaptiveGameFlowEngine"
 import EliteMatchCommandCenter from "./EliteMatchCommandCenter"
+import RealtimeDecisionRadar from "./RealtimeDecisionRadar"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -47,87 +48,49 @@ export default function MatchdayScreen() {
       }}
     >
       <LiveMatchHud />
-
       <OperationalScreenHeader
         title="Matchday"
         subtitle="Live football operations"
       />
-
       <QuickActionDock />
-
       <MatchTimerPanel />
-
       <QuarterAutomationPanel />
-
       <MatchMomentumPanel />
-
       <MatchOrchestrationPanel />
-
       <MatchIntelligenceEngine />
-
       <OperationalStateEngine />
-
       <TacticalRecoverySystem />
-
       <AdaptiveTacticalMatrix />
-
       <TacticalLearningCore />
-
       <LiveOrchestrationMemory />
-
       <EliteCoachingIntelligence />
-
       <NeuralMatchPredictionEngine />
-
       <AdvancedTacticalSimulator />
-
       <StrategicPressureAnalyzer />
-
       <AdaptiveGameFlowEngine />
-
       <EliteMatchCommandCenter />
-
+      <RealtimeDecisionRadar />
       <AutonomousDecisionCore />
-
       <AutomatedTacticalDecisions />
-
       <FormationBoard />
-
       <TacticalDragBoard />
-
       <LiveLineupBoard />
-
       <MatchStatsPanel />
-
       <RealTimeScoringEngine />
-
       <PlayerAnalyticsPanel />
-
       <OperationalAlertsPanel />
-
       <TacticalSuggestionsPanel />
-
       <EventCreationSheet />
-
       <SubstitutionPanel />
-
       <PlayerWorkloadPanel />
-
       <LiveSyncPanel />
-
       <MatchRecoveryPanel />
 
       <OperationalCard
         title="Live Timeline"
         subtitle="Real-time match events"
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div>⚽ Ava 12'</div>
           <div>⚽ Emily 31'</div>
           <div>🔁 Bella ↔ Sophia 42'</div>
