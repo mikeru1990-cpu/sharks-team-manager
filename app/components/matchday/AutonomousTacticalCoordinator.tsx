@@ -156,7 +156,7 @@ export default function AutonomousTacticalCoordinator() {
               {system.detail}
             </div>
           </div>
-        )}
+        )
       })}
     </div>
   )
