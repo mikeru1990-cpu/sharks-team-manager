@@ -75,7 +75,8 @@ export default function EliteTransitionControl() {
                 {system.value}
               </div>
             </div>
-          )}
+          )
+        })}
       </div>
     </OperationalCard>
   )
