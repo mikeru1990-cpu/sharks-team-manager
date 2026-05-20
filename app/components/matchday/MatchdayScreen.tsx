@@ -25,6 +25,7 @@ import DynamicSpatialControl from "./DynamicSpatialControl"
 import PredictiveTempoEngine from "./PredictiveTempoEngine"
 import AutonomousCounterAttackEngine from "./AutonomousCounterAttackEngine"
 import ElitePossessionCommand from "./ElitePossessionCommand"
+import NeuralPassingNetwork from "./NeuralPassingNetwork"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -88,6 +89,7 @@ export default function MatchdayScreen() {
       <PredictiveTempoEngine />
       <AutonomousCounterAttackEngine />
       <ElitePossessionCommand />
+      <NeuralPassingNetwork />
       <AutonomousDecisionCore />
       <AutomatedTacticalDecisions />
       <FormationBoard />
