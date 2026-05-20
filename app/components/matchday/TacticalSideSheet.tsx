@@ -57,6 +57,7 @@ export default function TacticalSideSheet() {
           <div style={{ fontSize: 12, opacity: 0.7 }}>
             CONTEXTUAL INTELLIGENCE
           </div>
+
           <div style={{ fontSize: 24, fontWeight: 900 }}>
             Tactical Side Sheet
           </div>
@@ -137,7 +138,7 @@ export default function TacticalSideSheet() {
               ))}
             </div>
           </div>
-        )}
+        )
       })}
     </div>
   )
