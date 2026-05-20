@@ -22,6 +22,7 @@ import EliteTransitionControl from "./EliteTransitionControl"
 import LiveTacticalChemistry from "./LiveTacticalChemistry"
 import AutonomousPressingMatrix from "./AutonomousPressingMatrix"
 import DynamicSpatialControl from "./DynamicSpatialControl"
+import PredictiveTempoEngine from "./PredictiveTempoEngine"
 import OperationalStateEngine from "./OperationalStateEngine"
 import TacticalRecoverySystem from "./TacticalRecoverySystem"
 import AdaptiveTacticalMatrix from "./AdaptiveTacticalMatrix"
@@ -82,6 +83,7 @@ export default function MatchdayScreen() {
       <LiveTacticalChemistry />
       <AutonomousPressingMatrix />
       <DynamicSpatialControl />
+      <PredictiveTempoEngine />
       <AutonomousDecisionCore />
       <AutomatedTacticalDecisions />
       <FormationBoard />
