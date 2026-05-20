@@ -5,6 +5,7 @@ import FloatingIntelligenceOverlay from "./FloatingIntelligenceOverlay"
 import BottomCommandDock from "./BottomCommandDock"
 import SwipeWorkspaceShell from "./SwipeWorkspaceShell"
 import TacticalSideSheet from "./TacticalSideSheet"
+import LivePitchOverlay from "./LivePitchOverlay"
 
 const alerts = [
   {
@@ -120,6 +121,8 @@ export default function TacticalCockpitLayout() {
             ))}
           </div>
         </div>
+
+        <LivePitchOverlay />
 
         <SwipeWorkspaceShell />
 
