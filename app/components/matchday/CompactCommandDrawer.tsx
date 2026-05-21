@@ -9,6 +9,7 @@ import {
   Users,
   Zap,
 } from "lucide-react"
+import TacticalModeSelector from "./TacticalModeSelector"
 
 const commands = [
   {
@@ -43,7 +44,7 @@ export default function CompactCommandDrawer() {
         bottom: 88,
         right: 18,
         zIndex: 60,
-        width: open ? 320 : 72,
+        width: open ? 340 : 72,
         transition: "all 0.25s ease",
       }}
     >
@@ -55,6 +56,8 @@ export default function CompactCommandDrawer() {
           backdropFilter: "blur(22px)",
           overflow: "hidden",
           boxShadow: "0 10px 40px rgba(0,0,0,0.45)",
+          maxHeight: open ? "80vh" : 72,
+          overflowY: "auto",
         }}
       >
         <button
@@ -86,10 +89,20 @@ export default function CompactCommandDrawer() {
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 10,
+              gap: 18,
               padding: "0 16px 16px",
             }}
           >
+            <TacticalModeSelector />
+
+            <div
+              style={{
+                height: 1,
+                background: "rgba(148,163,184,0.12)",
+                margin: "4px 0",
+              }}
+            />
+
             {commands.map((command) => {
               const Icon = command.icon
 
