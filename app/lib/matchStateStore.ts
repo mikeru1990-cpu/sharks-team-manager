@@ -2,9 +2,10 @@ import { create } from "zustand"
 
 export type TacticalMode =
   | "high-press"
-  | "compact-shape"
-  | "transition-attack"
-  | "possession-control"
+  | "balanced"
+  | "compact-block"
+  | "counter"
+  | "possession"
 
 export type FormationType = "2-3-1" | "3-2-1" | "2-2-2"
 
