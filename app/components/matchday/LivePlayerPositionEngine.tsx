@@ -1,77 +1,13 @@
 "use client"
 
-import { useState } from "react"
-
-const initialPlayers = [
-  {
-    id: 1,
-    name: "Emily",
-    x: 48,
-    y: 78,
-  },
-  {
-    id: 2,
-    name: "Sophia",
-    x: 22,
-    y: 58,
-  },
-  {
-    id: 3,
-    name: "Ava",
-    x: 72,
-    y: 58,
-  },
-  {
-    id: 4,
-    name: "Olivia",
-    x: 48,
-    y: 42,
-  },
-  {
-    id: 5,
-    name: "Grace",
-    x: 28,
-    y: 24,
-  },
-  {
-    id: 6,
-    name: "Mia",
-    x: 68,
-    y: 24,
-  },
-]
+import { useMatchStateStore } from "../../lib/matchStateStore"
 
 export default function LivePlayerPositionEngine() {
-  const [players, setPlayers] = useState(initialPlayers)
+  const players = useMatchStateStore((state) => state.players)
 
-  const movePlayer = (
-    id: number,
-    direction: "up" | "down" | "left" | "right",
-  ) => {
-    setPlayers((prev) =>
-      prev.map((player) => {
-        if (player.id !== id) return player
-
-        const amount = 4
-
-        return {
-          ...player,
-          x:
-            direction === "left"
-              ? Math.max(5, player.x - amount)
-              : direction === "right"
-                ? Math.min(95, player.x + amount)
-                : player.x,
-          y:
-            direction === "up"
-              ? Math.max(5, player.y - amount)
-              : direction === "down"
-                ? Math.min(90, player.y + amount)
-                : player.y,
-        }
-      }),
-    )
-  }
+  const movePlayer = useMatchStateStore(
+    (state) => state.movePlayer,
+  )
 
   return (
     <div
