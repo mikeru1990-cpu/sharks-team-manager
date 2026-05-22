@@ -1,6 +1,5 @@
 "use client"
 
-import { THEME } from "../../lib/theme"
 import { Badge } from "../ui"
 
 type Props = {
@@ -40,43 +39,39 @@ export default function DashboardHeader({
 
   return (
     <div
+      className="sharks-glass sharks-card-shine"
       style={{
         position: "relative",
         overflow: "hidden",
-        borderRadius: 34,
-        padding: 28,
-        background:
-          "linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.96) 50%, rgba(30,64,175,0.88) 100%)",
-        border: "1px solid rgba(148,163,184,0.14)",
-        boxShadow:
-          "0 30px 70px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
-        backdropFilter: "blur(18px)",
+        borderRadius: 38,
+        padding: 30,
       }}
     >
       <div
         style={{
           position: "absolute",
-          inset: 0,
-          opacity: 0.12,
-          backgroundImage:
-            "radial-gradient(circle at 20% 20%, rgba(96,165,250,0.9) 0%, transparent 30%), radial-gradient(circle at 80% 30%, rgba(59,130,246,0.6) 0%, transparent 30%)",
-          pointerEvents: "none",
+          top: -100,
+          right: -60,
+          width: 280,
+          height: 280,
+          borderRadius: "50%",
+          background: "rgba(56,189,248,0.14)",
+          filter: "blur(10px)",
         }}
       />
 
       <div
         style={{
           position: "absolute",
-          top: -80,
-          right: -80,
-          width: 260,
-          height: 260,
-          borderRadius: "50%",
-          background: "rgba(59,130,246,0.16)",
-          filter: "blur(10px)",
-          pointerEvents: "none",
+          left: -40,
+          bottom: -30,
+          fontSize: 120,
+          opacity: 0.05,
+          transform: "rotate(-10deg)",
         }}
-      />
+      >
+        🦈
+      </div>
 
       <div
         style={{
@@ -90,33 +85,32 @@ export default function DashboardHeader({
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 18,
+            gap: 20,
             flexWrap: "wrap",
           }}
         >
-          <div style={{ minWidth: 0, display: "grid", gap: 12 }}>
+          <div style={{ display: "grid", gap: 14 }}>
             <div
               style={{
                 display: "flex",
-                gap: 10,
                 alignItems: "center",
+                gap: 10,
                 flexWrap: "wrap",
               }}
             >
               <div
                 style={{
-                  padding: "6px 12px",
+                  padding: "7px 14px",
                   borderRadius: 999,
                   background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
                   color: "#dbeafe",
-                  fontSize: 11,
                   fontWeight: 900,
-                  letterSpacing: "0.12em",
+                  fontSize: 11,
+                  letterSpacing: ".16em",
                 }}
               >
-                SHARKS COACHING CONSOLE
+                LEONARD STANLEY SHARKS
               </div>
 
               <Badge tone="blue">
@@ -127,11 +121,12 @@ export default function DashboardHeader({
             <div>
               <div
                 style={{
-                  fontSize: 38,
-                  fontWeight: 900,
-                  color: "white",
+                  fontSize: 42,
                   lineHeight: 1,
-                  letterSpacing: "-0.04em",
+                  fontWeight: 1000,
+                  letterSpacing: "-0.05em",
+                  color: "white",
+                  textShadow: "0 10px 30px rgba(56,189,248,0.25)",
                 }}
               >
                 {teamName}
@@ -139,33 +134,27 @@ export default function DashboardHeader({
 
               <div
                 style={{
-                  marginTop: 10,
+                  marginTop: 12,
+                  maxWidth: 680,
                   color: "#cbd5e1",
                   fontSize: 15,
+                  lineHeight: 1.6,
                   fontWeight: 600,
-                  maxWidth: 620,
-                  lineHeight: 1.5,
                 }}
               >
-                Operational coaching dashboard with live squad readiness,
-                matchday intelligence, player analytics and rotation control.
+                Elite football operations console with tactical matchday control,
+                live squad readiness, analytics and intelligent player management.
               </div>
             </div>
           </div>
 
           <button
             onClick={() => void onSignOut()}
+            className="sharks-premium-button"
             style={{
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 18,
-              padding: "14px 18px",
-              background: "rgba(255,255,255,0.08)",
-              color: "white",
-              fontWeight: 800,
-              fontSize: 14,
+              padding: "14px 20px",
+              fontWeight: 900,
               cursor: "pointer",
-              backdropFilter: "blur(12px)",
-              boxShadow: "0 10px 24px rgba(0,0,0,0.18)",
             }}
           >
             Sign Out
@@ -175,61 +164,15 @@ export default function DashboardHeader({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: 16,
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 18,
           }}
         >
           <div
+            className="sharks-glass sharks-card-shine"
             style={{
               borderRadius: 24,
-              padding: 20,
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              backdropFilter: "blur(10px)",
-              display: "grid",
-              gap: 8,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 11,
-                letterSpacing: "0.1em",
-                fontWeight: 900,
-                color: "#93c5fd",
-              }}
-            >
-              NEXT EVENT
-            </div>
-
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 900,
-                color: "white",
-                lineHeight: 1.15,
-              }}
-            >
-              {nextEventTitle || "No upcoming event"}
-            </div>
-
-            <div
-              style={{
-                color: "#cbd5e1",
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              {nextEventDateLabel || "Select a fixture or training session"}
-            </div>
-          </div>
-
-          <div
-            style={{
-              borderRadius: 24,
-              padding: 20,
-              background: "rgba(255,255,255,0.08)",
-              border: `1px solid ${readinessColor}44`,
-              backdropFilter: "blur(10px)",
+              padding: 22,
               display: "grid",
               gap: 10,
             }}
@@ -237,9 +180,52 @@ export default function DashboardHeader({
             <div
               style={{
                 fontSize: 11,
-                letterSpacing: "0.1em",
+                letterSpacing: ".16em",
                 fontWeight: 900,
-                color: "#93c5fd",
+                color: "#7dd3fc",
+              }}
+            >
+              NEXT FIXTURE
+            </div>
+
+            <div
+              style={{
+                fontSize: 26,
+                lineHeight: 1.1,
+                fontWeight: 1000,
+                color: "white",
+              }}
+            >
+              {nextEventTitle || "No upcoming fixture"}
+            </div>
+
+            <div
+              style={{
+                color: "#cbd5e1",
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              {nextEventDateLabel || "Add a fixture or training event"}
+            </div>
+          </div>
+
+          <div
+            className="sharks-glass sharks-card-shine"
+            style={{
+              borderRadius: 24,
+              padding: 22,
+              display: "grid",
+              gap: 12,
+              border: `1px solid ${readinessColor}55`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 11,
+                letterSpacing: ".16em",
+                fontWeight: 900,
+                color: "#7dd3fc",
               }}
             >
               SQUAD READINESS
@@ -249,13 +235,13 @@ export default function DashboardHeader({
               style={{
                 display: "flex",
                 alignItems: "baseline",
-                gap: 8,
+                gap: 10,
               }}
             >
               <div
                 style={{
-                  fontSize: 40,
-                  fontWeight: 900,
+                  fontSize: 48,
+                  fontWeight: 1000,
                   color: readinessColor,
                   lineHeight: 1,
                 }}
@@ -266,7 +252,6 @@ export default function DashboardHeader({
               <div
                 style={{
                   color: "#cbd5e1",
-                  fontSize: 14,
                   fontWeight: 700,
                 }}
               >
@@ -277,8 +262,8 @@ export default function DashboardHeader({
             <div
               style={{
                 color: "#e2e8f0",
-                fontSize: 14,
                 fontWeight: 600,
+                fontSize: 14,
               }}
             >
               {availablePlayersCount ?? 0} available from {totalPlayersCount ?? 0} players
@@ -286,19 +271,19 @@ export default function DashboardHeader({
 
             <div
               style={{
-                height: 8,
+                height: 10,
                 borderRadius: 999,
-                overflow: "hidden",
                 background: "rgba(255,255,255,0.08)",
+                overflow: "hidden",
               }}
             >
               <div
                 style={{
                   width: `${readiness ?? 0}%`,
                   height: "100%",
-                  background: readinessColor,
                   borderRadius: 999,
-                  boxShadow: `0 0 18px ${readinessColor}`,
+                  background: readinessColor,
+                  boxShadow: `0 0 24px ${readinessColor}`,
                 }}
               />
             </div>
