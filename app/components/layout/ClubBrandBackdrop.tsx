@@ -37,41 +37,36 @@ export default function ClubBrandBackdrop() {
       <div
         style={{
           position: "absolute",
-          right: -72,
-          top: 92,
-          width: 270,
-          height: 270,
-          borderRadius: "50%",
-          border: "2px solid rgba(255,255,255,0.10)",
-          background:
-            "linear-gradient(135deg, rgba(255,255,255,0.06), rgba(14,165,233,0.07))",
-          display: "grid",
-          placeItems: "center",
-          color: "rgba(255,255,255,0.11)",
-          fontSize: 66,
-          fontWeight: 1000,
-          letterSpacing: "-0.08em",
+          right: -120,
+          top: 70,
+          width: 420,
+          height: 420,
+          opacity: 0.07,
           transform: "rotate(-12deg)",
-          boxShadow: "0 40px 100px rgba(14,165,233,0.14)",
+          filter: "drop-shadow(0 30px 80px rgba(56,189,248,0.18))",
+          backgroundImage: "url('/sharks-official-badge.svg')",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "contain",
+          backgroundPosition: "center",
         }}
-      >
-        LSFC
-      </div>
+      />
 
       <div
         style={{
           position: "absolute",
-          left: -26,
-          bottom: 104,
-          fontSize: 138,
-          lineHeight: 1,
-          opacity: 0.055,
-          transform: "rotate(-10deg)",
-          filter: "drop-shadow(0 20px 40px rgba(56,189,248,0.25))",
+          left: -60,
+          bottom: 40,
+          width: 320,
+          height: 320,
+          opacity: 0.05,
+          transform: "rotate(10deg)",
+          filter: "drop-shadow(0 20px 50px rgba(37,99,235,0.18))",
+          backgroundImage: "url('/sharks-official-badge.svg')",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "contain",
+          backgroundPosition: "center",
         }}
-      >
-        🦈
-      </div>
+      />
 
       <div
         style={{
@@ -85,6 +80,15 @@ export default function ClubBrandBackdrop() {
           background:
             "linear-gradient(90deg, transparent, rgba(56,189,248,0.08), transparent)",
           filter: "blur(4px)",
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(2,6,23,0) 0%, rgba(2,6,23,0.12) 40%, rgba(2,6,23,0.42) 100%)",
         }}
       />
     </div>
