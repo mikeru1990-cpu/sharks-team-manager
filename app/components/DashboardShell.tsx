@@ -13,6 +13,7 @@ import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
 import SeasonSwitcher from "./layout/SeasonSwitcher"
 import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
+import SharksIdentityBanner from "./layout/SharksIdentityBanner"
 import DashboardOverview from "./dashboard/DashboardOverview"
 
 import {
@@ -138,6 +139,8 @@ export default function DashboardShell(props: Props) {
 
         {tab === "home" && (
           <ShellSection>
+            <SharksIdentityBanner />
+
             <div
               style={{
                 display: "grid",
