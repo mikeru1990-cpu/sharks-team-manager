@@ -12,9 +12,18 @@ type Tone =
   | "softGreen"
   | "softYellow"
 
-/* =========================
-   PAGE CARD
-========================= */
+function premiumGlassStyle() {
+  return {
+    background:
+      "linear-gradient(135deg, rgba(15,23,42,0.86), rgba(30,41,59,0.72))",
+    color: "#e5eefc",
+    border: "1px solid rgba(148,163,184,0.18)",
+    boxShadow:
+      "0 22px 55px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)",
+    backdropFilter: "blur(18px)",
+  }
+}
+
 export function PageCard({
   children,
   tone = "default",
@@ -25,64 +34,65 @@ export function PageCard({
   const toneStyle =
     tone === "blue"
       ? {
-          background: `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
+          background:
+            "linear-gradient(135deg, rgba(2,6,23,0.96), rgba(30,64,175,0.82))",
           color: "white",
-          border: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "0 18px 40px rgba(15,23,42,0.18)",
+          border: "1px solid rgba(125,211,252,0.24)",
+          boxShadow:
+            "0 24px 60px rgba(2,6,23,0.42), inset 0 1px 0 rgba(255,255,255,0.08)",
         }
       : tone === "softBlue"
       ? {
-          background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)",
-          color: THEME.colors.textPrimary,
-          border: "1px solid #bfdbfe",
-          boxShadow: "0 10px 24px rgba(30,64,175,0.06)",
+          background:
+            "linear-gradient(135deg, rgba(14,165,233,0.14), rgba(15,23,42,0.78))",
+          color: "#e5eefc",
+          border: "1px solid rgba(125,211,252,0.24)",
+          boxShadow: "0 18px 46px rgba(14,165,233,0.10)",
         }
       : tone === "softGreen"
       ? {
-          background: "linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)",
-          color: THEME.colors.textPrimary,
-          border: "1px solid #bbf7d0",
-          boxShadow: "0 10px 24px rgba(22,101,52,0.05)",
+          background:
+            "linear-gradient(135deg, rgba(34,197,94,0.12), rgba(15,23,42,0.78))",
+          color: "#e5eefc",
+          border: "1px solid rgba(134,239,172,0.22)",
+          boxShadow: "0 18px 46px rgba(34,197,94,0.08)",
         }
       : tone === "softYellow"
       ? {
-          background: "linear-gradient(135deg, #fefce8 0%, #ffffff 100%)",
-          color: THEME.colors.textPrimary,
-          border: "1px solid #fde68a",
-          boxShadow: "0 10px 24px rgba(146,64,14,0.05)",
+          background:
+            "linear-gradient(135deg, rgba(250,204,21,0.13), rgba(15,23,42,0.78))",
+          color: "#e5eefc",
+          border: "1px solid rgba(250,204,21,0.24)",
+          boxShadow: "0 18px 46px rgba(250,204,21,0.08)",
         }
-      : {
-          background: THEME.colors.surface,
-          color: THEME.colors.textPrimary,
-          border: `1px solid ${THEME.colors.border}`,
-          boxShadow: "0 10px 28px rgba(15,23,42,0.05)",
-        }
+      : premiumGlassStyle()
 
   return (
     <div
+      className="sharks-card-shine"
       style={{
         ...toneStyle,
-        borderRadius: 24,
-        padding: 16,
+        borderRadius: 28,
+        padding: 18,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {children}
+      <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
     </div>
   )
 }
 
-/* =========================
-   SECTION TITLE
-========================= */
 export function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div
       style={{
-        fontSize: 20,
-        fontWeight: 900,
-        color: THEME.colors.textPrimary,
+        fontSize: 21,
+        fontWeight: 1000,
+        color: "#f8fafc",
         marginBottom: 8,
         lineHeight: 1.15,
+        letterSpacing: "-0.03em",
       }}
     >
       {children}
@@ -90,9 +100,6 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
-/* =========================
-   SECTION HEADER
-========================= */
 export function SectionHeader({
   title,
   subtitle,
@@ -111,18 +118,18 @@ export function SectionHeader({
         justifyContent: "space-between",
         alignItems: subtitle ? "flex-start" : "center",
         gap: 12,
-        marginBottom: 14,
+        marginBottom: 16,
         flexWrap: "wrap",
       }}
     >
       <div style={{ minWidth: 0 }}>
         <div
           style={{
-            fontSize: 21,
-            fontWeight: 900,
-            color: light ? "white" : THEME.colors.textPrimary,
+            fontSize: 22,
+            fontWeight: 1000,
+            color: light ? "white" : "#f8fafc",
             lineHeight: 1.15,
-            letterSpacing: "-0.01em",
+            letterSpacing: "-0.035em",
           }}
         >
           {title}
@@ -131,10 +138,11 @@ export function SectionHeader({
         {subtitle ? (
           <div
             style={{
-              marginTop: 5,
-              color: light ? "rgba(255,255,255,0.84)" : THEME.colors.textSecondary,
+              marginTop: 6,
+              color: light ? "rgba(255,255,255,0.84)" : "#aebed4",
               fontSize: 14,
-              lineHeight: 1.45,
+              lineHeight: 1.5,
+              fontWeight: 600,
             }}
           >
             {subtitle}
@@ -158,25 +166,19 @@ export function SectionHeader({
   )
 }
 
-/* =========================
-   BUTTON BASE
-========================= */
 function baseButtonStyle(disabled: boolean) {
   return {
-    padding: "12px 16px",
-    borderRadius: 16,
-    fontWeight: 800,
+    padding: "13px 16px",
+    borderRadius: 18,
+    fontWeight: 900,
     fontSize: 15,
     cursor: disabled ? "not-allowed" : "pointer",
     width: "100%",
-    transition: "all 0.2s ease",
+    transition: "all 0.18s ease",
     boxSizing: "border-box" as const,
   }
 }
 
-/* =========================
-   BUTTONS
-========================= */
 export function PrimaryButton({
   children,
   onClick,
@@ -190,14 +192,10 @@ export function PrimaryButton({
     <button
       onClick={onClick}
       disabled={disabled}
+      className="sharks-premium-button"
       style={{
         ...baseButtonStyle(disabled),
-        background: disabled
-          ? "#94a3b8"
-          : `linear-gradient(135deg, ${THEME.colors.primary} 0%, ${THEME.colors.primaryDark} 100%)`,
-        color: "white",
-        border: "none",
-        boxShadow: disabled ? "none" : "0 10px 20px rgba(30,58,138,0.18)",
+        opacity: disabled ? 0.55 : 1,
       }}
     >
       {children}
@@ -220,10 +218,14 @@ export function SecondaryButton({
       disabled={disabled}
       style={{
         ...baseButtonStyle(disabled),
-        background: disabled ? "#e2e8f0" : "white",
-        color: disabled ? "#94a3b8" : THEME.colors.textPrimary,
-        border: "1px solid #cbd5e1",
-        boxShadow: disabled ? "none" : "0 6px 14px rgba(15,23,42,0.05)",
+        background: disabled
+          ? "rgba(148,163,184,0.18)"
+          : "linear-gradient(135deg, rgba(255,255,255,0.13), rgba(15,23,42,0.58))",
+        color: disabled ? "#94a3b8" : "#e5eefc",
+        border: "1px solid rgba(148,163,184,0.24)",
+        boxShadow: disabled
+          ? "none"
+          : "0 12px 28px rgba(2,6,23,0.22), inset 0 1px 0 rgba(255,255,255,0.08)",
       }}
     >
       {children}
@@ -246,10 +248,14 @@ export function DangerButton({
       disabled={disabled}
       style={{
         ...baseButtonStyle(disabled),
-        background: disabled ? "#e2e8f0" : "#fff1f2",
-        color: disabled ? "#94a3b8" : "#b91c1c",
-        border: disabled ? "1px solid #cbd5e1" : "1px solid #fecaca",
-        boxShadow: disabled ? "none" : "0 6px 14px rgba(185,28,28,0.06)",
+        background: disabled
+          ? "rgba(148,163,184,0.18)"
+          : "linear-gradient(135deg, rgba(239,68,68,0.24), rgba(127,29,29,0.70))",
+        color: disabled ? "#94a3b8" : "#fee2e2",
+        border: disabled
+          ? "1px solid rgba(148,163,184,0.22)"
+          : "1px solid rgba(252,165,165,0.30)",
+        boxShadow: disabled ? "none" : "0 12px 28px rgba(127,29,29,0.22)",
       }}
     >
       {children}
@@ -257,9 +263,6 @@ export function DangerButton({
   )
 }
 
-/* =========================
-   BADGE
-========================= */
 export function Badge({
   children,
   tone = "default",
@@ -270,32 +273,32 @@ export function Badge({
   const style =
     tone === "blue"
       ? {
-          background: "#dbeafe",
-          color: "#1d4ed8",
-          border: "1px solid #bfdbfe",
+          background: "rgba(37,99,235,0.22)",
+          color: "#bfdbfe",
+          border: "1px solid rgba(147,197,253,0.32)",
         }
       : tone === "green"
       ? {
-          background: "#dcfce7",
-          color: "#166534",
-          border: "1px solid #86efac",
+          background: "rgba(34,197,94,0.18)",
+          color: "#bbf7d0",
+          border: "1px solid rgba(134,239,172,0.28)",
         }
       : tone === "yellow"
       ? {
-          background: "#fef3c7",
-          color: "#92400e",
-          border: "1px solid #fcd34d",
+          background: "rgba(250,204,21,0.18)",
+          color: "#fde68a",
+          border: "1px solid rgba(253,230,138,0.30)",
         }
       : tone === "red"
       ? {
-          background: "#fee2e2",
-          color: "#991b1b",
-          border: "1px solid #fecaca",
+          background: "rgba(239,68,68,0.18)",
+          color: "#fecaca",
+          border: "1px solid rgba(252,165,165,0.30)",
         }
       : {
-          background: "#f8fafc",
-          color: "#334155",
-          border: "1px solid #e2e8f0",
+          background: "rgba(148,163,184,0.16)",
+          color: "#e2e8f0",
+          border: "1px solid rgba(148,163,184,0.24)",
         }
 
   return (
@@ -305,12 +308,13 @@ export function Badge({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "5px 9px",
+        padding: "6px 10px",
         borderRadius: 999,
         fontSize: 12,
-        fontWeight: 800,
+        fontWeight: 900,
         lineHeight: 1,
         whiteSpace: "nowrap",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
       }}
     >
       {children}
