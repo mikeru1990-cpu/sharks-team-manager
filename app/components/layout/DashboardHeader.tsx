@@ -63,15 +63,19 @@ export default function DashboardHeader({
       <div
         style={{
           position: "absolute",
-          left: -40,
-          bottom: -30,
-          fontSize: 120,
-          opacity: 0.05,
-          transform: "rotate(-10deg)",
+          right: 20,
+          bottom: -54,
+          width: 240,
+          height: 270,
+          opacity: 0.075,
+          backgroundImage: "url('/sharks-official-badge.svg')",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "contain",
+          backgroundPosition: "center",
+          transform: "rotate(-8deg)",
+          filter: "drop-shadow(0 28px 60px rgba(56,189,248,0.25))",
         }}
-      >
-        🦈
-      </div>
+      />
 
       <div
         style={{
@@ -87,63 +91,90 @@ export default function DashboardHeader({
             justifyContent: "space-between",
             gap: 20,
             flexWrap: "wrap",
+            alignItems: "flex-start",
           }}
         >
-          <div style={{ display: "grid", gap: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gap: 14,
+              gridTemplateColumns: "auto 1fr",
+              alignItems: "center",
+              minWidth: 0,
+            }}
+          >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
+                width: 82,
+                height: 92,
+                borderRadius: 24,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(125,211,252,0.24)",
+                backgroundImage: "url('/sharks-official-badge.svg')",
+                backgroundSize: "contain",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                boxShadow:
+                  "0 18px 40px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
               }}
-            >
+            />
+
+            <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
               <div
                 style={{
-                  padding: "7px 14px",
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#dbeafe",
-                  fontWeight: 900,
-                  fontSize: 11,
-                  letterSpacing: ".16em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
                 }}
               >
-                LEONARD STANLEY SHARKS
+                <div
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 999,
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#dbeafe",
+                    fontWeight: 900,
+                    fontSize: 11,
+                    letterSpacing: ".16em",
+                  }}
+                >
+                  LEONARD STANLEY SHARKS
+                </div>
+
+                <Badge tone="blue">
+                  {isAdmin ? "ADMIN MODE" : "COACH VIEW"}
+                </Badge>
               </div>
 
-              <Badge tone="blue">
-                {isAdmin ? "ADMIN MODE" : "COACH VIEW"}
-              </Badge>
-            </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 42,
+                    lineHeight: 1,
+                    fontWeight: 1000,
+                    letterSpacing: "-0.05em",
+                    color: "white",
+                    textShadow: "0 10px 30px rgba(56,189,248,0.25)",
+                  }}
+                >
+                  {teamName}
+                </div>
 
-            <div>
-              <div
-                style={{
-                  fontSize: 42,
-                  lineHeight: 1,
-                  fontWeight: 1000,
-                  letterSpacing: "-0.05em",
-                  color: "white",
-                  textShadow: "0 10px 30px rgba(56,189,248,0.25)",
-                }}
-              >
-                {teamName}
-              </div>
-
-              <div
-                style={{
-                  marginTop: 12,
-                  maxWidth: 680,
-                  color: "#cbd5e1",
-                  fontSize: 15,
-                  lineHeight: 1.6,
-                  fontWeight: 600,
-                }}
-              >
-                Elite football operations console with tactical matchday control,
-                live squad readiness, analytics and intelligent player management.
+                <div
+                  style={{
+                    marginTop: 12,
+                    maxWidth: 680,
+                    color: "#cbd5e1",
+                    fontSize: 15,
+                    lineHeight: 1.6,
+                    fontWeight: 600,
+                  }}
+                >
+                  Elite football operations console with tactical matchday control,
+                  live squad readiness, analytics and intelligent player management.
+                </div>
               </div>
             </div>
           </div>
