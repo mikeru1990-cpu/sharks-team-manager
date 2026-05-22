@@ -12,6 +12,7 @@ import SeasonModal from "./modals/SeasonModal"
 import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
 import SeasonSwitcher from "./layout/SeasonSwitcher"
+import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
 import DashboardOverview from "./dashboard/DashboardOverview"
 
 import {
@@ -37,7 +38,7 @@ function ShellSection({
       style={{
         minWidth: 0,
         display: "grid",
-        gap: 20,
+        gap: 22,
       }}
     >
       {children}
@@ -55,19 +56,24 @@ export default function DashboardShell(props: Props) {
           minHeight: "100vh",
           padding: 24,
           background:
-            "linear-gradient(180deg, #020617 0%, #0f172a 40%, #111827 100%)",
+            "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)",
         }}
       >
+        <ClubBrandBackdrop />
         <div
           style={{
             ...cardStyle(),
+            position: "relative",
+            zIndex: 1,
             maxWidth: 840,
             margin: "0 auto",
-            borderRadius: 28,
-            padding: 28,
-            background: "rgba(255,255,255,0.95)",
-            boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
-            fontWeight: 700,
+            borderRadius: 30,
+            padding: 30,
+            background: "rgba(15,23,42,0.86)",
+            color: "white",
+            border: "1px solid rgba(125,211,252,0.20)",
+            boxShadow: "0 25px 70px rgba(0,0,0,0.42)",
+            fontWeight: 900,
           }}
         >
           Loading Sharks Coaching Console...
@@ -80,17 +86,23 @@ export default function DashboardShell(props: Props) {
     <main
       style={{
         minHeight: "100vh",
-        padding: 18,
-        paddingBottom: 140,
+        padding: 16,
+        paddingBottom: 142,
         background:
-          "radial-gradient(circle at top, #1e3a8a 0%, #0f172a 30%, #020617 100%)",
+          "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)",
         overflowX: "hidden",
         boxSizing: "border-box",
+        position: "relative",
+        color: "#e5eefc",
       }}
     >
+      <ClubBrandBackdrop />
+
       <div
         style={{
-          maxWidth: 1120,
+          position: "relative",
+          zIndex: 1,
+          maxWidth: 1140,
           margin: "0 auto",
           display: "grid",
           gap: 24,
@@ -152,26 +164,27 @@ export default function DashboardShell(props: Props) {
                 {
                   label: "Squad Size",
                   value: props.players?.length || 0,
-                  color: "#3b82f6",
+                  color: "#38bdf8",
                 },
               ].map((item) => (
                 <div
                   key={item.label}
+                  className="sharks-glass sharks-card-shine"
                   style={{
-                    borderRadius: 24,
+                    borderRadius: 26,
                     padding: 22,
-                    background: "rgba(15,23,42,0.82)",
                     border: `1px solid ${item.color}55`,
-                    boxShadow: `0 10px 30px ${item.color}22`,
-                    backdropFilter: "blur(12px)",
+                    boxShadow: `0 16px 42px ${item.color}16`,
                   }}
                 >
                   <div
                     style={{
-                      fontSize: 14,
-                      color: "#cbd5e1",
+                      fontSize: 12,
+                      color: "#aebed4",
                       marginBottom: 10,
-                      fontWeight: 600,
+                      fontWeight: 900,
+                      letterSpacing: ".11em",
+                      textTransform: "uppercase",
                     }}
                   >
                     {item.label}
@@ -179,10 +192,11 @@ export default function DashboardShell(props: Props) {
 
                   <div
                     style={{
-                      fontSize: 40,
-                      fontWeight: 900,
-                      color: "white",
+                      fontSize: 42,
+                      fontWeight: 1000,
+                      color: item.color,
                       lineHeight: 1,
+                      textShadow: `0 0 22px ${item.color}33`,
                     }}
                   >
                     {item.value}
