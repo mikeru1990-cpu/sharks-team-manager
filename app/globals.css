@@ -95,3 +95,94 @@ button:active {
   background: linear-gradient(120deg, rgba(255,255,255,0.11), transparent 34%, transparent 70%, rgba(56,189,248,0.08));
   pointer-events: none;
 }
+
+.sharks-elite-panel {
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at top right, rgba(56,189,248,0.14), transparent 32%),
+    linear-gradient(135deg, rgba(15,23,42,0.88), rgba(2,6,23,0.74));
+  border: 1px solid rgba(125,211,252,0.22);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.sharks-app-badge {
+  background-image: url('/sharks-official-badge.svg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.sharks-hero-watermark {
+  position: absolute;
+  inset: auto -48px -80px auto;
+  width: 260px;
+  height: 290px;
+  opacity: 0.08;
+  background-image: url('/sharks-official-badge.svg');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 30px 70px rgba(56,189,248,0.25));
+  pointer-events: none;
+}
+
+.sharks-tactical-pitch {
+  position: relative;
+  overflow: hidden;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(125,211,252,0.18), transparent 28%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 74px),
+    linear-gradient(180deg, #0f7a3a 0%, #0b6631 42%, #064a28 100%);
+  border: 1px solid rgba(255,255,255,0.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10), 0 24px 70px rgba(0,0,0,0.38);
+}
+
+.sharks-tactical-pitch::before {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 2px solid rgba(255,255,255,0.24);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+.sharks-tactical-pitch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,0.25), transparent);
+  pointer-events: none;
+}
+
+.sharks-player-token {
+  background: radial-gradient(circle at 30% 20%, #7dd3fc, #1d4ed8 50%, #020617 100%);
+  border: 1px solid rgba(255,255,255,0.58);
+  box-shadow: 0 12px 26px rgba(2,6,23,0.32), 0 0 24px rgba(56,189,248,0.22), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.sharks-sponsor-strip {
+  min-height: 86px;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(15,23,42,0.58)),
+    repeating-linear-gradient(90deg, rgba(125,211,252,0.12) 0 1px, transparent 1px 24px);
+  border: 1px solid rgba(148,163,184,0.18);
+  box-shadow: 0 16px 40px rgba(2,6,23,0.24);
+}
+
+@media (max-width: 640px) {
+  .sharks-hero-watermark {
+    width: 190px;
+    height: 220px;
+    right: -68px;
+    bottom: -78px;
+  }
+}
