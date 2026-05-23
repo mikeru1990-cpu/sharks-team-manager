@@ -61,6 +61,26 @@ button:active {
   transform: translateY(0px) scale(0.99);
 }
 
+@keyframes sharksPulse {
+  0%,100% {
+    box-shadow: 0 0 18px rgba(56,189,248,0.14);
+  }
+  50% {
+    box-shadow: 0 0 34px rgba(56,189,248,0.28);
+  }
+}
+
+@keyframes sharksFloat {
+  0%,100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes sharksSweep {
+  0% { transform: translateX(-120%); opacity: 0; }
+  30% { opacity: .3; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+
 .sharks-glass {
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(30, 41, 59, 0.68));
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -94,6 +114,16 @@ button:active {
   inset: 0;
   background: linear-gradient(120deg, rgba(255,255,255,0.11), transparent 34%, transparent 70%, rgba(56,189,248,0.08));
   pointer-events: none;
+}
+
+.sharks-card-shine::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  width: 80px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: sharksSweep 7s linear infinite;
 }
 
 .sharks-elite-panel {
@@ -166,16 +196,13 @@ button:active {
   background: radial-gradient(circle at 30% 20%, #7dd3fc, #1d4ed8 50%, #020617 100%);
   border: 1px solid rgba(255,255,255,0.58);
   box-shadow: 0 12px 26px rgba(2,6,23,0.32), 0 0 24px rgba(56,189,248,0.22), inset 0 1px 0 rgba(255,255,255,0.25);
+  animation: sharksFloat 5s ease-in-out infinite;
 }
 
-.sharks-sponsor-strip {
-  min-height: 86px;
-  border-radius: 26px;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(15,23,42,0.58)),
-    repeating-linear-gradient(90deg, rgba(125,211,252,0.12) 0 1px, transparent 1px 24px);
-  border: 1px solid rgba(148,163,184,0.18);
-  box-shadow: 0 16px 40px rgba(2,6,23,0.24);
+.sharks-player-token-live {
+  outline: 2px solid rgba(34,197,94,0.55);
+  outline-offset: 3px;
+  animation: sharksPulse 3s ease-in-out infinite;
 }
 
 .sharks-pitch-callout {
@@ -194,9 +221,14 @@ button:active {
   -webkit-backdrop-filter: blur(12px);
 }
 
-.sharks-player-token-live {
-  outline: 2px solid rgba(34,197,94,0.55);
-  outline-offset: 3px;
+.sharks-sponsor-strip {
+  min-height: 86px;
+  border-radius: 26px;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(15,23,42,0.58)),
+    repeating-linear-gradient(90deg, rgba(125,211,252,0.12) 0 1px, transparent 1px 24px);
+  border: 1px solid rgba(148,163,184,0.18);
+  box-shadow: 0 16px 40px rgba(2,6,23,0.24);
 }
 
 @media (max-width: 640px) {
