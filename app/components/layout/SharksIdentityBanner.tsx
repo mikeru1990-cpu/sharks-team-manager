@@ -1,10 +1,11 @@
 "use client"
 
 export default function SharksIdentityBanner() {
-  const commandStats = [
-    { label: "Matchday", value: "Live", tone: "#22c55e" },
-    { label: "Squad Ops", value: "Ready", tone: "#38bdf8" },
-    { label: "Tactics", value: "Active", tone: "#facc15" },
+  const homeActions = [
+    "Next Fixture",
+    "Attendance",
+    "Live Match",
+    "Player Form",
   ]
 
   return (
@@ -55,33 +56,22 @@ export default function SharksIdentityBanner() {
               letterSpacing: ".16em",
             }}
           >
-            SHARKS ELITE PLATFORM v2
+            SHARKS HOME DASHBOARD
           </div>
 
           <div
             style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
+              padding: "8px 11px",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.055)",
+              border: "1px solid rgba(34,197,94,0.44)",
+              boxShadow: "0 0 24px rgba(34,197,94,0.18)",
+              color: "#e2e8f0",
+              fontSize: 11,
+              fontWeight: 900,
             }}
           >
-            {commandStats.map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  padding: "8px 11px",
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.055)",
-                  border: `1px solid ${item.tone}44`,
-                  boxShadow: `0 0 24px ${item.tone}18`,
-                  color: "#e2e8f0",
-                  fontSize: 11,
-                  fontWeight: 900,
-                }}
-              >
-                <span style={{ color: item.tone }}>{item.value}</span> · {item.label}
-              </div>
-            ))}
+            <span style={{ color: "#22c55e" }}>LIVE</span> · MATCHDAY READY
           </div>
         </div>
 
@@ -128,8 +118,7 @@ export default function SharksIdentityBanner() {
                 maxWidth: 760,
               }}
             >
-              The home of Leonard Stanley Sharks operations — matchday control,
-              squad readiness, tactical planning, player development and live coaching workflow in one premium platform.
+              Elite football operations console focused on live fixtures, squad readiness, tactical planning and player development.
             </div>
           </div>
         </div>
@@ -139,30 +128,23 @@ export default function SharksIdentityBanner() {
           style={{
             padding: 14,
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: 10,
             alignItems: "center",
           }}
         >
-          {[
-            "Fixture Control",
-            "Attendance",
-            "Lineups",
-            "Live Match",
-            "Player Form",
-            "Reports",
-          ].map((label) => (
+          {homeActions.map((label) => (
             <div
               key={label}
               style={{
                 borderRadius: 18,
-                padding: "12px 10px",
+                padding: "14px 12px",
                 background: "rgba(2,6,23,0.42)",
                 border: "1px solid rgba(148,163,184,0.14)",
                 color: "#e2e8f0",
                 textAlign: "center",
                 fontWeight: 900,
-                fontSize: 12,
+                fontSize: 13,
               }}
             >
               {label}
