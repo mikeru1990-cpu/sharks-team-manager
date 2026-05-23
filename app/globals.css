@@ -165,6 +165,8 @@ button:active {
   border-radius: 30px;
   background:
     radial-gradient(circle at 50% 10%, rgba(125,211,252,0.18), transparent 28%),
+    radial-gradient(circle at 18% 50%, rgba(34,197,94,0.16), transparent 22%),
+    radial-gradient(circle at 82% 50%, rgba(239,68,68,0.10), transparent 24%),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 74px),
     linear-gradient(180deg, #0f7a3a 0%, #0b6631 42%, #064a28 100%);
   border: 1px solid rgba(255,255,255,0.16);
@@ -221,6 +223,24 @@ button:active {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.sharks-match-command-ribbon {
+  border-radius: 24px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(14,165,233,0.18), rgba(15,23,42,0.62));
+  border: 1px solid rgba(125,211,252,0.26);
+  box-shadow: 0 16px 38px rgba(2,6,23,0.28);
+}
+
+.sharks-match-live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 18px rgba(34,197,94,0.85);
+  display: inline-block;
+  margin-right: 8px;
+}
+
 .sharks-sponsor-strip {
   min-height: 86px;
   border-radius: 26px;
@@ -237,5 +257,9 @@ button:active {
     height: 220px;
     right: -68px;
     bottom: -78px;
+  }
+
+  .sharks-tactical-pitch {
+    border-radius: 24px;
   }
 }
