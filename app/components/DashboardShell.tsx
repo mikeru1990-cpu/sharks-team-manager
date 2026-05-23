@@ -29,19 +29,9 @@ const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
 
 type Props = any
 
-function ShellSection({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function ShellSection({ children }: { children: React.ReactNode }) {
   return (
-    <section
-      style={{
-        minWidth: 0,
-        display: "grid",
-        gap: 22,
-      }}
-    >
+    <section style={{ minWidth: 0, display: "grid", gap: 22 }}>
       {children}
     </section>
   )
@@ -110,31 +100,35 @@ export default function DashboardShell(props: Props) {
           minWidth: 0,
         }}
       >
-        <DashboardHeader
-          teamName={TEAM.name}
-          isAdmin={isAdmin}
-          onSignOut={signOut}
-          nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"}
-          nextEventDateLabel={
-            props.selectedDateEvents?.[0]
-              ? `${props.selectedDateEvents[0].date}${
-                  props.selectedDateEvents[0].startTime
-                    ? ` • ${props.selectedDateEvents[0].startTime}`
-                    : ""
-                }`
-              : "Select a day in the planner"
-          }
-          availablePlayersCount={props.availableCount}
-          totalPlayersCount={props.players?.length}
-        />
+        {tab === "home" ? (
+          <>
+            <DashboardHeader
+              teamName={TEAM.name}
+              isAdmin={isAdmin}
+              onSignOut={signOut}
+              nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"}
+              nextEventDateLabel={
+                props.selectedDateEvents?.[0]
+                  ? `${props.selectedDateEvents[0].date}${
+                      props.selectedDateEvents[0].startTime
+                        ? ` • ${props.selectedDateEvents[0].startTime}`
+                        : ""
+                    }`
+                  : "Select a day in the planner"
+              }
+              availablePlayersCount={props.availableCount}
+              totalPlayersCount={props.players?.length}
+            />
 
-        {props.seasons && props.setActiveSeasonId ? (
-          <SeasonSwitcher
-            seasons={props.seasons}
-            activeSeasonId={props.activeSeasonId}
-            onChange={props.setActiveSeasonId}
-            onCreate={() => props.setShowSeasonModal(true)}
-          />
+            {props.seasons && props.setActiveSeasonId ? (
+              <SeasonSwitcher
+                seasons={props.seasons}
+                activeSeasonId={props.activeSeasonId}
+                onChange={props.setActiveSeasonId}
+                onCreate={() => props.setShowSeasonModal(true)}
+              />
+            ) : null}
+          </>
         ) : null}
 
         {tab === "home" && (
@@ -149,26 +143,10 @@ export default function DashboardShell(props: Props) {
               }}
             >
               {[
-                {
-                  label: "Available",
-                  value: props.availableCount || 0,
-                  color: "#22c55e",
-                },
-                {
-                  label: "Maybe",
-                  value: props.maybeCount || 0,
-                  color: "#f59e0b",
-                },
-                {
-                  label: "Unavailable",
-                  value: props.unavailableCount || 0,
-                  color: "#ef4444",
-                },
-                {
-                  label: "Squad Size",
-                  value: props.players?.length || 0,
-                  color: "#38bdf8",
-                },
+                { label: "Available", value: props.availableCount || 0, color: "#22c55e" },
+                { label: "Maybe", value: props.maybeCount || 0, color: "#f59e0b" },
+                { label: "Unavailable", value: props.unavailableCount || 0, color: "#ef4444" },
+                { label: "Squad Size", value: props.players?.length || 0, color: "#38bdf8" },
               ].map((item) => (
                 <div
                   key={item.label}
