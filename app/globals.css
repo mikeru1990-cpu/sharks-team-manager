@@ -241,6 +241,34 @@ button:active {
   margin-right: 8px;
 }
 
+.sharks-mobile-action-bar {
+  position: sticky;
+  bottom: 92px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border-radius: 24px;
+  background: rgba(2, 6, 23, 0.76);
+  border: 1px solid rgba(125,211,252,0.20);
+  box-shadow: 0 18px 45px rgba(0,0,0,0.38);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.sharks-touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.sharks-score-hotkey {
+  min-height: 52px;
+  border-radius: 18px;
+  font-size: 16px;
+  font-weight: 1000;
+}
+
 .sharks-sponsor-strip {
   min-height: 86px;
   border-radius: 26px;
@@ -261,5 +289,21 @@ button:active {
 
   .sharks-tactical-pitch {
     border-radius: 24px;
+    min-height: 520px !important;
+    padding: 12px !important;
+  }
+
+  .sharks-elite-panel {
+    border-radius: 24px;
+  }
+
+  .sharks-card-shine::after {
+    display: none;
+  }
+
+  button,
+  select,
+  input {
+    min-height: 44px;
   }
 }
