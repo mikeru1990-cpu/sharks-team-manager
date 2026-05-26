@@ -29,6 +29,13 @@ const items: Array<{
 ]
 
 export default function BottomNav({ tab, setTab }: Props) {
+  function changeTab(nextTab: MainTab) {
+    setTab(nextTab)
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "smooth" })
+    })
+  }
+
   return (
     <div
       style={{
@@ -63,7 +70,7 @@ export default function BottomNav({ tab, setTab }: Props) {
           return (
             <button
               key={item.key}
-              onClick={() => setTab(item.key)}
+              onClick={() => changeTab(item.key)}
               style={{
                 border: active
                   ? "1px solid rgba(125,211,252,0.55)"
