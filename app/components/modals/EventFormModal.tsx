@@ -1,6 +1,6 @@
 "use client"
 
-import { THEME } from "../../lib/theme"
+import { useState } from "react"
 import {
   PageCard,
   PrimaryButton,
@@ -29,7 +29,7 @@ type Props = {
   eventNotes: string
   setEventNotes: (value: string) => void
   selectedDate: string
-  onSave: () => Promise<void> | void
+  onSave: (repeatWeeklyCount?: number) => Promise<void> | void
   onClose: () => void
 }
 
@@ -37,12 +37,12 @@ function overlayStyle() {
   return {
     position: "fixed" as const,
     inset: 0,
-    background: "rgba(15,23,42,0.52)",
+    background: "rgba(2,6,23,0.72)",
     display: "grid",
     placeItems: "center",
     zIndex: 200,
     padding: 16,
-    backdropFilter: "blur(8px)",
+    backdropFilter: "blur(10px)",
   }
 }
 
@@ -52,21 +52,31 @@ function fieldStyle() {
     boxSizing: "border-box" as const,
     padding: 14,
     borderRadius: 16,
-    border: "1px solid #cbd5e1",
+    border: "1px solid rgba(148,163,184,0.26)",
     fontSize: 16,
-    background: "white",
-    color: THEME.colors.textPrimary,
+    background: "rgba(2,6,23,0.58)",
+    color: "#f8fafc",
     outline: "none",
   }
 }
 
 function labelStyle() {
   return {
-    fontWeight: 800,
+    fontWeight: 900,
     fontSize: 13,
-    color: THEME.colors.textPrimary,
+    color: "#e2e8f0",
     marginBottom: 6,
   }
+}
+
+function addWeeks(date: string, weeks: number) {
+  const next = new Date(`${date}T12:00:00`)
+  next.setDate(next.getDate() + weeks * 7)
+  return next.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+  })
 }
 
 export default function EventFormModal(props: Props) {
@@ -93,15 +103,21 @@ export default function EventFormModal(props: Props) {
     onClose,
   } = props
 
+  const [repeatWeekly, setRepeatWeekly] = useState(false)
+  const [repeatWeeklyCount, setRepeatWeeklyCount] = useState(6)
+
   if (!open) return null
+
+  const repeatCount = repeatWeekly && !editingCalendarEventId ? Math.max(1, Math.min(52, repeatWeeklyCount || 1)) : 1
+  const lastRepeatDate = repeatCount > 1 ? addWeeks(selectedDate, repeatCount - 1) : ""
 
   return (
     <div style={overlayStyle()}>
-      <div style={{ width: "100%", maxWidth: 560 }}>
+      <div style={{ width: "100%", maxWidth: 580, maxHeight: "92vh", overflowY: "auto" }}>
         <PageCard>
           <SectionHeader
             title={editingCalendarEventId ? "Edit Event" : "Add Event"}
-            subtitle="Create or update a training session, match, or other club event."
+            subtitle="Create training, matches, club events and repeated weekly sessions."
             action={<Badge tone="blue">{selectedDate}</Badge>}
           />
 
@@ -147,13 +163,7 @@ export default function EventFormModal(props: Props) {
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 12,
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
               <div>
                 <div style={labelStyle()}>Start time</div>
                 <input
@@ -187,6 +197,38 @@ export default function EventFormModal(props: Props) {
               </div>
             ) : null}
 
+            {!editingCalendarEventId ? (
+              <div className="sharks-glass" style={{ borderRadius: 18, padding: 14, border: "1px solid rgba(125,211,252,0.22)", display: "grid", gap: 12 }}>
+                <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, color: "#f8fafc", fontWeight: 1000 }}>
+                  <span>Repeat weekly</span>
+                  <input
+                    type="checkbox"
+                    checked={repeatWeekly}
+                    onChange={(e) => setRepeatWeekly(e.target.checked)}
+                    style={{ width: 22, height: 22 }}
+                  />
+                </label>
+
+                {repeatWeekly ? (
+                  <div>
+                    <div style={labelStyle()}>Create this event for how many weeks?</div>
+                    <select
+                      value={repeatWeeklyCount}
+                      onChange={(e) => setRepeatWeeklyCount(Number(e.target.value))}
+                      style={fieldStyle()}
+                    >
+                      {[2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24].map((count) => (
+                        <option key={count} value={count}>{count} weeks</option>
+                      ))}
+                    </select>
+                    <div style={{ marginTop: 8, color: "#cbd5e1", fontSize: 13, fontWeight: 700 }}>
+                      Creates {repeatCount} weekly events. Last one: {lastRepeatDate}.
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <div>
               <div style={labelStyle()}>Notes</div>
               <textarea
@@ -201,29 +243,15 @@ export default function EventFormModal(props: Props) {
               />
             </div>
 
-            <div
-              style={{
-                padding: 14,
-                borderRadius: 16,
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                color: THEME.colors.textSecondary,
-              }}
-            >
-              <strong style={{ color: THEME.colors.textPrimary }}>Date:</strong> {selectedDate}
+            <div className="sharks-glass" style={{ padding: 14, borderRadius: 16, color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.20)" }}>
+              <strong style={{ color: "#f8fafc" }}>Start date:</strong> {selectedDate}
+              {repeatCount > 1 ? <div style={{ marginTop: 6 }}><strong style={{ color: "#f8fafc" }}>Repeat:</strong> weekly for {repeatCount} weeks</div> : null}
             </div>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginTop: 16,
-            }}
-          >
-            <PrimaryButton onClick={() => void onSave()}>
-              {editingCalendarEventId ? "Save Changes" : "Save Event"}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 16 }}>
+            <PrimaryButton onClick={() => void onSave(repeatCount)}>
+              {editingCalendarEventId ? "Save Changes" : repeatCount > 1 ? `Create ${repeatCount} Events` : "Save Event"}
             </PrimaryButton>
             <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
           </div>
