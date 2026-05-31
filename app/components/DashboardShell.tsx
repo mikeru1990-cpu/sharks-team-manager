@@ -37,6 +37,47 @@ function ShellSection({ children }: { children: React.ReactNode }) {
   )
 }
 
+function PageIntro({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
+  return (
+    <div
+      className="sharks-elite-panel sharks-card-shine"
+      style={{
+        padding: 20,
+        borderRadius: 28,
+        display: "grid",
+        gap: 8,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          color: "#7dd3fc",
+          fontSize: 11,
+          fontWeight: 1000,
+          letterSpacing: ".16em",
+          textTransform: "uppercase",
+        }}
+      >
+        {eyebrow}
+      </div>
+      <div
+        style={{
+          color: "white",
+          fontSize: 32,
+          fontWeight: 1000,
+          lineHeight: 1,
+          letterSpacing: "-0.045em",
+        }}
+      >
+        {title}
+      </div>
+      <div style={{ color: "#cbd5e1", fontWeight: 700, lineHeight: 1.55, maxWidth: 760 }}>
+        {subtitle}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin, signOut } = props
 
@@ -109,11 +150,7 @@ export default function DashboardShell(props: Props) {
               nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"}
               nextEventDateLabel={
                 props.selectedDateEvents?.[0]
-                  ? `${props.selectedDateEvents[0].date}${
-                      props.selectedDateEvents[0].startTime
-                        ? ` • ${props.selectedDateEvents[0].startTime}`
-                        : ""
-                    }`
+                  ? `${props.selectedDateEvents[0].date}${props.selectedDateEvents[0].startTime ? ` • ${props.selectedDateEvents[0].startTime}` : ""}`
                   : "Select a day in the planner"
               }
               availablePlayersCount={props.availableCount}
@@ -135,13 +172,7 @@ export default function DashboardShell(props: Props) {
           <ShellSection>
             <SharksIdentityBanner />
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: 16,
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
               {[
                 { label: "Available", value: props.availableCount || 0, color: "#22c55e" },
                 { label: "Maybe", value: props.maybeCount || 0, color: "#f59e0b" },
@@ -151,35 +182,12 @@ export default function DashboardShell(props: Props) {
                 <div
                   key={item.label}
                   className="sharks-glass sharks-card-shine"
-                  style={{
-                    borderRadius: 26,
-                    padding: 22,
-                    border: `1px solid ${item.color}55`,
-                    boxShadow: `0 16px 42px ${item.color}16`,
-                  }}
+                  style={{ borderRadius: 26, padding: 22, border: `1px solid ${item.color}55`, boxShadow: `0 16px 42px ${item.color}16` }}
                 >
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#aebed4",
-                      marginBottom: 10,
-                      fontWeight: 900,
-                      letterSpacing: ".11em",
-                      textTransform: "uppercase",
-                    }}
-                  >
+                  <div style={{ fontSize: 12, color: "#aebed4", marginBottom: 10, fontWeight: 900, letterSpacing: ".11em", textTransform: "uppercase" }}>
                     {item.label}
                   </div>
-
-                  <div
-                    style={{
-                      fontSize: 42,
-                      fontWeight: 1000,
-                      color: item.color,
-                      lineHeight: 1,
-                      textShadow: `0 0 22px ${item.color}33`,
-                    }}
-                  >
+                  <div style={{ fontSize: 42, fontWeight: 1000, color: item.color, lineHeight: 1, textShadow: `0 0 22px ${item.color}33` }}>
                     {item.value}
                   </div>
                 </div>
@@ -210,16 +218,14 @@ export default function DashboardShell(props: Props) {
 
         {tab === "players" && (
           <ShellSection>
-            <PlayersManager
-              players={props.players}
-              isAdmin={props.isAdmin}
-              onSavePlayers={props.savePlayers}
-            />
+            <PageIntro eyebrow="Players" title="Squad Manager" subtitle="Player database, positions, development notes and squad management." />
+            <PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} />
           </ShellSection>
         )}
 
         {tab === "events" && (
           <ShellSection>
+            <PageIntro eyebrow="Events" title="Events Command" subtitle="Training, fixtures, attendance and recurring weekly sessions." />
             <EventsTabContent
               isAdmin={props.isAdmin}
               selectedDate={props.selectedDate}
@@ -261,6 +267,7 @@ export default function DashboardShell(props: Props) {
 
         {tab === "coaches" && (
           <ShellSection>
+            <PageIntro eyebrow="Coaches" title="Coaching Tools" subtitle="Coach availability, session support and planning control." />
             <CoachesTabContent
               isAdmin={props.isAdmin}
               selectedDate={props.selectedDate}
@@ -276,12 +283,14 @@ export default function DashboardShell(props: Props) {
 
         {tab === "match" && (
           <ShellSection>
+            <PageIntro eyebrow="Match" title="Match Centre" subtitle="Live score, tactical board, quarter planning, rotations and match timeline." />
             <MatchTabContent {...props} />
           </ShellSection>
         )}
 
         {tab === "stats" && (
           <ShellSection>
+            <PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." />
             <StatsTab
               teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name}
               results={props.leagueResults}
