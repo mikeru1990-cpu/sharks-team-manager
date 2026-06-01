@@ -21,6 +21,7 @@ import {
   cardStyle,
   type MainTab,
   type MatchEventDraft,
+  type TimelineEventType,
 } from "../lib/types"
 
 import type { MatchEventDraftSetter } from "../lib/dashboardTypes"
@@ -106,6 +107,42 @@ function MatchLiveRibbon({ props }: { props: Props }) {
   )
 }
 
+function MatchQuickActions({ props }: { props: Props }) {
+  const actions: Array<{ label: string; icon: string; type: TimelineEventType; colour: string }> = [
+    { label: "Goal", icon: "⚽", type: "goal", colour: "#22c55e" },
+    { label: "Assist", icon: "🎯", type: "assist", colour: "#38bdf8" },
+    { label: "Sub", icon: "🔄", type: "sub", colour: "#facc15" },
+    { label: "Injury", icon: "⚕️", type: "injury", colour: "#fb7185" },
+    { label: "Note", icon: "📝", type: "note", colour: "#a78bfa" },
+  ]
+
+  function openAction(type: TimelineEventType) {
+    props.setEventDraft?.({ type, playerId: "", secondPlayerId: "", note: "" })
+    props.openCreateEvent?.()
+  }
+
+  return (
+    <div className="sharks-glass sharks-card-shine" style={{ borderRadius: 26, padding: 14, display: "grid", gap: 12, border: "1px solid rgba(125,211,252,0.22)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ color: "#7dd3fc", fontSize: 11, fontWeight: 1000, letterSpacing: ".15em" }}>MATCHDAY QUICK ACTIONS</div>
+          <div style={{ color: "#cbd5e1", fontSize: 13, fontWeight: 750, marginTop: 4 }}>One-tap event capture for live match moments.</div>
+        </div>
+        <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 900 }}>{props.timeline?.length || 0} events logged</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 8 }}>
+        {actions.map((action) => (
+          <button key={action.type} onClick={() => openAction(action.type)} className="sharks-touch-target" style={{ border: `1px solid ${action.colour}66`, background: `linear-gradient(135deg, ${action.colour}20, rgba(2,6,23,0.58))`, borderRadius: 18, padding: "12px 6px", color: "white", fontWeight: 1000, cursor: "pointer", display: "grid", gap: 5, justifyItems: "center", boxShadow: `0 12px 28px ${action.colour}16` }}>
+            <span style={{ fontSize: 22, lineHeight: 1 }}>{action.icon}</span>
+            <span style={{ fontSize: 12 }}>{action.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin, signOut } = props
 
@@ -156,7 +193,7 @@ export default function DashboardShell(props: Props) {
 
         {tab === "coaches" && <ShellSection><PageIntro eyebrow="Coaches" title="Coaching Tools" subtitle="Coach availability, session support and planning control." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} /></ShellSection>}
 
-        {tab === "match" && <ShellSection><MatchLiveRibbon props={props} /><MatchTabContent {...props} /></ShellSection>}
+        {tab === "match" && <ShellSection><MatchLiveRibbon props={props} /><MatchQuickActions props={props} /><MatchTabContent {...props} /></ShellSection>}
 
         {tab === "stats" && <ShellSection><PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name} results={props.leagueResults} players={props.players} ratings={props.playerRatings} timeline={props.timeline || []} /></ShellSection>}
       </div>
