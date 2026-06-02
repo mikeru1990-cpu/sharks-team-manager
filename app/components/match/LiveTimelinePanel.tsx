@@ -93,7 +93,7 @@ export default function LiveTimelinePanel({ timeline = [], onEdit, onDelete }: P
               >
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 24, lineHeight: 1 }}>{icon}</div>
-                  <div style={{ color, fontSize: 12, fontWeight: 1000, marginTop: 4 }}>{item.minute}'</div>
+                  <div style={{ color: colour, fontSize: 12, fontWeight: 1000, marginTop: 4 }}>{item.minute}'</div>
                 </div>
 
                 <div style={{ minWidth: 0 }}>
