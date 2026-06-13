@@ -63,7 +63,6 @@ export default function QuarterProgressPanel({
         {Array.from({ length: periodCount }, (_, index) => index + 1).map((period) => {
           const complete = period < currentPeriod
           const live = period === currentPeriod
-          const pending = period > currentPeriod
           const colour = complete ? "#22c55e" : live ? "#38bdf8" : "#94a3b8"
           const icon = complete ? "✓" : live ? "▶" : "○"
           const status = complete ? "Complete" : live ? (running ? "Live" : "Current") : "Pending"
@@ -91,7 +90,7 @@ export default function QuarterProgressPanel({
             >
               <div style={{ fontSize: 22, lineHeight: 1, fontWeight: 1000 }}>{icon}</div>
               <div style={{ color: "white", fontSize: 14, fontWeight: 1000 }}>{shortLabel}{period}</div>
-              <div style={{ fontSize: 11, fontWeight: 900, color, textTransform: "uppercase", letterSpacing: ".08em" }}>{status}</div>
+              <div style={{ fontSize: 11, fontWeight: 900, color: colour, textTransform: "uppercase", letterSpacing: ".08em" }}>{status}</div>
             </button>
           )
         })}
