@@ -3,17 +3,21 @@
 import { useEffect, useMemo, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
-import { TEAM, buttonPrimary, cardStyle } from "../lib/types"
+import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
+
+const FALLBACK_ADMIN_EMAILS = ["mikeru1990@hotmail.com"]
 
 function normaliseEmail(value?: string | null) {
   return (value || "").trim().toLowerCase()
 }
 
 function getAdminEmails() {
-  return (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+  const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map(normaliseEmail)
     .filter(Boolean)
+
+  return envEmails.length ? envEmails : FALLBACK_ADMIN_EMAILS.map(normaliseEmail)
 }
 
 type AuthGateProps = {
@@ -70,7 +74,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   async function signIn() {
     if (!supabase) return setMessage("Secure sign-in is not available right now.")
 
-    const cleanEmail = normaliseEmail(email)
+    const cleanEmail = email.trim()
     if (!cleanEmail || !password) {
       setMessage("Enter your email and password.")
       return
@@ -82,7 +86,17 @@ export default function AuthGate({ children }: AuthGateProps) {
       password,
     })
 
-    if (error) setMessage("Sign-in failed. Check your details and try again.")
+    if (error) setMessage(error.message || "Sign-in failed. Please try again.")
+  }
+
+  async function sendPasswordReset() {
+    if (!supabase) return setMessage("Secure sign-in is not available right now.")
+    const cleanEmail = email.trim()
+    if (!cleanEmail) return setMessage("Enter your email first, then tap reset password.")
+
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail)
+    if (error) setMessage(error.message || "Unable to send password reset.")
+    else setMessage("Password reset sent. Check your email inbox.")
   }
 
   async function signOut() {
@@ -155,6 +169,10 @@ export default function AuthGate({ children }: AuthGateProps) {
 
             <button onClick={signIn} style={buttonPrimary()}>
               Sign In
+            </button>
+
+            <button onClick={() => void sendPasswordReset()} style={{ ...buttonSecondary(), marginTop: 10 }}>
+              Reset Password
             </button>
 
             {message ? <div style={{ marginTop: 10, color: "#92400e", fontWeight: 800 }}>{message}</div> : null}
