@@ -1,11 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
-import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
+import { TEAM, buttonPrimary, cardStyle } from "../lib/types"
 
-const ADMIN_EMAILS = ["mikeru1990@hotmail.com"]
+function normaliseEmail(value?: string | null) {
+  return (value || "").trim().toLowerCase()
+}
+
+function getAdminEmails() {
+  return (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
+    .split(",")
+    .map(normaliseEmail)
+    .filter(Boolean)
+}
 
 type AuthGateProps = {
   children: (args: {
@@ -21,15 +30,14 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [message, setMessage] = useState("")
+  const adminEmails = useMemo(() => getAdminEmails(), [])
 
   useEffect(() => {
     let mounted = true
 
     async function init() {
       try {
-        // 🔥 SAFE GUARD (this is the fix)
         if (!supabase) {
-          console.error("Supabase is not configured")
           setLoading(false)
           return
         }
@@ -46,8 +54,8 @@ export default function AuthGate({ children }: AuthGateProps) {
         })
 
         return () => listener.subscription.unsubscribe()
-      } catch (err) {
-        console.error("Auth error:", err)
+      } catch {
+        setMessage("Unable to check your session. Please try again.")
         setLoading(false)
       }
     }
@@ -60,63 +68,47 @@ export default function AuthGate({ children }: AuthGateProps) {
   }, [])
 
   async function signIn() {
-    if (!supabase) return setMessage("Supabase not configured")
+    if (!supabase) return setMessage("Secure sign-in is not available right now.")
+
+    const cleanEmail = normaliseEmail(email)
+    if (!cleanEmail || !password) {
+      setMessage("Enter your email and password.")
+      return
+    }
 
     setMessage("")
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     })
-    if (error) setMessage(error.message)
-  }
 
-  async function signUp() {
-    if (!supabase) return setMessage("Supabase not configured")
-
-    setMessage("")
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    if (error) setMessage(error.message)
-    else setMessage("Account created. Check your email.")
+    if (error) setMessage("Sign-in failed. Check your details and try again.")
   }
 
   async function signOut() {
     if (!supabase) return
+    setPassword("")
     await supabase.auth.signOut()
   }
 
-  // 🔥 LOADING SCREEN
   if (loading) {
     return (
       <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          Loading...
-        </div>
+        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>Loading...</div>
       </main>
     )
   }
 
-  // 🔥 IF SUPABASE BROKEN → SHOW MESSAGE INSTEAD OF BLACK SCREEN
   if (!supabase) {
     return (
       <main style={{ minHeight: "100vh", padding: 24 }}>
         <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          ❌ Supabase not configured
-          <br />
-          <br />
-          Add these to Vercel:
-          <br />
-          NEXT_PUBLIC_SUPABASE_URL
-          <br />
-          NEXT_PUBLIC_SUPABASE_ANON_KEY
+          Secure sign-in is not configured for this deployment.
         </div>
       </main>
     )
   }
 
-  // 🔥 LOGIN SCREEN
   if (!user) {
     return (
       <main
@@ -135,21 +127,29 @@ export default function AuthGate({ children }: AuthGateProps) {
             }}
           >
             <div style={{ fontSize: 28, fontWeight: 900 }}>Team Manager</div>
+            <div style={{ opacity: 0.82, marginTop: 6, fontWeight: 700 }}>Private club access only</div>
           </div>
 
           <div style={cardStyle()}>
             <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               style={{ width: "100%", padding: 12, marginBottom: 10 }}
             />
 
             <input
               type="password"
+              autoComplete="current-password"
               placeholder="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void signIn()
+              }}
               style={{ width: "100%", padding: 12, marginBottom: 10 }}
             />
 
@@ -157,14 +157,14 @@ export default function AuthGate({ children }: AuthGateProps) {
               Sign In
             </button>
 
-            {message && <div style={{ marginTop: 10 }}>{message}</div>}
+            {message ? <div style={{ marginTop: 10, color: "#92400e", fontWeight: 800 }}>{message}</div> : null}
           </div>
         </div>
       </main>
     )
   }
 
-  const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+  const isAdmin = adminEmails.includes(normaliseEmail(user.email))
 
   return <>{children({ user, isAdmin, signOut })}</>
 }
