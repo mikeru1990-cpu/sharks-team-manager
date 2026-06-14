@@ -15,6 +15,7 @@ import BottomNav from "./layout/BottomNav"
 import SeasonSwitcher from "./layout/SeasonSwitcher"
 import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
 import SharksIdentityBanner from "./layout/SharksIdentityBanner"
+import TeamLocationBadge from "./layout/TeamLocationBadge"
 import DashboardOverview from "./dashboard/DashboardOverview"
 
 import {
@@ -50,6 +51,11 @@ function formatClock(seconds?: number) {
   const mins = Math.floor(safe / 60)
   const secs = safe % 60
   return `${mins}:${secs.toString().padStart(2, "0")}`
+}
+
+function titleCase(value?: string) {
+  const safe = String(value || "Home")
+  return safe.charAt(0).toUpperCase() + safe.slice(1)
 }
 
 function MatchLiveRibbon({ props }: { props: Props }) {
@@ -160,6 +166,8 @@ export default function DashboardShell(props: Props) {
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 142, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 24, minWidth: 0 }}>
+        <TeamLocationBadge teamName={props.activeTeamName || TEAM.name} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={isAdmin ? "Club-wide view" : "Team workspace"} />
+
         {tab === "home" ? (
           <>
             <DashboardHeader teamName={TEAM.name} isAdmin={isAdmin} onSignOut={signOut} nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"} nextEventDateLabel={props.selectedDateEvents?.[0] ? `${props.selectedDateEvents[0].date}${props.selectedDateEvents[0].startTime ? ` • ${props.selectedDateEvents[0].startTime}` : ""}` : "Select a day in the planner"} availablePlayersCount={props.availableCount} totalPlayersCount={props.players?.length} />
