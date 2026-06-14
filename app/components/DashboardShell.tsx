@@ -16,8 +16,10 @@ import SeasonSwitcher from "./layout/SeasonSwitcher"
 import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
 import SharksIdentityBanner from "./layout/SharksIdentityBanner"
 import TeamLocationBadge from "./layout/TeamLocationBadge"
+import TeamSwitcherBar from "./layout/TeamSwitcherBar"
 import DashboardOverview from "./dashboard/DashboardOverview"
 
+import { defaultClubTeams } from "../lib/defaultTeams"
 import {
   TEAM,
   cardStyle,
@@ -162,11 +164,15 @@ export default function DashboardShell(props: Props) {
     )
   }
 
+  const switcherTeams = props.clubTeams || defaultClubTeams
+  const activeTeamId = props.activeTeamId || "all"
+
   return (
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 142, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 24, minWidth: 0 }}>
         <TeamLocationBadge teamName={props.activeTeamName || TEAM.name} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={isAdmin ? "Club-wide view" : "Team workspace"} />
+        <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={props.setActiveTeamId} />
 
         {tab === "home" ? (
           <>
