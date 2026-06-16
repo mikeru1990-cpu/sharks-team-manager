@@ -7,6 +7,7 @@ import EventsTabContent from "./tabs/EventsTabContent"
 import MatchTabContent from "./tabs/MatchTabContent"
 import CoachesTabContent from "./tabs/CoachesTabContent"
 import UserApprovalCentre from "./admin/UserApprovalCentre"
+import TeamsAdminPanel from "./admin/TeamsAdminPanel"
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
 import SeasonModal from "./modals/SeasonModal"
@@ -206,7 +207,7 @@ export default function DashboardShell(props: Props) {
           </ShellSection>
         )}
 
-        {tab === "coaches" && <ShellSection><PageIntro eyebrow="Coaches" title="Coaching Tools" subtitle="Coach availability, session support and planning control." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} />{props.isAdmin ? <UserApprovalCentre /> : null}</ShellSection>}
+        {tab === "coaches" && <ShellSection><PageIntro eyebrow="Coaches" title="Coaching Tools" subtitle="Coach availability, session support and planning control." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection>}
 
         {tab === "match" && <ShellSection><MatchLiveRibbon props={props} /><MatchQuickActions props={props} /><MatchTabContent {...props} /></ShellSection>}
 
