@@ -25,7 +25,7 @@ const items: Array<{
   { key: "match", label: "Match", icon: <FootballIcon /> },
   { key: "players", label: "Players", icon: <UsersIcon /> },
   { key: "stats", label: "Stats", icon: <ChartIcon /> },
-  { key: "coaches", label: "Coaches", icon: <CapIcon /> },
+  { key: "coaches", label: "Admin", icon: <CapIcon /> },
 ]
 
 export default function BottomNav({ tab, setTab }: Props) {
@@ -37,30 +37,31 @@ export default function BottomNav({ tab, setTab }: Props) {
   }
 
   return (
-    <div
+    <nav
+      aria-label="Main app navigation"
       style={{
         position: "fixed",
         left: "50%",
         transform: "translateX(-50%)",
-        bottom: 16,
-        width: "min(94vw, 780px)",
+        bottom: 14,
+        width: "min(95vw, 820px)",
         zIndex: 100,
-        borderRadius: 36,
-        padding: 10,
+        borderRadius: 34,
+        padding: 8,
         background:
-          "linear-gradient(135deg, rgba(2,6,23,0.90), rgba(15,23,42,0.82))",
-        border: "1px solid rgba(125,211,252,0.20)",
+          "radial-gradient(circle at top, rgba(56,189,248,0.14), transparent 38%), linear-gradient(135deg, rgba(2,6,23,0.94), rgba(15,23,42,0.88))",
+        border: "1px solid rgba(125,211,252,0.26)",
         boxShadow:
-          "0 26px 60px rgba(0,0,0,0.55), 0 0 40px rgba(14,165,233,0.10), inset 0 1px 0 rgba(255,255,255,0.08)",
-        backdropFilter: "blur(22px)",
-        WebkitBackdropFilter: "blur(22px)",
+          "0 28px 70px rgba(0,0,0,0.58), 0 0 48px rgba(14,165,233,0.13), inset 0 1px 0 rgba(255,255,255,0.10)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
       }}
     >
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-          gap: 7,
+          gap: 6,
           alignItems: "stretch",
         }}
       >
@@ -70,28 +71,29 @@ export default function BottomNav({ tab, setTab }: Props) {
           return (
             <button
               key={item.key}
+              aria-current={active ? "page" : undefined}
               onClick={() => changeTab(item.key)}
               style={{
                 border: active
-                  ? "1px solid rgba(125,211,252,0.55)"
-                  : "1px solid rgba(148,163,184,0.08)",
+                  ? "1px solid rgba(125,211,252,0.62)"
+                  : "1px solid rgba(148,163,184,0.10)",
                 background: active
-                  ? "linear-gradient(135deg, #1d4ed8 0%, #0284c7 56%, #0f172a 100%)"
-                  : "rgba(255,255,255,0.035)",
+                  ? "linear-gradient(135deg, #2563eb 0%, #0284c7 56%, #0f172a 100%)"
+                  : "linear-gradient(135deg, rgba(255,255,255,0.050), rgba(255,255,255,0.024))",
                 color: active ? "white" : "#cbd5e1",
-                borderRadius: 26,
-                padding: "12px 4px 10px",
+                borderRadius: 24,
+                padding: "11px 4px 9px",
                 display: "grid",
                 justifyItems: "center",
                 alignContent: "center",
-                gap: 6,
+                gap: 5,
                 minWidth: 0,
                 cursor: "pointer",
                 position: "relative",
                 overflow: "hidden",
-                transition: "all 0.2s ease",
+                transition: "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease",
                 boxShadow: active
-                  ? "0 14px 34px rgba(37,99,235,0.42), inset 0 1px 0 rgba(255,255,255,0.18)"
+                  ? "0 16px 36px rgba(37,99,235,0.46), inset 0 1px 0 rgba(255,255,255,0.20)"
                   : "inset 0 1px 0 rgba(255,255,255,0.04)",
               }}
             >
@@ -102,7 +104,7 @@ export default function BottomNav({ tab, setTab }: Props) {
                       position: "absolute",
                       inset: 0,
                       background:
-                        "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%)",
+                        "linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 100%)",
                       pointerEvents: "none",
                     }}
                   />
@@ -111,12 +113,12 @@ export default function BottomNav({ tab, setTab }: Props) {
                       position: "absolute",
                       left: "50%",
                       bottom: 3,
-                      width: 24,
+                      width: 26,
                       height: 3,
                       borderRadius: 999,
                       background: "#7dd3fc",
                       transform: "translateX(-50%)",
-                      boxShadow: "0 0 16px rgba(125,211,252,0.95)",
+                      boxShadow: "0 0 18px rgba(125,211,252,0.98)",
                     }}
                   />
                 </>
@@ -132,7 +134,7 @@ export default function BottomNav({ tab, setTab }: Props) {
                   position: "relative",
                   zIndex: 1,
                   filter: active
-                    ? "drop-shadow(0 8px 14px rgba(125,211,252,0.28))"
+                    ? "drop-shadow(0 8px 14px rgba(125,211,252,0.30))"
                     : "none",
                 }}
               >
@@ -142,10 +144,10 @@ export default function BottomNav({ tab, setTab }: Props) {
               <div
                 style={{
                   fontSize: 11,
-                  fontWeight: active ? 1000 : 800,
+                  fontWeight: active ? 1000 : 850,
                   whiteSpace: "nowrap",
                   letterSpacing: 0.2,
-                  opacity: active ? 1 : 0.78,
+                  opacity: active ? 1 : 0.80,
                   position: "relative",
                   zIndex: 1,
                 }}
@@ -156,6 +158,6 @@ export default function BottomNav({ tab, setTab }: Props) {
           )
         })}
       </div>
-    </div>
+    </nav>
   )
 }
