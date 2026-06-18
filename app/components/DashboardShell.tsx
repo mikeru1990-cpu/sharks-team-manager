@@ -2,7 +2,6 @@
 
 import nextDynamic from "next/dynamic"
 import PlayersManager from "./PlayersManager"
-import HomeTab from "./tabs/HomeTab"
 import EventsTabContent from "./tabs/EventsTabContent"
 import MatchTabContent from "./tabs/MatchTabContent"
 import CoachesTabContent from "./tabs/CoachesTabContent"
@@ -11,9 +10,7 @@ import TeamsAdminPanel from "./admin/TeamsAdminPanel"
 import EventFormModal from "./modals/EventFormModal"
 import MatchEventModal from "./modals/MatchEventModal"
 import SeasonModal from "./modals/SeasonModal"
-import DashboardHeader from "./layout/DashboardHeader"
 import BottomNav from "./layout/BottomNav"
-import SeasonSwitcher from "./layout/SeasonSwitcher"
 import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
 import SharksIdentityBanner from "./layout/SharksIdentityBanner"
 import TeamLocationBadge from "./layout/TeamLocationBadge"
@@ -38,15 +35,15 @@ const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
 type Props = any
 
 function ShellSection({ children }: { children: React.ReactNode }) {
-  return <section style={{ minWidth: 0, display: "grid", gap: 22 }}>{children}</section>
+  return <section style={{ minWidth: 0, display: "grid", gap: 14 }}>{children}</section>
 }
 
 function PageIntro({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
   return (
-    <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 20, borderRadius: 28, display: "grid", gap: 8, overflow: "hidden" }}>
-      <div style={{ color: "#7dd3fc", fontSize: 11, fontWeight: 1000, letterSpacing: ".16em", textTransform: "uppercase" }}>{eyebrow}</div>
-      <div style={{ color: "white", fontSize: 32, fontWeight: 1000, lineHeight: 1, letterSpacing: "-0.045em" }}>{title}</div>
-      <div style={{ color: "#cbd5e1", fontWeight: 700, lineHeight: 1.55, maxWidth: 760 }}>{subtitle}</div>
+    <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 18, borderRadius: 24, display: "grid", gap: 7, overflow: "hidden" }}>
+      <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".16em", textTransform: "uppercase" }}>{eyebrow}</div>
+      <div style={{ color: "white", fontSize: 28, fontWeight: 1000, lineHeight: 1, letterSpacing: "-0.045em" }}>{title}</div>
+      <div style={{ color: "#cbd5e1", fontWeight: 700, lineHeight: 1.45, maxWidth: 760 }}>{subtitle}</div>
     </div>
   )
 }
@@ -175,31 +172,15 @@ export default function DashboardShell(props: Props) {
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 142, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
       <AppPolishFrame />
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 24, minWidth: 0 }}>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 14, minWidth: 0 }}>
         <TeamLocationBadge teamName={props.activeTeamName || TEAM.name} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={isAdmin ? "Club-wide view" : "Team workspace"} />
         <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={props.setActiveTeamId} />
-
-        {tab === "home" ? (
-          <>
-            <DashboardHeader teamName={TEAM.name} isAdmin={isAdmin} onSignOut={signOut} nextEventTitle={props.selectedDateEvents?.[0]?.title || "No upcoming event"} nextEventDateLabel={props.selectedDateEvents?.[0] ? `${props.selectedDateEvents[0].date}${props.selectedDateEvents[0].startTime ? ` • ${props.selectedDateEvents[0].startTime}` : ""}` : "Select a day in the planner"} availablePlayersCount={props.availableCount} totalPlayersCount={props.players?.length} />
-            {props.seasons && props.setActiveSeasonId ? <SeasonSwitcher seasons={props.seasons} activeSeasonId={props.activeSeasonId} onChange={props.setActiveSeasonId} onCreate={() => props.setShowSeasonModal(true)} /> : null}
-          </>
-        ) : null}
 
         {tab === "home" && (
           <ShellSection>
             <SharksIdentityBanner />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-              {[
-                { label: "Available", value: props.availableCount || 0, color: "#22c55e" },
-                { label: "Maybe", value: props.maybeCount || 0, color: "#f59e0b" },
-                { label: "Unavailable", value: props.unavailableCount || 0, color: "#ef4444" },
-                { label: "Squad Size", value: props.players?.length || 0, color: "#38bdf8" },
-              ].map((item) => <div key={item.label} className="sharks-glass sharks-card-shine" style={{ borderRadius: 26, padding: 22, border: `1px solid ${item.color}55`, boxShadow: `0 16px 42px ${item.color}16` }}><div style={{ fontSize: 12, color: "#aebed4", marginBottom: 10, fontWeight: 900, letterSpacing: ".11em", textTransform: "uppercase" }}>{item.label}</div><div style={{ fontSize: 42, fontWeight: 1000, color: item.color, lineHeight: 1, textShadow: `0 0 22px ${item.color}33` }}>{item.value}</div></div>)}
-            </div>
-            <ExperienceUpgradePanel isAdmin={isAdmin} onOpenPlayers={() => props.setTab?.("players")} onOpenEvents={() => props.setTab?.("events")} onOpenMatchday={() => props.setTab?.("match")} onOpenAdmin={() => props.setTab?.("coaches")} />
             <DashboardOverview players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} />
-            <HomeTab teamName={TEAM.name} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} selectedDate={props.selectedDate} onOpenTab={props.setTab} />
+            <ExperienceUpgradePanel isAdmin={isAdmin} onOpenPlayers={() => props.setTab?.("players")} onOpenEvents={() => props.setTab?.("events")} onOpenMatchday={() => props.setTab?.("match")} onOpenAdmin={() => props.setTab?.("coaches")} />
           </ShellSection>
         )}
 
@@ -212,7 +193,7 @@ export default function DashboardShell(props: Props) {
           </ShellSection>
         )}
 
-        {tab === "coaches" && <ShellSection><PageIntro eyebrow="Coaches" title="Coaching Tools" subtitle="Coach availability, session support and planning control." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection>}
+        {tab === "coaches" && <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection>}
 
         {tab === "match" && <ShellSection><MatchLiveRibbon props={props} /><MatchQuickActions props={props} /><MatchTabContent {...props} /></ShellSection>}
 
