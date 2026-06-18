@@ -16,19 +16,46 @@ export default function TeamLocationBadge({
   modeLabel = "Club-wide view",
 }: Props) {
   return (
-    <div className="sharks-glass sharks-card-shine" style={{ borderRadius: 24, padding: 14, display: "grid", gap: 8, border: "1px solid rgba(125,211,252,0.22)" }}>
-      <div style={{ color: "#94a3b8", fontSize: 11, fontWeight: 1000, letterSpacing: ".15em", textTransform: "uppercase" }}>
-        {clubName}
+    <div
+      className="sharks-glass"
+      style={{
+        borderRadius: 20,
+        padding: 10,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        border: "1px solid rgba(125,211,252,0.22)",
+        minWidth: 0,
+      }}
+    >
+      <div
+        className="sharks-app-badge"
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 14,
+          flex: "0 0 auto",
+          backgroundColor: "rgba(255,255,255,0.08)",
+          border: "1px solid rgba(125,211,252,0.24)",
+        }}
+      />
+
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 1000, letterSpacing: ".13em", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {clubName}
+        </div>
+        <div style={{ color: "white", fontSize: 21, fontWeight: 1000, letterSpacing: "-0.045em", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {teamName}
+        </div>
       </div>
-      <div style={{ color: "white", fontSize: 24, fontWeight: 1000, letterSpacing: "-0.04em" }}>
-        {teamName}
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {[roleLabel, sectionLabel, modeLabel].map((label) => (
-          <span key={label} style={{ borderRadius: 999, padding: "7px 10px", background: "rgba(14,165,233,0.12)", border: "1px solid rgba(125,211,252,0.24)", color: "#bae6fd", fontSize: 12, fontWeight: 900 }}>
-            {label}
-          </span>
-        ))}
+
+      <div style={{ display: "grid", gap: 4, justifyItems: "end", flex: "0 0 auto" }}>
+        <span style={{ borderRadius: 999, padding: "5px 8px", background: "rgba(14,165,233,0.12)", border: "1px solid rgba(125,211,252,0.24)", color: "#bae6fd", fontSize: 10, fontWeight: 1000, whiteSpace: "nowrap" }}>
+          {roleLabel}
+        </span>
+        <span style={{ color: "#94a3b8", fontSize: 10, fontWeight: 900, whiteSpace: "nowrap" }}>
+          {sectionLabel} · {modeLabel}
+        </span>
       </div>
     </div>
   )
