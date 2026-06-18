@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
 import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
+import SupabaseSetupRequired from "./setup/SupabaseSetupRequired"
 
 const FALLBACK_ADMIN_EMAILS = ["mikeru1990@hotmail.com"]
 
@@ -114,13 +115,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   }
 
   if (!supabase) {
-    return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          Secure sign-in is not configured for this deployment.
-        </div>
-      </main>
-    )
+    return <SupabaseSetupRequired />
   }
 
   if (!user) {
