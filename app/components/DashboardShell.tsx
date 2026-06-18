@@ -12,12 +12,10 @@ import MatchEventModal from "./modals/MatchEventModal"
 import SeasonModal from "./modals/SeasonModal"
 import BottomNav from "./layout/BottomNav"
 import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
-import SharksIdentityBanner from "./layout/SharksIdentityBanner"
 import TeamLocationBadge from "./layout/TeamLocationBadge"
 import TeamSwitcherBar from "./layout/TeamSwitcherBar"
 import AppPolishFrame from "./layout/AppPolishFrame"
-import DashboardOverview from "./dashboard/DashboardOverview"
-import ExperienceUpgradePanel from "./dashboard/ExperienceUpgradePanel"
+import FootballHomeDashboard from "./dashboard/FootballHomeDashboard"
 
 import { defaultClubTeams } from "../lib/defaultTeams"
 import {
@@ -153,7 +151,7 @@ function MatchQuickActions({ props }: { props: Props }) {
 }
 
 export default function DashboardShell(props: Props) {
-  const { loading, tab, isAdmin, signOut } = props
+  const { loading, tab, isAdmin } = props
 
   if (loading) {
     return (
@@ -177,11 +175,7 @@ export default function DashboardShell(props: Props) {
         <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={props.setActiveTeamId} />
 
         {tab === "home" && (
-          <ShellSection>
-            <SharksIdentityBanner />
-            <DashboardOverview players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} />
-            <ExperienceUpgradePanel isAdmin={isAdmin} onOpenPlayers={() => props.setTab?.("players")} onOpenEvents={() => props.setTab?.("events")} onOpenMatchday={() => props.setTab?.("match")} onOpenAdmin={() => props.setTab?.("coaches")} />
-          </ShellSection>
+          <FootballHomeDashboard teamName={TEAM.name} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} />
         )}
 
         {tab === "players" && <ShellSection><PageIntro eyebrow="Players" title="Squad Manager" subtitle="Player database, positions, development notes and squad management." /><PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /></ShellSection>}
