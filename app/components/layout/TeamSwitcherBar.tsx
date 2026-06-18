@@ -14,32 +14,42 @@ export default function TeamSwitcherBar({ teams = [], activeTeamId = "all", canS
   if (!canSwitch) return null
 
   return (
-    <div className="sharks-glass sharks-card-shine" style={{ borderRadius: 22, padding: 12, display: "grid", gap: 8, border: "1px solid rgba(125,211,252,0.22)" }}>
-      <label style={{ display: "grid", gap: 6 }}>
-        <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 1000, letterSpacing: ".13em", textTransform: "uppercase" }}>
-          Team Switcher
-        </span>
-        <select
-          value={activeTeamId}
-          onChange={(event) => onChangeTeam?.(event.target.value)}
-          style={{
-            width: "100%",
-            border: "1px solid rgba(125,211,252,0.24)",
-            background: "rgba(15,23,42,0.92)",
-            color: "white",
-            borderRadius: 14,
-            padding: 12,
-            fontWeight: 900,
-          }}
-        >
-          <option value="all">All Teams</option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {getTeamDisplayName(team)}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div
+      className="sharks-glass"
+      style={{
+        borderRadius: 18,
+        padding: 10,
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0, 1fr)",
+        gap: 10,
+        alignItems: "center",
+        border: "1px solid rgba(125,211,252,0.20)",
+      }}
+    >
+      <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 1000, letterSpacing: ".12em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+        Team
+      </div>
+      <select
+        value={activeTeamId}
+        onChange={(event) => onChangeTeam?.(event.target.value)}
+        style={{
+          width: "100%",
+          border: "1px solid rgba(125,211,252,0.22)",
+          background: "rgba(2,6,23,0.72)",
+          color: "white",
+          borderRadius: 13,
+          padding: "10px 12px",
+          fontWeight: 1000,
+          minWidth: 0,
+        }}
+      >
+        <option value="all">All Teams</option>
+        {teams.map((team) => (
+          <option key={team.id} value={team.id}>
+            {getTeamDisplayName(team)}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }
