@@ -18,7 +18,9 @@ import ClubBrandBackdrop from "./layout/ClubBrandBackdrop"
 import SharksIdentityBanner from "./layout/SharksIdentityBanner"
 import TeamLocationBadge from "./layout/TeamLocationBadge"
 import TeamSwitcherBar from "./layout/TeamSwitcherBar"
+import AppPolishFrame from "./layout/AppPolishFrame"
 import DashboardOverview from "./dashboard/DashboardOverview"
+import ExperienceUpgradePanel from "./dashboard/ExperienceUpgradePanel"
 
 import { defaultClubTeams } from "../lib/defaultTeams"
 import {
@@ -160,6 +162,7 @@ export default function DashboardShell(props: Props) {
     return (
       <main style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)" }}>
         <ClubBrandBackdrop />
+        <AppPolishFrame />
         <div style={{ ...cardStyle(), position: "relative", zIndex: 1, maxWidth: 840, margin: "0 auto", borderRadius: 30, padding: 30, background: "rgba(15,23,42,0.86)", color: "white", border: "1px solid rgba(125,211,252,0.20)", boxShadow: "0 25px 70px rgba(0,0,0,0.42)", fontWeight: 900 }}>Loading Sharks Coaching Console...</div>
       </main>
     )
@@ -171,6 +174,7 @@ export default function DashboardShell(props: Props) {
   return (
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 142, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
+      <AppPolishFrame />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 24, minWidth: 0 }}>
         <TeamLocationBadge teamName={props.activeTeamName || TEAM.name} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={isAdmin ? "Club-wide view" : "Team workspace"} />
         <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={props.setActiveTeamId} />
@@ -193,6 +197,7 @@ export default function DashboardShell(props: Props) {
                 { label: "Squad Size", value: props.players?.length || 0, color: "#38bdf8" },
               ].map((item) => <div key={item.label} className="sharks-glass sharks-card-shine" style={{ borderRadius: 26, padding: 22, border: `1px solid ${item.color}55`, boxShadow: `0 16px 42px ${item.color}16` }}><div style={{ fontSize: 12, color: "#aebed4", marginBottom: 10, fontWeight: 900, letterSpacing: ".11em", textTransform: "uppercase" }}>{item.label}</div><div style={{ fontSize: 42, fontWeight: 1000, color: item.color, lineHeight: 1, textShadow: `0 0 22px ${item.color}33` }}>{item.value}</div></div>)}
             </div>
+            <ExperienceUpgradePanel isAdmin={isAdmin} onOpenPlayers={() => props.setTab?.("players")} onOpenEvents={() => props.setTab?.("events")} onOpenMatchday={() => props.setTab?.("match")} onOpenAdmin={() => props.setTab?.("coaches")} />
             <DashboardOverview players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} />
             <HomeTab teamName={TEAM.name} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} selectedDate={props.selectedDate} onOpenTab={props.setTab} />
           </ShellSection>
