@@ -1,8 +1,6 @@
 "use client"
 
 import type { SeasonItem } from "../../lib/dashboardTypes"
-import { THEME } from "../../lib/theme"
-import { PrimaryButton, SectionHeader } from "../ui"
 
 type Props = {
   seasons: SeasonItem[]
@@ -21,83 +19,39 @@ export default function SeasonSwitcher({
 
   return (
     <div
+      className="sharks-glass"
       style={{
-        background: "white",
-        border: "1px solid #dbe3ef",
-        borderRadius: 24,
-        padding: 16,
-        boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+        borderRadius: 20,
+        padding: 12,
         display: "grid",
-        gap: 14,
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        gap: 10,
+        alignItems: "center",
+        border: "1px solid rgba(125,211,252,0.22)",
       }}
     >
-      <SectionHeader
-        title="Season"
-        subtitle={activeSeason ? `Currently viewing ${activeSeason.name}` : "No active season selected"}
-        action={
-          <div style={{ minWidth: 130 }}>
-            <PrimaryButton onClick={onCreate}>New Season</PrimaryButton>
-          </div>
-        }
-      />
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) auto",
-          gap: 12,
-          alignItems: "center",
-        }}
-      >
-        <div
-          style={{
-            borderRadius: 18,
-            padding: 14,
-            background: "linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)",
-            border: "1px solid #dbeafe",
-            display: "grid",
-            gap: 4,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              color: THEME.colors.textSecondary,
-              textTransform: "uppercase",
-            }}
-          >
-            Active Season
-          </div>
-          <div
-            style={{
-              fontSize: 22,
-              fontWeight: 900,
-              color: THEME.colors.textPrimary,
-              lineHeight: 1.1,
-            }}
-          >
-            {activeSeason?.name || "No season"}
-          </div>
-          {activeSeason ? (
-            <div style={{ color: THEME.colors.textSecondary, fontSize: 13 }}>
-              {activeSeason.startDate} → {activeSeason.endDate}
-            </div>
-          ) : null}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: "#94a3b8", fontSize: 10, fontWeight: 1000, letterSpacing: ".13em", textTransform: "uppercase" }}>
+          Season
         </div>
+        <div style={{ color: "white", fontSize: 18, fontWeight: 1000, lineHeight: 1.1 }}>
+          {activeSeason?.name || "No season"}
+        </div>
+      </div>
 
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <select
           value={activeSeasonId}
           onChange={(e) => onChange(e.target.value)}
           style={{
-            padding: 12,
+            padding: "10px 12px",
             borderRadius: 14,
-            border: "1px solid #cbd5e1",
-            background: "white",
-            fontSize: 15,
-            fontWeight: 700,
-            minWidth: 200,
-            color: THEME.colors.textPrimary,
+            border: "1px solid rgba(125,211,252,0.24)",
+            background: "rgba(15,23,42,0.92)",
+            fontSize: 14,
+            fontWeight: 900,
+            color: "white",
+            maxWidth: 150,
           }}
         >
           {seasons.map((season) => (
@@ -106,6 +60,21 @@ export default function SeasonSwitcher({
             </option>
           ))}
         </select>
+
+        <button
+          onClick={onCreate}
+          style={{
+            border: "1px solid rgba(125,211,252,0.32)",
+            background: "rgba(14,165,233,0.14)",
+            color: "#bae6fd",
+            borderRadius: 14,
+            padding: "10px 12px",
+            fontWeight: 1000,
+            cursor: "pointer",
+          }}
+        >
+          +
+        </button>
       </div>
     </div>
   )
