@@ -2,6 +2,7 @@
 
 import type { EventAttendance, LeagueResult, MainTab, Player, PlayerMatchRating } from "../../lib/types"
 import type { EventWithPlan } from "../../lib/dashboardTypes"
+import ClubBadge from "../branding/ClubBadge"
 
 type Props = {
   teamName: string
@@ -73,10 +74,10 @@ export default function FootballHomeDashboard({ teamName, players, events, atten
     <section style={{ display: "grid", gap: 14 }}>
       <div className="sharks-elite-panel sharks-card-shine" style={{ borderRadius: 28, padding: 18, display: "grid", gap: 16, overflow: "hidden" }}>
         <div style={{ display: "flex", gap: 14, alignItems: "center", minWidth: 0 }}>
-          <div className="sharks-app-badge" style={{ width: 62, height: 62, flex: "0 0 auto", borderRadius: 20, backgroundColor: "white", border: "1px solid rgba(125,211,252,0.30)", boxShadow: "0 14px 32px rgba(0,0,0,0.28)" }} />
+          <ClubBadge size={64} />
           <div style={{ minWidth: 0 }}>
             <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Leonard Stanley Youth FC</div>
-            <div style={{ color: "white", fontSize: 30, fontWeight: 1000, letterSpacing: "-0.055em", lineHeight: 1 }}>{teamName}</div>
+            <div style={{ color: "white", fontSize: 30, fontWeight: 1000, letterSpacing: "-0.055em", lineHeight: 1, overflowWrap: "anywhere" }}>{teamName}</div>
             <div style={{ color: "#cbd5e1", fontSize: 13, fontWeight: 800, marginTop: 4 }}>2025/26 season overview</div>
           </div>
         </div>
