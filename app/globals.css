@@ -66,12 +66,8 @@ button:active {
 }
 
 @keyframes sharksPulse {
-  0%,100% {
-    box-shadow: 0 0 18px rgba(56,189,248,0.14);
-  }
-  50% {
-    box-shadow: 0 0 34px rgba(56,189,248,0.28);
-  }
+  0%,100% { box-shadow: 0 0 18px rgba(56,189,248,0.14); }
+  50% { box-shadow: 0 0 34px rgba(56,189,248,0.28); }
 }
 
 @keyframes sharksFloat {
@@ -142,25 +138,16 @@ button:active {
 }
 
 .sharks-app-badge {
+  background-color: rgba(255,255,255,0.96);
   background-image: url('/sharks-official-badge.svg');
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: 86% 86%;
+  border-radius: 18px;
 }
 
 .sharks-hero-watermark {
-  position: absolute;
-  inset: auto -48px -80px auto;
-  width: 260px;
-  height: 290px;
-  opacity: 0.08;
-  background-image: url('/sharks-official-badge.svg');
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  transform: rotate(-8deg);
-  filter: drop-shadow(0 30px 70px rgba(56,189,248,0.25));
-  pointer-events: none;
+  display: none;
 }
 
 .sharks-tactical-pitch {
@@ -258,34 +245,6 @@ button:active {
   border: 1px solid rgba(125,211,252,0.20);
   box-shadow: 0 18px 45px rgba(0,0,0,0.38);
   backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-}
-
-.sharks-touch-target {
-  min-width: 48px;
-}
-
-.sharks-score-hotkey {
-  min-height: 52px;
-  border-radius: 18px;
-  font-size: 16px;
-  font-weight: 1000;
-}
-
-.sharks-sponsor-strip {
-  min-height: 86px;
-  border-radius: 26px;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.08), rgba(15,23,42,0.58)),
-    repeating-linear-gradient(90deg, rgba(125,211,252,0.12) 0 1px, transparent 1px 24px);
-  border: 1px solid rgba(148,163,184,0.18);
-  box-shadow: 0 16px 40px rgba(2,6,23,0.24);
-}
-
-/* Global polish pass */
-::selection {
-  background: rgba(56, 189, 248, 0.34);
-  color: #ffffff;
 }
 
 html {
@@ -297,29 +256,48 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at top, black 0%, transparent 72%);
   z-index: 0;
-}
-
-main {
-  isolation: isolate;
+  background:
+    linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.62), transparent 78%);
 }
 
 .sharks-glass,
-.sharks-elite-panel,
-.sharks-match-command-ribbon,
-.sharks-sponsor-strip {
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+.sharks-elite-panel {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .sharks-glass:hover,
 .sharks-elite-panel:hover {
-  border-color: rgba(125, 211, 252, 0.32);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255,255,255,0.09);
+  border-color: rgba(125, 211, 252, 0.34);
+  box-shadow: 0 28px 76px rgba(0,0,0,0.44), 0 0 0 1px rgba(125,211,252,0.07), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.sharks-section-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.sharks-page-title {
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.sharks-soft-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(125,211,252,0.28), transparent);
+}
+
+.sharks-stat-tile {
+  border-radius: 24px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(125,211,252,0.10), transparent 38%),
+    rgba(2,6,23,0.46);
+  border: 1px solid rgba(125,211,252,0.20);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 34px rgba(0,0,0,0.28);
 }
 
 input,
@@ -331,104 +309,28 @@ textarea {
 
 input:focus,
 select:focus,
-textarea:focus,
-button:focus-visible {
-  border-color: rgba(125, 211, 252, 0.70) !important;
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.14) !important;
+textarea:focus {
+  border-color: rgba(125,211,252,0.58) !important;
+  box-shadow: 0 0 0 3px rgba(56,189,248,0.13);
 }
 
 button {
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease, opacity 0.16s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-  transform: none;
-}
-
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(2, 6, 23, 0.88);
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.62), rgba(29, 78, 216, 0.55));
-  border-radius: 999px;
-  border: 2px solid rgba(2, 6, 23, 0.88);
-}
-
-.sharks-section-title {
-  color: white;
-  font-size: clamp(24px, 4vw, 38px);
-  font-weight: 1000;
-  letter-spacing: -0.055em;
-  line-height: 0.98;
-}
-
-.sharks-muted-copy {
-  color: #cbd5e1;
-  font-weight: 750;
-  line-height: 1.55;
-}
-
-.sharks-pill {
-  border-radius: 999px;
-  padding: 7px 10px;
-  border: 1px solid rgba(125, 211, 252, 0.24);
-  background: rgba(14, 165, 233, 0.12);
-  color: #bae6fd;
-  font-size: 12px;
-  font-weight: 1000;
-}
-
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   body {
     background:
-      radial-gradient(circle at top, rgba(37, 99, 235, 0.34), transparent 34%),
-      linear-gradient(180deg, #020617 0%, #07111f 52%, #020617 100%);
-  }
-
-  .sharks-hero-watermark {
-    width: 190px;
-    height: 220px;
-    right: -68px;
-    bottom: -78px;
-  }
-
-  .sharks-tactical-pitch {
-    border-radius: 24px;
-    min-height: 520px !important;
-    padding: 12px !important;
+      radial-gradient(circle at top, rgba(37, 99, 235, 0.22), transparent 30%),
+      linear-gradient(180deg, #020617 0%, #07111f 54%, #020617 100%);
   }
 
   .sharks-elite-panel,
   .sharks-glass {
-    border-radius: 22px;
+    border-radius: 22px !important;
   }
 
   .sharks-card-shine::after {
     display: none;
-  }
-
-  button,
-  select,
-  input {
-    min-height: 44px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
   }
 }
