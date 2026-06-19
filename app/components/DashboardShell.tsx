@@ -67,7 +67,7 @@ export default function DashboardShell(props: Props) {
   const activeTeamId = props.activeTeamId || "all"
 
   return (
-    <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 170, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
+    <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 118, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
       <AppPolishFrame />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 14, minWidth: 0 }}>
