@@ -16,6 +16,7 @@ import TeamLocationBadge from "./layout/TeamLocationBadge"
 import TeamSwitcherBar from "./layout/TeamSwitcherBar"
 import AppPolishFrame from "./layout/AppPolishFrame"
 import FootballHomeDashboard from "./dashboard/FootballHomeDashboard"
+import MatchLineupSnapshot from "./match/MatchLineupSnapshot"
 
 import { defaultClubTeams } from "../lib/defaultTeams"
 import {
@@ -89,7 +90,7 @@ export default function DashboardShell(props: Props) {
 
         {tab === "coaches" && <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent isAdmin={props.isAdmin} selectedDate={props.selectedDate} coaches={props.coaches} coachAvailability={props.coachAvailability} selectedDateCoachAvailability={props.selectedDateCoachAvailability || []} formatFullDate={props.formatFullDate} saveCoaches={props.saveCoaches} saveCoachAvailability={props.saveCoachAvailability} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection>}
 
-        {tab === "match" && <ShellSection><MatchTabContent {...props} /></ShellSection>}
+        {tab === "match" && <ShellSection><MatchLineupSnapshot {...props} /><MatchTabContent {...props} /></ShellSection>}
 
         {tab === "stats" && <ShellSection><PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name} results={props.leagueResults} players={props.players} ratings={props.playerRatings} timeline={props.timeline || []} /></ShellSection>}
       </div>
