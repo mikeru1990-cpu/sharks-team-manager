@@ -135,12 +135,21 @@ export default function EventsTabContent({
   openAddCalendarEvent,
   openEditCalendarEvent,
   deleteCalendarEvent,
+  persistSettings,
 }: Props) {
   const today = localToday()
 
+  function chooseDate(value: string) {
+    setSelectedDate(value)
+    void persistSettings({ selectedDate: value })
+  }
+
   useEffect(() => {
-    if (selectedDate !== today) setSelectedDate(today)
-    // Only force today on first mount so manual date picking still works.
+    if (selectedDate !== today) {
+      setSelectedDate(today)
+      void persistSettings({ selectedDate: today })
+    }
+    // Only force today when the events page is opened so manual date picking still works after that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -163,7 +172,7 @@ export default function EventsTabContent({
     <div style={{ display: "grid", gap: 18 }}>
       <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 22, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 16 }}>
-          <SectionHeader title="Events Command" subtitle="Fixtures, training, attendance and matchday planning." light action={<div style={{ display: "flex", gap: 8, minWidth: 220 }}>{nextEvent ? <PrimaryButton onClick={() => setSelectedEventId(nextEvent.id)}>Open Next</PrimaryButton> : null}{isAdmin ? <SecondaryButton onClick={openAddCalendarEvent}>Add Event</SecondaryButton> : null}</div>} />
+          <SectionHeader title="Events Command" subtitle="Fixtures, training, attendance and matchday planning." light action={<div style={{ display: "flex", gap: 8, minWidth: 220 }}>{nextEvent ? <PrimaryButton onClick={() => { setSelectedEventId(nextEvent.id); chooseDate(nextEvent.date) }}>Open Next</PrimaryButton> : null}{isAdmin ? <SecondaryButton onClick={openAddCalendarEvent}>Add Event</SecondaryButton> : null}</div>} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: 12 }}>
             <StatTile label="Total" value={totalEvents} />
             <StatTile label="Upcoming" value={upcomingCount} tone="#22c55e" />
@@ -177,12 +186,12 @@ export default function EventsTabContent({
       <PageCard>
         <SectionHeader title="Day Planner" subtitle="Choose a date, select the event and manage attendance." />
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center", marginBottom: 14 }}>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 14, borderRadius: 16, border: "1px solid rgba(148,163,184,0.22)", fontSize: 16, width: "100%", boxSizing: "border-box", background: "rgba(2,6,23,0.58)", color: "white" }} />
+          <input type="date" value={selectedDate} onChange={(e) => chooseDate(e.target.value)} style={{ padding: 14, borderRadius: 16, border: "1px solid rgba(148,163,184,0.22)", fontSize: 16, width: "100%", boxSizing: "border-box", background: "rgba(2,6,23,0.58)", color: "white" }} />
           {isAdmin ? <div style={{ minWidth: 110 }}><SecondaryButton onClick={openAddCalendarEvent}>New</SecondaryButton></div> : null}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ color: "#cbd5e1", fontWeight: 800 }}>{formatFullDate(selectedDate)}</div>
-          {selectedDate !== today ? <SecondaryButton onClick={() => setSelectedDate(today)}>Today</SecondaryButton> : null}
+          {selectedDate !== today ? <SecondaryButton onClick={() => chooseDate(today)}>Today</SecondaryButton> : null}
         </div>
       </PageCard>
 
