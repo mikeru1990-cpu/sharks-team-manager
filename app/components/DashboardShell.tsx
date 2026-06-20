@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import nextDynamic from "next/dynamic"
 import PlayersManager from "./PlayersManager"
 import EventsTabContent from "./tabs/EventsTabContent"
@@ -19,6 +20,7 @@ import FootballHomeDashboard from "./dashboard/FootballHomeDashboard"
 import ClubDashboard from "./dashboard/ClubDashboard"
 import MatchLineupSnapshot from "./match/MatchLineupSnapshot"
 import { defaultClubTeams } from "../lib/defaultTeams"
+import { getTeamDisplayName } from "../lib/teamAccess"
 import { TEAM, cardStyle, type MainTab, type MatchEventDraft } from "../lib/types"
 import type { MatchEventDraftSetter } from "../lib/dashboardTypes"
 
@@ -46,6 +48,7 @@ function titleCase(value?: string) {
 
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin } = props
+  const [localActiveTeamId, setLocalActiveTeamId] = useState("all")
 
   if (loading) {
     return (
@@ -58,18 +61,22 @@ export default function DashboardShell(props: Props) {
   }
 
   const switcherTeams = props.clubTeams || defaultClubTeams
-  const activeTeamId = props.activeTeamId || "all"
+  const activeTeamId = props.activeTeamId || localActiveTeamId
+  const activeTeam = switcherTeams.find((team: any) => team.id === activeTeamId)
+  const activeTeamName = activeTeamId === "all" ? "All Teams" : activeTeam ? getTeamDisplayName(activeTeam) : props.activeTeamName || TEAM.name
+  const activeColour = activeTeam?.primaryColour || "#38bdf8"
   const showClubDashboard = tab === "home" && isAdmin && activeTeamId === "all"
+  const setActiveTeam = props.setActiveTeamId || setLocalActiveTeamId
 
   return (
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 118, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
       <ClubBrandBackdrop />
       <AppPolishFrame />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 14, minWidth: 0 }}>
-        <TeamLocationBadge teamName={props.activeTeamName || TEAM.name} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={isAdmin ? "Club-wide view" : "Team workspace"} />
-        <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={props.setActiveTeamId} />
-        {showClubDashboard ? <ClubDashboard teams={switcherTeams} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} onOpenTeam={props.setActiveTeamId} /> : null}
-        {tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={TEAM.name} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}
+        <TeamLocationBadge teamName={activeTeamName} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={activeTeamId === "all" ? "Club-wide view" : "Team workspace"} primaryColour={activeColour} />
+        <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={setActiveTeam} />
+        {showClubDashboard ? <ClubDashboard teams={switcherTeams} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} onOpenTeam={setActiveTeam} /> : null}
+        {tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={activeTeamName} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}
         {tab === "players" ? <ShellSection><PageIntro eyebrow="Players" title="Squad Manager" subtitle="Player database, positions, development notes and squad management." /><PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /></ShellSection> : null}
         {tab === "events" ? <ShellSection><PageIntro eyebrow="Events" title="Events Command" subtitle="Training, fixtures, attendance and recurring weekly sessions." /><EventsTabContent {...props} /></ShellSection> : null}
         {tab === "coaches" ? <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent {...props} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection> : null}
