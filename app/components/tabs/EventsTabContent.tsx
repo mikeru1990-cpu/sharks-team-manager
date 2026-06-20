@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { PageCard, SectionHeader, Badge, PrimaryButton, SecondaryButton } from "../ui"
 import type { EventWithPlan } from "../../lib/dashboardTypes"
 
@@ -41,8 +41,16 @@ type Props = {
   deleteCalendarEvent: (id: string) => Promise<void>
 }
 
+function localToday() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 function getStatus(date: string) {
-  const today = new Date().toISOString().split("T")[0]
+  const today = localToday()
   if (date < today) return "done"
   if (date === today) return "today"
   return "upcoming"
@@ -68,14 +76,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatTile({ label, value, tone = "#38bdf8" }: { label: string; value: string | number; tone?: string }) {
   return (
-    <div
-      className="sharks-elite-panel sharks-card-shine"
-      style={{
-        padding: 16,
-        border: `1px solid ${tone}44`,
-        boxShadow: `0 16px 38px ${tone}14`,
-      }}
-    >
+    <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 16, border: `1px solid ${tone}44`, boxShadow: `0 16px 38px ${tone}14` }}>
       <div style={{ color: "#aebed4", fontSize: 11, fontWeight: 1000, letterSpacing: ".13em", textTransform: "uppercase" }}>{label}</div>
       <div style={{ marginTop: 8, fontSize: 34, fontWeight: 1000, lineHeight: 1, color: tone }}>{value}</div>
     </div>
@@ -97,34 +98,10 @@ function attendanceButtonStyle(active: boolean, tone: "available" | "maybe" | "u
   } as const
 }
 
-function EventCard({
-  event,
-  selected,
-  activeMatch,
-  onClick,
-}: {
-  event: EventWithPlan
-  selected: boolean
-  activeMatch: boolean
-  onClick: () => void
-}) {
+function EventCard({ event, selected, activeMatch, onClick }: { event: EventWithPlan; selected: boolean; activeMatch: boolean; onClick: () => void }) {
   const status = getStatus(event.date)
   return (
-    <button
-      onClick={onClick}
-      className="sharks-glass sharks-card-shine"
-      style={{
-        border: selected ? "1px solid rgba(125,211,252,0.72)" : "1px solid rgba(148,163,184,0.18)",
-        background: selected ? "rgba(14,165,233,0.16)" : undefined,
-        borderRadius: 22,
-        padding: 15,
-        textAlign: "left",
-        display: "grid",
-        gap: 9,
-        cursor: "pointer",
-        color: "white",
-      }}
-    >
+    <button onClick={onClick} className="sharks-glass sharks-card-shine" style={{ border: selected ? "1px solid rgba(125,211,252,0.72)" : "1px solid rgba(148,163,184,0.18)", background: selected ? "rgba(14,165,233,0.16)" : undefined, borderRadius: 22, padding: 15, textAlign: "left", display: "grid", gap: 9, cursor: "pointer", color: "white" }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Badge tone={event.type === "match" ? "blue" : "green"}>{event.type.toUpperCase()}</Badge>
         <StatusBadge status={status} />
@@ -159,6 +136,14 @@ export default function EventsTabContent({
   openEditCalendarEvent,
   deleteCalendarEvent,
 }: Props) {
+  const today = localToday()
+
+  useEffect(() => {
+    if (selectedDate !== today) setSelectedDate(today)
+    // Only force today on first mount so manual date picking still works.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const sorted = useMemo(() => {
     return [...events].sort((a, b) => {
       const d = a.date.localeCompare(b.date)
@@ -167,7 +152,6 @@ export default function EventsTabContent({
     })
   }, [events])
 
-  const today = new Date().toISOString().split("T")[0]
   const nextEvent = sorted.find((event) => event.date >= today) || sorted[0] || null
   const totalEvents = sorted.length
   const upcomingCount = sorted.filter((event) => event.date > today).length
@@ -179,18 +163,7 @@ export default function EventsTabContent({
     <div style={{ display: "grid", gap: 18 }}>
       <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 22, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 16 }}>
-          <SectionHeader
-            title="Events Command"
-            subtitle="Fixtures, training, attendance and matchday planning."
-            light
-            action={
-              <div style={{ display: "flex", gap: 8, minWidth: 220 }}>
-                {nextEvent ? <PrimaryButton onClick={() => setSelectedEventId(nextEvent.id)}>Open Next</PrimaryButton> : null}
-                {isAdmin ? <SecondaryButton onClick={openAddCalendarEvent}>Add Event</SecondaryButton> : null}
-              </div>
-            }
-          />
-
+          <SectionHeader title="Events Command" subtitle="Fixtures, training, attendance and matchday planning." light action={<div style={{ display: "flex", gap: 8, minWidth: 220 }}>{nextEvent ? <PrimaryButton onClick={() => setSelectedEventId(nextEvent.id)}>Open Next</PrimaryButton> : null}{isAdmin ? <SecondaryButton onClick={openAddCalendarEvent}>Add Event</SecondaryButton> : null}</div>} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: 12 }}>
             <StatTile label="Total" value={totalEvents} />
             <StatTile label="Upcoming" value={upcomingCount} tone="#22c55e" />
@@ -204,127 +177,46 @@ export default function EventsTabContent({
       <PageCard>
         <SectionHeader title="Day Planner" subtitle="Choose a date, select the event and manage attendance." />
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "center", marginBottom: 14 }}>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            style={{ padding: 14, borderRadius: 16, border: "1px solid rgba(148,163,184,0.22)", fontSize: 16, width: "100%", boxSizing: "border-box", background: "rgba(2,6,23,0.58)", color: "white" }}
-          />
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 14, borderRadius: 16, border: "1px solid rgba(148,163,184,0.22)", fontSize: 16, width: "100%", boxSizing: "border-box", background: "rgba(2,6,23,0.58)", color: "white" }} />
           {isAdmin ? <div style={{ minWidth: 110 }}><SecondaryButton onClick={openAddCalendarEvent}>New</SecondaryButton></div> : null}
         </div>
-        <div style={{ color: "#cbd5e1", fontWeight: 800 }}>{formatFullDate(selectedDate)}</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ color: "#cbd5e1", fontWeight: 800 }}>{formatFullDate(selectedDate)}</div>
+          {selectedDate !== today ? <SecondaryButton onClick={() => setSelectedDate(today)}>Today</SecondaryButton> : null}
+        </div>
       </PageCard>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         <PageCard>
           <SectionHeader title="Selected Day" subtitle="Events scheduled for this date." />
-          {selectedDateEvents.length === 0 ? (
-            <div style={{ color: "#aebed4" }}>No events on this date.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              {selectedDateEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  selected={selectedEventId === event.id}
-                  activeMatch={activeMatchEventId === event.id}
-                  onClick={() => {
-                    setSelectedEventId(event.id)
-                    if (event.type === "match") setActiveMatchEventId(event.id)
-                  }}
-                />
-              ))}
+          {selectedDateEvents.length === 0 ? <div style={{ color: "#aebed4" }}>No events on this date.</div> : <div style={{ display: "grid", gap: 10 }}>{selectedDateEvents.map((event) => <EventCard key={event.id} event={event} selected={selectedEventId === event.id} activeMatch={activeMatchEventId === event.id} onClick={() => { setSelectedEventId(event.id); if (event.type === "match") setActiveMatchEventId(event.id) }} />)}</div>}
+        </PageCard>
+
+        {selectedEvent ? (
+          <PageCard>
+            <SectionHeader title={selectedEvent.title} subtitle="Attendance and event controls." />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              <Badge tone={selectedEvent.type === "match" ? "blue" : "green"}>{selectedEvent.type}</Badge>
+              <Badge>{formatPrettyDate(selectedEvent.date)}</Badge>
+              {selectedEvent.startTime ? <Badge>{selectedEvent.startTime}</Badge> : null}
             </div>
-          )}
-        </PageCard>
-
-        <PageCard>
-          <SectionHeader title="Next Event" subtitle="Closest upcoming activity." />
-          {!nextEvent ? (
-            <div style={{ color: "#aebed4" }}>No next event yet.</div>
-          ) : (
-            <EventCard
-              event={nextEvent}
-              selected={selectedEventId === nextEvent.id}
-              activeMatch={activeMatchEventId === nextEvent.id}
-              onClick={() => setSelectedEventId(nextEvent.id)}
-            />
-          )}
-        </PageCard>
-      </div>
-
-      {selectedEvent ? (
-        <PageCard>
-          <SectionHeader
-            title="Selected Event Details"
-            subtitle="Quick view for the currently selected event."
-            action={isAdmin ? (
-              <div style={{ display: "flex", gap: 8, minWidth: 220 }}>
-                <SecondaryButton onClick={() => openEditCalendarEvent(selectedEvent)}>Edit</SecondaryButton>
-                <SecondaryButton onClick={() => void deleteCalendarEvent(selectedEvent.id)}>Delete</SecondaryButton>
-              </div>
-            ) : undefined}
-          />
-          <EventCard
-            event={selectedEvent}
-            selected
-            activeMatch={activeMatchEventId === selectedEvent.id}
-            onClick={() => undefined}
-          />
-        </PageCard>
-      ) : null}
-
-      {selectedEvent ? (
-        <PageCard>
-          <SectionHeader title="Player Availability" subtitle={`Set availability for ${selectedEvent.title}.`} />
-          {players.length === 0 ? (
-            <div style={{ color: "#aebed4" }}>No players found.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
+            {isAdmin ? <div style={{ display: "flex", gap: 8, marginBottom: 14 }}><SecondaryButton onClick={() => openEditCalendarEvent(selectedEvent)}>Edit</SecondaryButton><SecondaryButton onClick={() => deleteCalendarEvent(selectedEvent.id)}>Delete</SecondaryButton></div> : null}
+            <div style={{ display: "grid", gap: 8 }}>
               {players.map((player) => {
-                const currentStatus = getPlayerStatus(selectedEvent.id, player.id)
+                const status = getPlayerStatus(selectedEvent.id, player.id)
                 return (
-                  <div key={player.id} className="sharks-glass" style={{ borderRadius: 18, padding: 14, display: "grid", gap: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 1000, fontSize: 16, color: "white" }}>{player.name}</div>
-                      <div style={{ color: "#94a3b8", fontSize: 13, marginTop: 3 }}>{player.positions?.join(" / ") || "Player"}</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {(["available", "maybe", "unavailable"] as const).map((status) => (
-                        <button key={status} disabled={!isAdmin} onClick={() => void saveAttendance(selectedEvent.id, player.id, status)} style={attendanceButtonStyle(currentStatus === status, status)}>
-                          {status === "available" ? "Available" : status === "maybe" ? "Maybe" : "Unavailable"}
-                        </button>
-                      ))}
+                  <div key={player.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center", borderRadius: 16, background: "rgba(15,23,42,0.58)", border: "1px solid rgba(148,163,184,0.18)", padding: 10 }}>
+                    <div style={{ color: "white", fontWeight: 900, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player.name}</div>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "end" }}>
+                      {(["available", "maybe", "unavailable"] as const).map((nextStatus) => <button key={nextStatus} disabled={!isAdmin} onClick={() => saveAttendance(selectedEvent.id, player.id, nextStatus)} style={attendanceButtonStyle(status === nextStatus, nextStatus)}>{nextStatus[0].toUpperCase()}</button>)}
                     </div>
                   </div>
                 )
               })}
             </div>
-          )}
-        </PageCard>
-      ) : null}
-
-      <PageCard>
-        <SectionHeader title="All Events" subtitle="Full event list in date order." />
-        {sorted.length === 0 ? (
-          <div style={{ color: "#aebed4" }}>No events yet.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 12 }}>
-            {sorted.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                selected={selectedEventId === event.id}
-                activeMatch={activeMatchEventId === event.id}
-                onClick={() => {
-                  setSelectedEventId(event.id)
-                  if (event.type === "match") setActiveMatchEventId(event.id)
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </PageCard>
+          </PageCard>
+        ) : null}
+      </div>
     </div>
   )
 }
