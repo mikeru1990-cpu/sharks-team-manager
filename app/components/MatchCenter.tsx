@@ -16,13 +16,12 @@ function TeamInput({ value, align, disabled, onChange }: { value: string; align?
       style={{
         width: "100%",
         border: "none",
-        borderBottom: "1px solid rgba(255,255,255,0.18)",
         background: "transparent",
         color: "white",
         outline: "none",
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 1000,
-        padding: "6px 0",
+        padding: "4px 0",
         textAlign: align || "left",
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -33,19 +32,7 @@ function TeamInput({ value, align, disabled, onChange }: { value: string; align?
 
 function MiniScoreButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        width: 48,
-        height: 40,
-        borderRadius: 14,
-        border: "1px solid rgba(125,211,252,0.30)",
-        background: "linear-gradient(135deg, rgba(255,255,255,0.13), rgba(15,23,42,0.64))",
-        color: "white",
-        fontWeight: 1000,
-        cursor: "pointer",
-      }}
-    >
+    <button onClick={onClick} style={{ minWidth: 42, height: 36, borderRadius: 14, border: "1px solid rgba(125,211,252,0.30)", background: "linear-gradient(135deg, rgba(255,255,255,0.13), rgba(15,23,42,0.64))", color: "white", fontWeight: 1000, cursor: "pointer" }}>
       {children}
     </button>
   )
@@ -53,19 +40,7 @@ function MiniScoreButton({ children, onClick }: { children: React.ReactNode; onC
 
 function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        border: active ? "1px solid rgba(125,211,252,0.65)" : "1px solid rgba(148,163,184,0.16)",
-        background: active ? "linear-gradient(135deg, #1d4ed8 0%, #0284c7 62%, #0f172a 100%)" : "rgba(255,255,255,0.04)",
-        color: active ? "white" : "#cbd5e1",
-        borderRadius: 16,
-        padding: "10px 6px",
-        fontWeight: 1000,
-        fontSize: 12,
-        cursor: "pointer",
-      }}
-    >
+    <button onClick={onClick} style={{ border: active ? "1px solid rgba(125,211,252,0.65)" : "1px solid rgba(148,163,184,0.16)", background: active ? "linear-gradient(135deg, #1d4ed8 0%, #0284c7 62%, #0f172a 100%)" : "rgba(255,255,255,0.04)", color: active ? "white" : "#cbd5e1", borderRadius: 15, padding: "9px 5px", fontWeight: 1000, fontSize: 11, cursor: "pointer" }}>
       {children}
     </button>
   )
@@ -83,44 +58,58 @@ function PlayerRow({ player, subtitle }: { player: Player; subtitle?: string }) 
   )
 }
 
-function MetricCard({ label, value }: { label: string; value: string | number }) {
+function MetricCard({ label, value, colour = "#7dd3fc" }: { label: string; value: string | number; colour?: string }) {
   return (
-    <div style={{ borderRadius: 16, padding: 12, background: "rgba(255,255,255,0.065)", border: "1px solid rgba(148,163,184,0.18)" }}>
-      <div style={{ color: "#aebed4", fontSize: 10, fontWeight: 1000, letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ color: "white", fontSize: 22, fontWeight: 1000, marginTop: 4 }}>{String(value)}</div>
+    <div style={{ borderRadius: 15, padding: 10, background: "rgba(255,255,255,0.065)", border: `1px solid ${colour}44` }}>
+      <div style={{ color: "#aebed4", fontSize: 9, fontWeight: 1000, letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: colour, fontSize: 20, fontWeight: 1000, marginTop: 4 }}>{String(value)}</div>
     </div>
   )
 }
 
-function LineupStrip({ currentSlots, lineupMap, players, benchPlayers }: { currentSlots: PitchSlot[]; lineupMap: Record<string, string | null>; players: Player[]; benchPlayers: Player[] }) {
-  const starters = currentSlots
-    .map((slot) => ({ slot, player: players.find((player) => player.id === lineupMap?.[slot.id]) }))
-    .filter((item) => item.player)
+function PlayerChip({ player, label, tone = "#38bdf8" }: { player?: Player; label: string; tone?: string }) {
+  return (
+    <div style={{ borderRadius: 14, padding: 8, background: player ? "rgba(2,6,23,0.62)" : "rgba(15,23,42,0.42)", border: `1px solid ${player ? tone : "rgba(148,163,184,0.18)"}`, minWidth: 0, textAlign: "center" }}>
+      <div style={{ color: tone, fontSize: 9, fontWeight: 1000 }}>{label}</div>
+      <div style={{ color: player ? "white" : "#64748b", fontSize: 12, fontWeight: 1000, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player?.name || "Empty"}</div>
+    </div>
+  )
+}
+
+function PitchBoard({ currentSlots, lineupMap, players }: { currentSlots: PitchSlot[]; lineupMap: Record<string, string | null>; players: Player[] }) {
+  const byPosition = {
+    FWD: currentSlots.filter((slot) => slot.position === "FWD"),
+    MID: currentSlots.filter((slot) => slot.position === "MID"),
+    DEF: currentSlots.filter((slot) => slot.position === "DEF"),
+    GK: currentSlots.filter((slot) => slot.position === "GK"),
+  }
 
   return (
-    <div className="sharks-glass" style={{ borderRadius: 22, padding: 12, display: "grid", gap: 10, border: "1px solid rgba(125,211,252,0.22)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-        <div>
-          <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Current Quarter</div>
-          <div style={{ color: "white", fontSize: 20, fontWeight: 1000, marginTop: 2 }}>Starting lineup</div>
+    <div className="sharks-tactical-pitch" style={{ minHeight: 360, padding: 18, display: "grid", alignContent: "space-between", gap: 12 }}>
+      {(["FWD", "MID", "DEF", "GK"] as const).map((pos) => (
+        <div key={pos} style={{ position: "relative", zIndex: 2, display: "grid", gridTemplateColumns: `repeat(${Math.max(1, byPosition[pos].length)}, minmax(0, 1fr))`, gap: 8, alignItems: "center" }}>
+          {byPosition[pos].length ? byPosition[pos].map((slot) => {
+            const player = players.find((item) => item.id === lineupMap?.[slot.id])
+            return <PlayerChip key={slot.id} player={player} label={slot.label || pos} tone={pos === "GK" ? "#facc15" : pos === "DEF" ? "#22c55e" : pos === "MID" ? "#38bdf8" : "#fb7185"} />
+          }) : <div />}
         </div>
-        <Badge tone="blue">{starters.length} on</Badge>
+      ))}
+    </div>
+  )
+}
+
+function BenchStrip({ benchPlayers }: { benchPlayers: Player[] }) {
+  return (
+    <div className="sharks-glass" style={{ borderRadius: 20, padding: 12, display: "grid", gap: 10, border: "1px solid rgba(250,204,21,0.25)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+        <div style={{ color: "#facc15", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Bench</div>
+        <Badge tone="yellow">{benchPlayers.length}</Badge>
       </div>
-
-      {starters.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 8 }}>
-          {starters.map(({ slot, player }) => (
-            <div key={slot.id} style={{ borderRadius: 14, padding: 9, background: "rgba(2,6,23,0.48)", border: "1px solid rgba(148,163,184,0.15)" }}>
-              <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000 }}>{slot.label} • {slot.position}</div>
-              <div style={{ color: "white", fontSize: 13, fontWeight: 1000, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{player?.name}</div>
-            </div>
-          ))}
+      {benchPlayers.length ? (
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
+          {benchPlayers.map((player) => <div key={player.id} style={{ flex: "0 0 auto", borderRadius: 999, padding: "9px 12px", background: "rgba(250,204,21,0.12)", border: "1px solid rgba(250,204,21,0.35)", color: "#fde68a", fontWeight: 1000, fontSize: 12 }}>{player.name}</div>)}
         </div>
-      ) : (
-        <div style={{ color: "#cbd5e1", fontWeight: 850, padding: 10 }}>No lineup selected yet.</div>
-      )}
-
-      {benchPlayers.length ? <div style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 850 }}>Bench: {benchPlayers.slice(0, 8).map((player) => player.name).join(", ")}{benchPlayers.length > 8 ? ` +${benchPlayers.length - 8}` : ""}</div> : null}
+      ) : <div style={{ color: "#94a3b8", fontWeight: 850 }}>No players on the bench.</div>}
     </div>
   )
 }
@@ -180,59 +169,56 @@ export default function MatchCenter(props: Props) {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 16, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 14, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "relative", zIndex: 1, display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ color: "#7dd3fc", fontSize: 11, fontWeight: 1000, letterSpacing: ".16em" }}>MATCHDAY COMMAND</div>
-              {trackingTitle ? <div style={{ color: "white", fontSize: 15, fontWeight: 900, marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trackingTitle}</div> : null}
+              <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".16em" }}>MATCH CENTRE</div>
+              {trackingTitle ? <div style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 900, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{trackingTitle}</div> : null}
             </div>
-            <Badge tone={running ? "green" : "default"}>{running ? "LIVE" : "PAUSED"}</Badge>
+            <Badge tone={running ? "green" : "default"}>{running ? "LIVE" : "READY"}</Badge>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: 10, alignItems: "end" }}>
-            <TeamInput value={homeTeam} disabled={!isAdmin} onChange={setHomeTeam} />
-            <div style={{ color: "#7dd3fc", fontWeight: 1000, paddingBottom: 7 }}>VS</div>
-            <TeamInput value={awayTeam} disabled={!isAdmin} align="right" onChange={setAwayTeam} />
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: 10, alignItems: "center" }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ color: "white", fontSize: 54, fontWeight: 1000, lineHeight: 1 }}>{homeScore}</div>
-              {isAdmin ? <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 8 }}><MiniScoreButton onClick={() => void setHomeScore(homeScore + 1)}>+1</MiniScoreButton><MiniScoreButton onClick={() => void setHomeScore(Math.max(0, homeScore - 1))}>-1</MiniScoreButton></div> : null}
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 94px minmax(0, 1fr)", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "grid", gap: 5, textAlign: "left" }}>
+              <TeamInput value={homeTeam} disabled={!isAdmin} onChange={setHomeTeam} />
+              <div style={{ color: "white", fontSize: 48, fontWeight: 1000, lineHeight: 1 }}>{homeScore}</div>
+              {isAdmin ? <div style={{ display: "flex", gap: 5 }}><MiniScoreButton onClick={() => void setHomeScore(homeScore + 1)}>+1</MiniScoreButton><MiniScoreButton onClick={() => void setHomeScore(Math.max(0, homeScore - 1))}>-1</MiniScoreButton></div> : null}
             </div>
 
-            <div style={{ textAlign: "center", minWidth: 102 }}>
-              <div style={{ color: "#7dd3fc", fontSize: 13, fontWeight: 1000 }}>{periodLabel}</div>
-              <div style={{ color: "white", fontSize: 38, fontWeight: 1000, lineHeight: 1.05 }}>{formatClock(seconds)}</div>
-              <div style={{ color: "#cbd5e1", fontWeight: 700, fontSize: 12, marginTop: 5 }}>{periodLength} min</div>
+            <div style={{ borderRadius: 22, padding: "10px 6px", background: "rgba(2,6,23,0.56)", border: "1px solid rgba(125,211,252,0.25)", textAlign: "center" }}>
+              <div style={{ color: "#7dd3fc", fontSize: 12, fontWeight: 1000 }}>{periodLabel}</div>
+              <div style={{ color: "white", fontSize: 30, fontWeight: 1000, lineHeight: 1.05 }}>{formatClock(seconds)}</div>
+              <div style={{ color: "#cbd5e1", fontWeight: 750, fontSize: 11, marginTop: 4 }}>{periodLength} min</div>
             </div>
 
-            <div style={{ textAlign: "center" }}>
-              <div style={{ color: "white", fontSize: 54, fontWeight: 1000, lineHeight: 1 }}>{awayScore}</div>
-              {isAdmin ? <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 8 }}><MiniScoreButton onClick={() => void setAwayScore(awayScore + 1)}>+1</MiniScoreButton><MiniScoreButton onClick={() => void setAwayScore(Math.max(0, awayScore - 1))}>-1</MiniScoreButton></div> : null}
+            <div style={{ display: "grid", gap: 5, textAlign: "right" }}>
+              <TeamInput value={awayTeam} disabled={!isAdmin} align="right" onChange={setAwayTeam} />
+              <div style={{ color: "white", fontSize: 48, fontWeight: 1000, lineHeight: 1 }}>{awayScore}</div>
+              {isAdmin ? <div style={{ display: "flex", justifyContent: "end", gap: 5 }}><MiniScoreButton onClick={() => void setAwayScore(awayScore + 1)}>+1</MiniScoreButton><MiniScoreButton onClick={() => void setAwayScore(Math.max(0, awayScore - 1))}>-1</MiniScoreButton></div> : null}
             </div>
-          </div>
-
-          <LineupStrip currentSlots={currentSlots} lineupMap={lineupMap} players={players} benchPlayers={benchPlayers} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
-            <MetricCard label="Format" value={matchFormat} />
-            <MetricCard label="Shape" value={formation} />
-            <MetricCard label="On" value={lineupPlayers.length} />
-            <MetricCard label="Bench" value={benchPlayers.length} />
           </div>
 
           {isAdmin ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 7 }}>
               <PrimaryButton onClick={() => setRunning(true)}>Start</PrimaryButton>
               <SecondaryButton onClick={() => setRunning(false)}>Pause</SecondaryButton>
               <SecondaryButton onClick={resetClock}>Reset</SecondaryButton>
               <DangerButton onClick={() => void onEndGame()}>End</DangerButton>
             </div>
           ) : null}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 7 }}>
+            <MetricCard label="Format" value={matchFormat} />
+            <MetricCard label="Shape" value={formation} />
+            <MetricCard label="On" value={lineupPlayers.length} colour="#22c55e" />
+            <MetricCard label="Bench" value={benchPlayers.length} colour="#facc15" />
+          </div>
         </div>
       </div>
+
+      <PitchBoard currentSlots={currentSlots} lineupMap={lineupMap} players={players} />
+      <BenchStrip benchPlayers={benchPlayers} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 6 }}>
         {[["overview", "Control"], ["lineup", "Lineup"], ["live", "Live"], ["quarters", periodsTabLabel], ["stats", "Stats"]].map(([value, label]) => (
@@ -262,7 +248,6 @@ export default function MatchCenter(props: Props) {
             </div>
             {isAdmin ? <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}><input value={lineupName} onChange={(event) => setLineupName(event.target.value)} placeholder="Save lineup name" style={{ padding: 12, borderRadius: 15, background: "rgba(2,6,23,0.58)", color: "white", border: "1px solid rgba(148,163,184,0.22)" }} /><div style={{ width: 100 }}><PrimaryButton onClick={() => void onSaveLineup()}>Save</PrimaryButton></div></div> : null}
           </PageCard>
-
           {savedLineups?.length ? <PageCard><SectionHeader title="Saved Lineups" subtitle="Quickly load a previous setup." /><div style={{ display: "grid", gap: 10 }}>{savedLineups.map((item: any) => <div key={item.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center", borderRadius: 16, padding: 10, background: "rgba(15,23,42,0.66)", border: "1px solid rgba(148,163,184,0.18)" }}><div><div style={{ color: "white", fontWeight: 1000 }}>{item.name}</div><div style={{ color: "#aebed4", fontSize: 12 }}>{item.format} • {item.formation}</div></div><SecondaryButton onClick={() => void onLoadSavedLineup(item.id)}>Load</SecondaryButton>{isAdmin ? <DangerButton onClick={() => void onDeleteSavedLineup(item.id)}>Delete</DangerButton> : null}</div>)}</div></PageCard> : null}
         </div>
       ) : null}
@@ -275,7 +260,6 @@ export default function MatchCenter(props: Props) {
       ) : null}
 
       {matchTab === "quarters" ? <PageCard tone="softYellow"><SectionHeader title={periodMode === "quarters" ? "Quarter Summary" : "Half Summary"} subtitle="Use the planner below to save, load and auto-generate plans." /></PageCard> : null}
-
       {matchTab === "stats" ? <PageCard><SectionHeader title="Match Stats" subtitle="Player minute totals for the active game." /><div style={{ display: "grid", gap: 8 }}>{players.map((player: Player) => <PlayerRow key={player.id} player={player} subtitle={`Live ${formatMinutes(liveSecondsMap[player.id] || 0)}m • Season ${formatMinutes(player.seasonSeconds || 0)}m`} />)}</div></PageCard> : null}
     </div>
   )
