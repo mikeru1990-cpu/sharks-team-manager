@@ -1,9 +1,9 @@
 "use client"
 
+import { useEffect, useMemo } from "react"
 import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
 import MatchReportGenerator from "../MatchReportGenerator"
-import PlayerFeedbackCard from "../PlayerFeedbackCard"
 import { PageCard, SectionHeader, Badge } from "../ui"
 import type {
   Coach,
@@ -18,8 +18,6 @@ import type {
   TimelineItem,
 } from "../../lib/types"
 import type { EventWithPlan, PeriodMode } from "../../lib/dashboardTypes"
-
-type OverallStatus = "developing" | "improving" | "strong"
 
 type Props = {
   isAdmin: boolean
@@ -99,26 +97,51 @@ type Props = {
   saveMatchReport: (coachNotes: string) => Promise<void>
 }
 
-function mapRatingToOverall(rating?: number): OverallStatus | null {
-  if (typeof rating !== "number") return null
-  if (rating <= 5) return "developing"
-  if (rating <= 7) return "improving"
-  return "strong"
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
 }
 
-function mapOverallToRating(status: OverallStatus | null): number {
-  if (status === "developing") return 4
-  if (status === "improving") return 7
-  return 9
+function startOfWeek(date = new Date()) {
+  const copy = new Date(date)
+  const day = copy.getDay() || 7
+  copy.setDate(copy.getDate() - day + 1)
+  copy.setHours(0, 0, 0, 0)
+  return copy
 }
 
-function parseExistingFeedback(notes?: string) {
-  const text = notes || ""
-  return {
-    strengthArea: text.match(/Strength:\s*(.*)/i)?.[1]?.trim() || "",
-    focusArea: text.match(/Focus:\s*(.*)/i)?.[1]?.trim() || "",
-    coachNote: text.match(/Coach note:\s*([\s\S]*)/i)?.[1]?.trim() || "",
+function toLocalDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function getWeekWindow() {
+  const start = startOfWeek()
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { start: toLocalDate(start), end: toLocalDate(end) }
+}
+
+function formatShortDate(date: string) {
+  try {
+    return new Date(`${date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" })
+  } catch {
+    return date
   }
+}
+
+function isThisWeek(event: EventWithPlan) {
+  const { start, end } = getWeekWindow()
+  return event.date >= start && event.date <= end
+}
+
+function getSmartMatch(events: EventWithPlan[]) {
+  const today = localToday()
+  const matchEvents = events.filter((event) => event.type === "match")
+  const thisWeek = matchEvents.filter(isThisWeek).sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`))
+  const todayMatch = thisWeek.find((event) => event.date === today)
+  const upcomingThisWeek = thisWeek.find((event) => event.date >= today)
+  const nextUpcoming = matchEvents.filter((event) => event.date >= today).sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`))[0]
+  return todayMatch || upcomingThisWeek || thisWeek[0] || nextUpcoming || matchEvents[0] || null
 }
 
 function AlertStrip({ tone, children }: { tone: "danger" | "warning"; children: React.ReactNode }) {
@@ -130,17 +153,46 @@ function AlertStrip({ tone, children }: { tone: "danger" | "warning"; children: 
   )
 }
 
-function CompactMatchSelector({ events, activeMatchEventId, setActiveMatchEventId, persistSettings }: Pick<Props, "events" | "activeMatchEventId" | "setActiveMatchEventId" | "persistSettings">) {
+function MatchWeekBanner({ event }: { event: EventWithPlan | null }) {
+  if (!event) {
+    return (
+      <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 5, border: "1px solid rgba(245,158,11,0.30)" }}>
+        <div style={{ color: "#facc15", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>No match this week</div>
+        <div style={{ color: "white", fontWeight: 1000, fontSize: 18 }}>Matchday is clear</div>
+        <div style={{ color: "#cbd5e1", fontWeight: 750, fontSize: 13 }}>Create a fixture in Events and it will appear here automatically.</div>
+      </div>
+    )
+  }
+
+  const today = localToday()
+  const label = event.date === today ? "Match Today" : isThisWeek(event) ? "This Week's Match" : "Next Fixture"
+
+  return (
+    <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 7, border: event.date === today ? "1px solid rgba(34,197,94,0.46)" : "1px solid rgba(125,211,252,0.28)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+        <div style={{ color: event.date === today ? "#86efac" : "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>{label}</div>
+        <Badge tone={event.date === today ? "green" : "blue"}>{formatShortDate(event.date)}{event.startTime ? ` • ${event.startTime}` : ""}</Badge>
+      </div>
+      <div style={{ color: "white", fontWeight: 1000, fontSize: 19, lineHeight: 1.15 }}>{event.title}</div>
+      {event.opponent ? <div style={{ color: "#cbd5e1", fontWeight: 850, fontSize: 13 }}>vs {event.opponent}</div> : null}
+    </div>
+  )
+}
+
+function CompactMatchSelector({ events, activeMatchEventId, setActiveMatchEventId, persistSettings, smartMatch }: Pick<Props, "events" | "activeMatchEventId" | "setActiveMatchEventId" | "persistSettings"> & { smartMatch: EventWithPlan | null }) {
   const matchEvents = events.filter((event) => event.type === "match")
+  const thisWeek = matchEvents.filter(isThisWeek)
+  const otherMatches = matchEvents.filter((event) => !isThisWeek(event))
+
   if (matchEvents.length === 0) {
     return <AlertStrip tone="warning">No match events created yet. Add one from Events.</AlertStrip>
   }
 
   return (
     <div className="sharks-glass" style={{ borderRadius: 20, padding: 10, display: "grid", gap: 7, border: "1px solid rgba(125,211,252,0.18)" }}>
-      <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Active match</div>
+      <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Matchday fixture</div>
       <select
-        value={activeMatchEventId || ""}
+        value={activeMatchEventId || smartMatch?.id || ""}
         onChange={(event) => {
           const value = event.target.value || null
           setActiveMatchEventId(value)
@@ -149,9 +201,8 @@ function CompactMatchSelector({ events, activeMatchEventId, setActiveMatchEventI
         style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(125,211,252,0.24)", fontSize: 15, width: "100%", background: "rgba(2,6,23,0.66)", color: "white", fontWeight: 900 }}
       >
         <option value="">Choose match event</option>
-        {matchEvents.slice().sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`)).map((event) => (
-          <option key={event.id} value={event.id}>{event.date} • {event.startTime || "00:00"} • {event.title}</option>
-        ))}
+        {thisWeek.length ? <optgroup label="This week">{thisWeek.map((event) => <option key={event.id} value={event.id}>{formatShortDate(event.date)} • {event.startTime || "00:00"} • {event.title}</option>)}</optgroup> : null}
+        {otherMatches.length ? <optgroup label="Other matches">{otherMatches.slice().sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`)).map((event) => <option key={event.id} value={event.id}>{formatShortDate(event.date)} • {event.startTime || "00:00"} • {event.title}</option>)}</optgroup> : null}
       </select>
     </div>
   )
@@ -161,7 +212,7 @@ export default function MatchTabContent(props: Props) {
   const {
     isAdmin, matchTab, setMatchTab, events, activeMatchEventId, setActiveMatchEventId, activeMatchEvent,
     matchPlayers, maybePlayers, unavailablePlayers, noAvailableKeeper, persistSettings,
-    availableCoaches, unavailableCoachesList, holidayCoachesList, headCoachAvailable, noAvailableCoaches,
+    availableCoaches, headCoachAvailable, noAvailableCoaches,
     matchFormat, formation, currentSlots, lineupMap, benchIds, homeTeam, awayTeam, homeScore, awayScore, seconds, running,
     liveSecondsMap, timeline, savedLineups, lineupName, setLineupName, activeDragPlayerId, setActiveDragPlayerId,
     setHomeTeamState, setAwayTeamState, setHomeScoreState, setAwayScoreState, setRunning, setSeconds, setLiveSecondsMap,
@@ -169,12 +220,25 @@ export default function MatchTabContent(props: Props) {
     handleDragStart, handleDragEnd, openCreateEvent, openEditEvent, handleDeleteTimelineItem, handleEndGame,
     periodMode, periodLength, currentQuarter, setCurrentQuarterState, setPeriodModeState, setPeriodLengthState,
     quarterPlans, quarterWarnings, handleSaveCurrentQuarter, handleLoadQuarter, handleAutoGenerate,
-    playerRatings, savePlayerRating, playerOfMatchMap, players, activeTopPerformers, activeGoalsSummary, latestActiveMatchReport, saveMatchReport,
+    playerOfMatchMap, players, activeTopPerformers, activeGoalsSummary, latestActiveMatchReport, saveMatchReport,
   } = props
+
+  const smartMatch = useMemo(() => getSmartMatch(events), [events])
+  const shouldShowPostMatch = Boolean(activeMatchEvent && !running && (homeScore > 0 || awayScore > 0 || timeline.length > 0 || latestActiveMatchReport))
+
+  useEffect(() => {
+    const current = events.find((event) => event.id === activeMatchEventId) || null
+    const currentIsRelevant = current && current.type === "match" && (isThisWeek(current) || current.date >= localToday())
+    if (!running && smartMatch && (!current || !currentIsRelevant)) {
+      setActiveMatchEventId(smartMatch.id)
+      void persistSettings({ activeMatchEventId: smartMatch.id })
+    }
+  }, [events, activeMatchEventId, running, smartMatch, setActiveMatchEventId, persistSettings])
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <CompactMatchSelector events={events} activeMatchEventId={activeMatchEventId} setActiveMatchEventId={setActiveMatchEventId} persistSettings={persistSettings} />
+      <MatchWeekBanner event={activeMatchEvent || smartMatch} />
+      <CompactMatchSelector events={events} activeMatchEventId={activeMatchEventId} setActiveMatchEventId={setActiveMatchEventId} persistSettings={persistSettings} smartMatch={smartMatch} />
 
       {activeMatchEvent ? (
         <div style={{ display: "grid", gap: 8 }}>
@@ -248,22 +312,17 @@ export default function MatchTabContent(props: Props) {
 
       {matchTab === "quarters" ? <QuarterPlanner isAdmin={isAdmin} currentQuarter={currentQuarter} setCurrentQuarter={(q) => { setCurrentQuarterState(q); void persistMatchState({ currentPeriod: q }) }} quarterPlans={quarterPlans} quarterWarnings={quarterWarnings} currentSlots={currentSlots} players={matchPlayers} lineupMap={lineupMap} benchIds={benchIds} onSaveCurrentQuarter={handleSaveCurrentQuarter} onLoadQuarter={handleLoadQuarter} onAutoGenerate={handleAutoGenerate} periodMode={periodMode} periodLength={periodLength} /> : null}
 
-      <PageCard>
-        <SectionHeader title="Player Feedback" subtitle="Development-focused notes instead of match ratings." />
-        {!activeMatchEvent ? <div style={{ color: "#64748b" }}>Choose an active match event to record player feedback.</div> : matchPlayers.length === 0 ? <div style={{ color: "#64748b" }}>No available players for the selected match.</div> : (
-          <div style={{ display: "grid", gap: 14 }}>
-            {matchPlayers.map((player) => {
-              const existing = playerRatings.find((item) => item.eventId === activeMatchEventId && item.playerId === player.id)
-              const parsed = parseExistingFeedback(existing?.notes)
-              return <PlayerFeedbackCard key={player.id} playerName={player.name} initialValue={{ overallStatus: mapRatingToOverall(existing?.rating), strengthArea: parsed.strengthArea, focusArea: parsed.focusArea, coachNote: parsed.coachNote }} onSave={async (value) => { if (!value.overallStatus) { window.alert("Please choose Overall today before saving."); return } await savePlayerRating(player.id, mapOverallToRating(value.overallStatus), [`Strength: ${value.strengthArea || ""}`, `Focus: ${value.focusArea || ""}`, `Coach note: ${value.coachNote || ""}`].join("\n")) }} />
-            })}
+      {shouldShowPostMatch ? (
+        <PageCard tone="softYellow">
+          <SectionHeader title="Post-Match Summary" subtitle="Feedback and match report after the game." />
+          <div style={{ display: "grid", gap: 10 }}>
+            {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? <div style={{ color: "#92400e", fontWeight: 900 }}>Player of the Match: {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}</div> : null}
+            <div style={{ color: "#92400e", fontWeight: 800 }}>Player feedback has been moved out of live Matchday so the match screen stays focused while the game is running.</div>
           </div>
-        )}
-      </PageCard>
+        </PageCard>
+      ) : null}
 
-      {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? <PageCard tone="softYellow"><SectionHeader title="Player of the Match" /><div style={{ color: "#92400e", fontWeight: 800 }}>{players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}</div></PageCard> : null}
-
-      {activeMatchEvent ? <MatchReportGenerator isAdmin={isAdmin} activeMatchTitle={activeMatchEvent.title} activeMatchDate={activeMatchEvent.date} opponent={activeMatchEvent.opponent || awayTeam} scoreLine={`${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`} playerOfTheMatch={players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || ""} topPerformers={activeTopPerformers} goalsSummary={activeGoalsSummary} onSaveReport={saveMatchReport} latestReport={latestActiveMatchReport} /> : null}
+      {shouldShowPostMatch && activeMatchEvent ? <MatchReportGenerator isAdmin={isAdmin} activeMatchTitle={activeMatchEvent.title} activeMatchDate={activeMatchEvent.date} opponent={activeMatchEvent.opponent || awayTeam} scoreLine={`${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`} playerOfTheMatch={players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || ""} topPerformers={activeTopPerformers} goalsSummary={activeGoalsSummary} onSaveReport={saveMatchReport} latestReport={latestActiveMatchReport} /> : null}
     </div>
   )
 }
