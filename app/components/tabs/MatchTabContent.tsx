@@ -1,22 +1,11 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import QuarterPlanner from "../QuarterPlanner"
 import MatchCenter from "../MatchCenter"
 import MatchReportGenerator from "../MatchReportGenerator"
-import { PageCard, SectionHeader, Badge } from "../ui"
-import type {
-  Coach,
-  MatchFormat,
-  MatchReport,
-  MatchTab,
-  PitchSlot,
-  Player,
-  PlayerMatchRating,
-  QuarterPlan,
-  SavedLineup,
-  TimelineItem,
-} from "../../lib/types"
+import { PageCard, SectionHeader, Badge, SecondaryButton } from "../ui"
+import type { Coach, MatchFormat, MatchReport, MatchTab, PitchSlot, Player, PlayerMatchRating, QuarterPlan, SavedLineup, TimelineItem } from "../../lib/types"
 import type { EventWithPlan, PeriodMode } from "../../lib/dashboardTypes"
 
 type Props = {
@@ -146,60 +135,27 @@ function getSmartMatch(events: EventWithPlan[]) {
 
 function AlertStrip({ tone, children }: { tone: "danger" | "warning"; children: React.ReactNode }) {
   const colour = tone === "danger" ? "#fb7185" : "#f59e0b"
-  return (
-    <div style={{ borderRadius: 16, padding: "11px 12px", background: `${colour}18`, border: `1px solid ${colour}66`, color: tone === "danger" ? "#fecdd3" : "#fde68a", fontWeight: 900, fontSize: 13 }}>
-      {children}
-    </div>
-  )
+  return <div style={{ borderRadius: 16, padding: "11px 12px", background: `${colour}18`, border: `1px solid ${colour}66`, color: tone === "danger" ? "#fecdd3" : "#fde68a", fontWeight: 900, fontSize: 13 }}>{children}</div>
 }
 
 function MatchWeekBanner({ event }: { event: EventWithPlan | null }) {
   if (!event) {
-    return (
-      <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 5, border: "1px solid rgba(245,158,11,0.30)" }}>
-        <div style={{ color: "#facc15", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>No match this week</div>
-        <div style={{ color: "white", fontWeight: 1000, fontSize: 18 }}>Matchday is clear</div>
-        <div style={{ color: "#cbd5e1", fontWeight: 750, fontSize: 13 }}>Create a fixture in Events and it will appear here automatically.</div>
-      </div>
-    )
+    return <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 5, border: "1px solid rgba(245,158,11,0.30)" }}><div style={{ color: "#facc15", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>No match this week</div><div style={{ color: "white", fontWeight: 1000, fontSize: 18 }}>Matchday is clear</div><div style={{ color: "#cbd5e1", fontWeight: 750, fontSize: 13 }}>Create a fixture in Events and it will appear here automatically.</div></div>
   }
-
   const today = localToday()
   const label = event.date === today ? "Match Today" : isThisWeek(event) ? "This Week's Match" : "Next Fixture"
-
-  return (
-    <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 7, border: event.date === today ? "1px solid rgba(34,197,94,0.46)" : "1px solid rgba(125,211,252,0.28)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-        <div style={{ color: event.date === today ? "#86efac" : "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>{label}</div>
-        <Badge tone={event.date === today ? "green" : "blue"}>{formatShortDate(event.date)}{event.startTime ? ` • ${event.startTime}` : ""}</Badge>
-      </div>
-      <div style={{ color: "white", fontWeight: 1000, fontSize: 19, lineHeight: 1.15 }}>{event.title}</div>
-      {event.opponent ? <div style={{ color: "#cbd5e1", fontWeight: 850, fontSize: 13 }}>vs {event.opponent}</div> : null}
-    </div>
-  )
+  return <div className="sharks-glass" style={{ borderRadius: 20, padding: 14, display: "grid", gap: 7, border: event.date === today ? "1px solid rgba(34,197,94,0.46)" : "1px solid rgba(125,211,252,0.28)" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}><div style={{ color: event.date === today ? "#86efac" : "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>{label}</div><Badge tone={event.date === today ? "green" : "blue"}>{formatShortDate(event.date)}{event.startTime ? ` • ${event.startTime}` : ""}</Badge></div><div style={{ color: "white", fontWeight: 1000, fontSize: 19, lineHeight: 1.15 }}>{event.title}</div>{event.opponent ? <div style={{ color: "#cbd5e1", fontWeight: 850, fontSize: 13 }}>vs {event.opponent}</div> : null}</div>
 }
 
 function CompactMatchSelector({ events, activeMatchEventId, setActiveMatchEventId, persistSettings, smartMatch }: Pick<Props, "events" | "activeMatchEventId" | "setActiveMatchEventId" | "persistSettings"> & { smartMatch: EventWithPlan | null }) {
   const matchEvents = events.filter((event) => event.type === "match")
   const thisWeek = matchEvents.filter(isThisWeek)
   const otherMatches = matchEvents.filter((event) => !isThisWeek(event))
-
-  if (matchEvents.length === 0) {
-    return <AlertStrip tone="warning">No match events created yet. Add one from Events.</AlertStrip>
-  }
-
+  if (matchEvents.length === 0) return <AlertStrip tone="warning">No match events created yet. Add one from Events.</AlertStrip>
   return (
     <div className="sharks-glass" style={{ borderRadius: 20, padding: 10, display: "grid", gap: 7, border: "1px solid rgba(125,211,252,0.18)" }}>
       <div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".14em", textTransform: "uppercase" }}>Matchday fixture</div>
-      <select
-        value={activeMatchEventId || smartMatch?.id || ""}
-        onChange={(event) => {
-          const value = event.target.value || null
-          setActiveMatchEventId(value)
-          void persistSettings({ activeMatchEventId: value })
-        }}
-        style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(125,211,252,0.24)", fontSize: 15, width: "100%", background: "rgba(2,6,23,0.66)", color: "white", fontWeight: 900 }}
-      >
+      <select value={activeMatchEventId || smartMatch?.id || ""} onChange={(event) => { const value = event.target.value || null; setActiveMatchEventId(value); void persistSettings({ activeMatchEventId: value }) }} style={{ padding: 12, borderRadius: 16, border: "1px solid rgba(125,211,252,0.24)", fontSize: 15, width: "100%", background: "rgba(2,6,23,0.66)", color: "white", fontWeight: 900 }}>
         <option value="">Choose match event</option>
         {thisWeek.length ? <optgroup label="This week">{thisWeek.map((event) => <option key={event.id} value={event.id}>{formatShortDate(event.date)} • {event.startTime || "00:00"} • {event.title}</option>)}</optgroup> : null}
         {otherMatches.length ? <optgroup label="Other matches">{otherMatches.slice().sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`)).map((event) => <option key={event.id} value={event.id}>{formatShortDate(event.date)} • {event.startTime || "00:00"} • {event.title}</option>)}</optgroup> : null}
@@ -208,23 +164,44 @@ function CompactMatchSelector({ events, activeMatchEventId, setActiveMatchEventI
   )
 }
 
-export default function MatchTabContent(props: Props) {
-  const {
-    isAdmin, matchTab, setMatchTab, events, activeMatchEventId, setActiveMatchEventId, activeMatchEvent,
-    matchPlayers, maybePlayers, unavailablePlayers, noAvailableKeeper, persistSettings,
-    availableCoaches, headCoachAvailable, noAvailableCoaches,
-    matchFormat, formation, currentSlots, lineupMap, benchIds, homeTeam, awayTeam, homeScore, awayScore, seconds, running,
-    liveSecondsMap, timeline, savedLineups, lineupName, setLineupName, activeDragPlayerId, setActiveDragPlayerId,
-    setHomeTeamState, setAwayTeamState, setHomeScoreState, setAwayScoreState, setRunning, setSeconds, setLiveSecondsMap,
-    persistMatchState, handleSaveMinutes, handleChangeFormation, handleSaveLineup, handleLoadSavedLineup, handleDeleteSavedLineup,
-    handleDragStart, handleDragEnd, openCreateEvent, openEditEvent, handleDeleteTimelineItem, handleEndGame,
-    periodMode, periodLength, currentQuarter, setCurrentQuarterState, setPeriodModeState, setPeriodLengthState,
-    quarterPlans, quarterWarnings, handleSaveCurrentQuarter, handleLoadQuarter, handleAutoGenerate,
-    playerOfMatchMap, players, activeTopPerformers, activeGoalsSummary, latestActiveMatchReport, saveMatchReport,
-  } = props
+function goalsByPlayer(timeline: TimelineItem[]) {
+  const counts: Record<string, number> = {}
+  timeline.filter((item) => item.type === "goal").forEach((item) => {
+    const name = item.text.split(" scored")[0].replace(/^.*-\s*/, "").trim() || item.text
+    counts[name] = (counts[name] || 0) + 1
+  })
+  return counts
+}
 
+function ParentReportCard({ event, homeTeam, awayTeam, homeScore, awayScore, timeline, playerOfTheMatch }: { event: EventWithPlan; homeTeam: string; awayTeam: string; homeScore: number; awayScore: number; timeline: TimelineItem[]; playerOfTheMatch?: string }) {
+  const [copied, setCopied] = useState(false)
+  const goals = goalsByPlayer(timeline)
+  const goalLines = Object.keys(goals).length ? Object.entries(goals).map(([name, count]) => `⚽ ${name}${count > 1 ? ` x${count}` : ""}`) : ["Goals: none logged"]
+  const text = [`⚽ Match Report`, ``, `${homeTeam} ${homeScore}-${awayScore} ${awayTeam}`, ``, `Date: ${formatShortDate(event.date)}`, event.opponent ? `Opponent: ${event.opponent}` : "", ``, `Goals:`, ...goalLines, ``, playerOfTheMatch ? `🏆 Player of the Match: ${playerOfTheMatch}` : "🏆 Player of the Match: TBC", ``, `Fantastic effort from the team today. Well done everyone!`].filter(Boolean).join("\n")
+
+  async function copyReport() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      window.prompt("Copy match report", text)
+    }
+  }
+
+  return (
+    <PageCard>
+      <SectionHeader title="Parent WhatsApp Report" subtitle="Ready to copy after the match." action={<div style={{ minWidth: 120 }}><SecondaryButton onClick={() => void copyReport()}>{copied ? "Copied" : "Copy"}</SecondaryButton></div>} />
+      <pre style={{ whiteSpace: "pre-wrap", margin: 0, color: "#e5eefc", background: "rgba(2,6,23,0.55)", border: "1px solid rgba(125,211,252,0.18)", borderRadius: 18, padding: 14, fontFamily: "inherit", fontWeight: 800, lineHeight: 1.45 }}>{text}</pre>
+    </PageCard>
+  )
+}
+
+export default function MatchTabContent(props: Props) {
+  const { isAdmin, matchTab, setMatchTab, events, activeMatchEventId, setActiveMatchEventId, activeMatchEvent, matchPlayers, maybePlayers, unavailablePlayers, noAvailableKeeper, persistSettings, availableCoaches, headCoachAvailable, noAvailableCoaches, matchFormat, formation, currentSlots, lineupMap, benchIds, homeTeam, awayTeam, homeScore, awayScore, seconds, running, liveSecondsMap, timeline, savedLineups, lineupName, setLineupName, activeDragPlayerId, setActiveDragPlayerId, setHomeTeamState, setAwayTeamState, setHomeScoreState, setAwayScoreState, setRunning, setSeconds, setLiveSecondsMap, persistMatchState, handleSaveMinutes, handleChangeFormation, handleSaveLineup, handleLoadSavedLineup, handleDeleteSavedLineup, handleDragStart, handleDragEnd, openCreateEvent, openEditEvent, handleDeleteTimelineItem, handleEndGame, periodMode, periodLength, currentQuarter, setCurrentQuarterState, setPeriodModeState, setPeriodLengthState, quarterPlans, quarterWarnings, handleSaveCurrentQuarter, handleLoadQuarter, handleAutoGenerate, playerOfMatchMap, players, activeTopPerformers, activeGoalsSummary, latestActiveMatchReport, saveMatchReport } = props
   const smartMatch = useMemo(() => getSmartMatch(events), [events])
   const shouldShowPostMatch = Boolean(activeMatchEvent && !running && (homeScore > 0 || awayScore > 0 || timeline.length > 0 || latestActiveMatchReport))
+  const playerOfMatchName = activeMatchEvent ? players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || "" : ""
 
   useEffect(() => {
     const current = events.find((event) => event.id === activeMatchEventId) || null
@@ -240,89 +217,15 @@ export default function MatchTabContent(props: Props) {
       <MatchWeekBanner event={activeMatchEvent || smartMatch} />
       <CompactMatchSelector events={events} activeMatchEventId={activeMatchEventId} setActiveMatchEventId={setActiveMatchEventId} persistSettings={persistSettings} smartMatch={smartMatch} />
 
-      {activeMatchEvent ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
-            {[
-              ["Available", matchPlayers.length, "#22c55e"],
-              ["Maybe", maybePlayers.length, "#f59e0b"],
-              ["Out", unavailablePlayers.length, "#ef4444"],
-              ["Coaches", availableCoaches.length, "#38bdf8"],
-            ].map(([label, value, colour]) => (
-              <div key={String(label)} style={{ borderRadius: 16, padding: 10, background: "rgba(2,6,23,0.48)", border: `1px solid ${colour}55`, minWidth: 0 }}>
-                <div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 1000, letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div>
-                <div style={{ color: String(colour), fontSize: 24, fontWeight: 1000, lineHeight: 1, marginTop: 4 }}>{String(value)}</div>
-              </div>
-            ))}
-          </div>
-          {noAvailableKeeper ? <AlertStrip tone="danger">No available goalkeeper is marked for this match.</AlertStrip> : null}
-          {noAvailableCoaches ? <AlertStrip tone="danger">No coaches are available for this day.</AlertStrip> : null}
-          {!headCoachAvailable ? <AlertStrip tone="warning">No Head Coach is marked as available.</AlertStrip> : null}
-        </div>
-      ) : null}
+      {activeMatchEvent ? <div style={{ display: "grid", gap: 8 }}><div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>{[["Available", matchPlayers.length, "#22c55e"], ["Maybe", maybePlayers.length, "#f59e0b"], ["Out", unavailablePlayers.length, "#ef4444"], ["Coaches", availableCoaches.length, "#38bdf8"]].map(([label, value, colour]) => <div key={String(label)} style={{ borderRadius: 16, padding: 10, background: "rgba(2,6,23,0.48)", border: `1px solid ${colour}55`, minWidth: 0 }}><div style={{ color: "#94a3b8", fontSize: 9, fontWeight: 1000, letterSpacing: ".08em", textTransform: "uppercase" }}>{label}</div><div style={{ color: String(colour), fontSize: 24, fontWeight: 1000, lineHeight: 1, marginTop: 4 }}>{String(value)}</div></div>)}</div>{noAvailableKeeper ? <AlertStrip tone="danger">No available goalkeeper is marked for this match.</AlertStrip> : null}{noAvailableCoaches ? <AlertStrip tone="danger">No coaches are available for this day.</AlertStrip> : null}{!headCoachAvailable ? <AlertStrip tone="warning">No Head Coach is marked as available.</AlertStrip> : null}</div> : null}
 
-      <MatchCenter
-        isAdmin={isAdmin}
-        matchTab={matchTab}
-        setMatchTab={setMatchTab}
-        matchFormat={matchFormat}
-        formation={formation}
-        currentSlots={currentSlots}
-        players={matchPlayers}
-        lineupMap={lineupMap}
-        benchIds={benchIds}
-        homeTeam={homeTeam}
-        awayTeam={awayTeam}
-        homeScore={homeScore}
-        awayScore={awayScore}
-        seconds={seconds}
-        running={running}
-        liveSecondsMap={liveSecondsMap}
-        timeline={timeline}
-        savedLineups={savedLineups}
-        lineupName={lineupName}
-        setLineupName={setLineupName}
-        activeDragPlayerId={activeDragPlayerId}
-        setActiveDragPlayerId={setActiveDragPlayerId}
-        setHomeTeam={async (value: string) => { setHomeTeamState(value); await persistMatchState({ homeTeam: value }) }}
-        setAwayTeam={async (value: string) => { setAwayTeamState(value); await persistMatchState({ awayTeam: value }) }}
-        setHomeScore={async (value: number) => { setHomeScoreState(value); await persistMatchState({ homeScore: value }) }}
-        setAwayScore={async (value: number) => { setAwayScoreState(value); await persistMatchState({ awayScore: value }) }}
-        setRunning={(value: boolean) => { setRunning(value); void persistMatchState({ running: value }) }}
-        resetClock={() => { setRunning(false); setSeconds(0); setLiveSecondsMap({}); void persistMatchState({ running: false, seconds: 0, liveSecondsMap: {} }) }}
-        saveMinutes={handleSaveMinutes}
-        onChangeFormation={handleChangeFormation}
-        onSaveLineup={handleSaveLineup}
-        onLoadSavedLineup={handleLoadSavedLineup}
-        onDeleteSavedLineup={handleDeleteSavedLineup}
-        onDragStartExternal={handleDragStart}
-        onDragEndExternal={handleDragEnd}
-        onOpenCreateEvent={openCreateEvent}
-        onOpenEditEvent={openEditEvent}
-        onDeleteTimelineItem={handleDeleteTimelineItem}
-        onEndGame={handleEndGame}
-        periodMode={periodMode}
-        periodLength={periodLength}
-        currentPeriod={currentQuarter}
-        setCurrentPeriod={(value: number) => { setCurrentQuarterState(value); void persistMatchState({ currentPeriod: value }) }}
-        setPeriodMode={async (value: PeriodMode) => { setPeriodModeState(value); setCurrentQuarterState(1); await persistMatchState({ periodMode: value, currentPeriod: 1 }) }}
-        setPeriodLength={async (value: number) => { const nextValue = Math.max(1, value || 1); setPeriodLengthState(nextValue); await persistMatchState({ periodLength: nextValue }) }}
-        trackingTitle={activeMatchEvent ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}` : ""}
-      />
+      <MatchCenter isAdmin={isAdmin} matchTab={matchTab} setMatchTab={setMatchTab} matchFormat={matchFormat} formation={formation} currentSlots={currentSlots} players={matchPlayers} lineupMap={lineupMap} benchIds={benchIds} homeTeam={homeTeam} awayTeam={awayTeam} homeScore={homeScore} awayScore={awayScore} seconds={seconds} running={running} liveSecondsMap={liveSecondsMap} timeline={timeline} savedLineups={savedLineups} lineupName={lineupName} setLineupName={setLineupName} activeDragPlayerId={activeDragPlayerId} setActiveDragPlayerId={setActiveDragPlayerId} setHomeTeam={async (value: string) => { setHomeTeamState(value); await persistMatchState({ homeTeam: value }) }} setAwayTeam={async (value: string) => { setAwayTeamState(value); await persistMatchState({ awayTeam: value }) }} setHomeScore={async (value: number) => { setHomeScoreState(value); await persistMatchState({ homeScore: value }) }} setAwayScore={async (value: number) => { setAwayScoreState(value); await persistMatchState({ awayScore: value }) }} setRunning={(value: boolean) => { setRunning(value); void persistMatchState({ running: value }) }} resetClock={() => { setRunning(false); setSeconds(0); setLiveSecondsMap({}); void persistMatchState({ running: false, seconds: 0, liveSecondsMap: {} }) }} saveMinutes={handleSaveMinutes} onChangeFormation={handleChangeFormation} onSaveLineup={handleSaveLineup} onLoadSavedLineup={handleLoadSavedLineup} onDeleteSavedLineup={handleDeleteSavedLineup} onDragStartExternal={handleDragStart} onDragEndExternal={handleDragEnd} onOpenCreateEvent={openCreateEvent} onOpenEditEvent={openEditEvent} onDeleteTimelineItem={handleDeleteTimelineItem} onEndGame={handleEndGame} periodMode={periodMode} periodLength={periodLength} currentPeriod={currentQuarter} setCurrentPeriod={(value: number) => { setCurrentQuarterState(value); void persistMatchState({ currentPeriod: value }) }} setPeriodMode={async (value: PeriodMode) => { setPeriodModeState(value); setCurrentQuarterState(1); await persistMatchState({ periodMode: value, currentPeriod: 1 }) }} setPeriodLength={async (value: number) => { const nextValue = Math.max(1, value || 1); setPeriodLengthState(nextValue); await persistMatchState({ periodLength: nextValue }) }} trackingTitle={activeMatchEvent ? `${activeMatchEvent.title}${activeMatchEvent.startTime ? ` • ${activeMatchEvent.startTime}` : ""}` : ""} />
 
       {matchTab === "quarters" ? <QuarterPlanner isAdmin={isAdmin} currentQuarter={currentQuarter} setCurrentQuarter={(q) => { setCurrentQuarterState(q); void persistMatchState({ currentPeriod: q }) }} quarterPlans={quarterPlans} quarterWarnings={quarterWarnings} currentSlots={currentSlots} players={matchPlayers} lineupMap={lineupMap} benchIds={benchIds} onSaveCurrentQuarter={handleSaveCurrentQuarter} onLoadQuarter={handleLoadQuarter} onAutoGenerate={handleAutoGenerate} periodMode={periodMode} periodLength={periodLength} /> : null}
 
-      {shouldShowPostMatch ? (
-        <PageCard tone="softYellow">
-          <SectionHeader title="Post-Match Summary" subtitle="Feedback and match report after the game." />
-          <div style={{ display: "grid", gap: 10 }}>
-            {activeMatchEventId && playerOfMatchMap[activeMatchEventId] ? <div style={{ color: "#92400e", fontWeight: 900 }}>Player of the Match: {players.find((p) => p.id === playerOfMatchMap[activeMatchEventId])?.name || "Unknown player"}</div> : null}
-            <div style={{ color: "#92400e", fontWeight: 800 }}>Player feedback has been moved out of live Matchday so the match screen stays focused while the game is running.</div>
-          </div>
-        </PageCard>
-      ) : null}
-
-      {shouldShowPostMatch && activeMatchEvent ? <MatchReportGenerator isAdmin={isAdmin} activeMatchTitle={activeMatchEvent.title} activeMatchDate={activeMatchEvent.date} opponent={activeMatchEvent.opponent || awayTeam} scoreLine={`${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`} playerOfTheMatch={players.find((p) => p.id === playerOfMatchMap[activeMatchEvent.id])?.name || ""} topPerformers={activeTopPerformers} goalsSummary={activeGoalsSummary} onSaveReport={saveMatchReport} latestReport={latestActiveMatchReport} /> : null}
+      {shouldShowPostMatch ? <PageCard tone="softYellow"><SectionHeader title="Post-Match Summary" subtitle="Feedback and match report after the game." /><div style={{ display: "grid", gap: 10 }}>{playerOfMatchName ? <div style={{ color: "#92400e", fontWeight: 900 }}>Player of the Match: {playerOfMatchName}</div> : null}<div style={{ color: "#92400e", fontWeight: 800 }}>Live Matchday is now kept clean. Reports, parent messages and feedback sit here after the game.</div></div></PageCard> : null}
+      {shouldShowPostMatch && activeMatchEvent ? <ParentReportCard event={activeMatchEvent} homeTeam={homeTeam} awayTeam={awayTeam} homeScore={homeScore} awayScore={awayScore} timeline={timeline} playerOfTheMatch={playerOfMatchName} /> : null}
+      {shouldShowPostMatch && activeMatchEvent ? <MatchReportGenerator isAdmin={isAdmin} activeMatchTitle={activeMatchEvent.title} activeMatchDate={activeMatchEvent.date} opponent={activeMatchEvent.opponent || awayTeam} scoreLine={`${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}`} playerOfTheMatch={playerOfMatchName} topPerformers={activeTopPerformers} goalsSummary={activeGoalsSummary} onSaveReport={saveMatchReport} latestReport={latestActiveMatchReport} /> : null}
     </div>
   )
 }
