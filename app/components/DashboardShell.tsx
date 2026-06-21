@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import nextDynamic from "next/dynamic"
 import PlayersManager from "./PlayersManager"
 import EventsTabContent from "./tabs/EventsTabContent"
@@ -25,6 +25,7 @@ import { TEAM, cardStyle, type MainTab, type MatchEventDraft } from "../lib/type
 import type { MatchEventDraftSetter } from "../lib/dashboardTypes"
 
 const StatsTab = nextDynamic(() => import("./tabs/StatsTab"))
+const TEAM_WORKSPACE_KEY = "sharks-active-team-id"
 type Props = any
 
 function ShellSection({ children }: { children: React.ReactNode }) {
@@ -46,9 +47,27 @@ function titleCase(value?: string) {
   return safe.charAt(0).toUpperCase() + safe.slice(1)
 }
 
+function itemTeamId(item: unknown) {
+  const value = item as { teamId?: string | null; team_id?: string | null }
+  return value?.teamId || value?.team_id || null
+}
+
+function filterByTeam<T>(items: T[] = [], activeTeamId: string) {
+  if (activeTeamId === "all") return items
+  const scoped = items.filter((item) => itemTeamId(item) === activeTeamId)
+  return scoped.length ? scoped : items
+}
+
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin } = props
   const [localActiveTeamId, setLocalActiveTeamId] = useState("all")
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(TEAM_WORKSPACE_KEY)
+      if (saved) setLocalActiveTeamId(saved)
+    } catch {}
+  }, [])
 
   if (loading) {
     return (
@@ -61,12 +80,32 @@ export default function DashboardShell(props: Props) {
   }
 
   const switcherTeams = props.clubTeams || defaultClubTeams
-  const activeTeamId = props.activeTeamId || localActiveTeamId
+  const validIds = new Set(["all", ...switcherTeams.map((team: any) => team.id)])
+  const activeTeamId = validIds.has(props.activeTeamId || localActiveTeamId) ? props.activeTeamId || localActiveTeamId : "all"
   const activeTeam = switcherTeams.find((team: any) => team.id === activeTeamId)
   const activeTeamName = activeTeamId === "all" ? "All Teams" : activeTeam ? getTeamDisplayName(activeTeam) : props.activeTeamName || TEAM.name
   const activeColour = activeTeam?.primaryColour || "#38bdf8"
   const showClubDashboard = tab === "home" && isAdmin && activeTeamId === "all"
-  const setActiveTeam = props.setActiveTeamId || setLocalActiveTeamId
+
+  function setActiveTeam(nextTeamId: string) {
+    setLocalActiveTeamId(nextTeamId)
+    try {
+      window.localStorage.setItem(TEAM_WORKSPACE_KEY, nextTeamId)
+    } catch {}
+    props.setActiveTeamId?.(nextTeamId)
+  }
+
+  const scopedProps = useMemo(() => ({
+    ...props,
+    activeTeamId,
+    activeTeamName,
+    players: filterByTeam(props.players, activeTeamId),
+    coaches: filterByTeam(props.coaches, activeTeamId),
+    events: filterByTeam(props.events, activeTeamId),
+    leagueResults: filterByTeam(props.leagueResults, activeTeamId),
+    playerRatings: filterByTeam(props.playerRatings, activeTeamId),
+    matchReports: filterByTeam(props.matchReports, activeTeamId),
+  }), [props, activeTeamId, activeTeamName])
 
   return (
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 118, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
@@ -76,16 +115,16 @@ export default function DashboardShell(props: Props) {
         <TeamLocationBadge teamName={activeTeamName} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={titleCase(tab)} modeLabel={activeTeamId === "all" ? "Club-wide view" : "Team workspace"} primaryColour={activeColour} />
         <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={setActiveTeam} />
         {showClubDashboard ? <ClubDashboard teams={switcherTeams} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} onOpenTeam={setActiveTeam} /> : null}
-        {tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={activeTeamName} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} ratings={props.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}
-        {tab === "players" ? <ShellSection><PageIntro eyebrow="Players" title="Squad Manager" subtitle="Player database, positions, development notes and squad management." /><PlayersManager players={props.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /></ShellSection> : null}
-        {tab === "events" ? <ShellSection><PageIntro eyebrow="Events" title="Events Command" subtitle="Training, fixtures, attendance and recurring weekly sessions." /><EventsTabContent {...props} /></ShellSection> : null}
-        {tab === "coaches" ? <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent {...props} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection> : null}
-        {tab === "match" ? <ShellSection><MatchLineupSnapshot {...props} /><MatchTabContent {...props} /></ShellSection> : null}
-        {tab === "stats" ? <ShellSection><PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(TEAM.name) : TEAM.name} results={props.leagueResults} players={props.players} ratings={props.playerRatings} timeline={props.timeline || []} /></ShellSection> : null}
+        {tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={activeTeamName} players={scopedProps.players} events={scopedProps.events} attendance={props.attendance} results={scopedProps.leagueResults} ratings={scopedProps.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}
+        {tab === "players" ? <ShellSection><PageIntro eyebrow="Players" title="Squad Manager" subtitle="Player database, positions, development notes and squad management." /><PlayersManager players={scopedProps.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /></ShellSection> : null}
+        {tab === "events" ? <ShellSection><PageIntro eyebrow="Events" title="Events Command" subtitle="Training, fixtures, attendance and recurring weekly sessions." /><EventsTabContent {...scopedProps} /></ShellSection> : null}
+        {tab === "coaches" ? <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent {...scopedProps} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection> : null}
+        {tab === "match" ? <ShellSection><MatchLineupSnapshot {...scopedProps} /><MatchTabContent {...scopedProps} /></ShellSection> : null}
+        {tab === "stats" ? <ShellSection><PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(activeTeamName) : activeTeamName} results={scopedProps.leagueResults} players={scopedProps.players} ratings={scopedProps.playerRatings} timeline={props.timeline || []} /></ShellSection> : null}
       </div>
       <BottomNav tab={props.tab as MainTab} setTab={props.setTab} />
       <EventFormModal {...props} open={props.showEventForm} onSave={props.addEvent} onClose={() => props.setShowEventForm(false)} />
-      <MatchEventModal open={props.showMatchEventModal} editingTimelineId={props.editingTimelineId} eventDraft={props.eventDraft || ({} as MatchEventDraft)} setEventDraft={props.setEventDraft as MatchEventDraftSetter} matchPlayers={props.matchPlayers || props.players} onSave={props.saveMatchEvent} onClose={() => props.setShowMatchEventModal(false)} />
+      <MatchEventModal open={props.showMatchEventModal} editingTimelineId={props.editingTimelineId} eventDraft={props.eventDraft || ({} as MatchEventDraft)} setEventDraft={props.setEventDraft as MatchEventDraftSetter} matchPlayers={scopedProps.matchPlayers || scopedProps.players} onSave={props.saveMatchEvent} onClose={() => props.setShowMatchEventModal(false)} />
       {props.setShowSeasonModal ? <SeasonModal open={props.showSeasonModal} value={props.seasonForm} setValue={props.setSeasonForm} onSave={props.handleCreateSeason} onClose={() => props.setShowSeasonModal(false)} /> : null}
     </main>
   )
