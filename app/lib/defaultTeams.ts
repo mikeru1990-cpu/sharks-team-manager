@@ -52,13 +52,13 @@ export const defaultClubTeams: TeamIdentity[] = [
     secondaryColour: "#ffffff",
   },
   {
-    id: "u10-girls-sharks",
-    name: "U10 Girls Sharks",
+    id: "u10-girls-lionesses",
+    name: "U10 Girls Lionesses",
     ageGroup: "U10",
     section: "girls",
-    squadName: "Sharks",
-    displayName: "U10 Girls Sharks",
-    primaryColour: "#0ea5e9",
+    squadName: "Lionesses",
+    displayName: "U10 Girls Lionesses",
+    primaryColour: "#ec4899",
     secondaryColour: "#ffffff",
   },
   {
@@ -102,3 +102,24 @@ export const defaultClubTeams: TeamIdentity[] = [
     secondaryColour: "#ffffff",
   },
 ]
+
+export const defaultSquadSplitNotes = {
+  u10GirlsLionesses: [
+    "Bailee Dowler-Rowles",
+    "Elsy Harmer",
+    "Evelyn Evans",
+    "Selena / Selina",
+  ],
+  u11GirlsLionesses: [
+    "Darcy-Rae Russell",
+    "Bella Bainbridge",
+    "Connie Luff",
+    "Ella Wilson",
+    "Martha Scrivens",
+    "Isabella Ogden",
+    "Ruby Salter",
+    "Olivia Hassall",
+    "Betsy Rowland",
+    "Lyra Twinning",
+  ],
+}
