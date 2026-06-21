@@ -69,16 +69,6 @@ export default function DashboardShell(props: Props) {
     } catch {}
   }, [])
 
-  if (loading) {
-    return (
-      <main style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)" }}>
-        <ClubBrandBackdrop />
-        <AppPolishFrame />
-        <div style={{ ...cardStyle(), position: "relative", zIndex: 1, maxWidth: 840, margin: "0 auto", borderRadius: 30, padding: 30, background: "rgba(15,23,42,0.86)", color: "white", border: "1px solid rgba(125,211,252,0.20)", boxShadow: "0 25px 70px rgba(0,0,0,0.42)", fontWeight: 900 }}>Loading Sharks Coaching Console...</div>
-      </main>
-    )
-  }
-
   const switcherTeams = props.clubTeams || defaultClubTeams
   const validIds = new Set(["all", ...switcherTeams.map((team: any) => team.id)])
   const activeTeamId = validIds.has(props.activeTeamId || localActiveTeamId) ? props.activeTeamId || localActiveTeamId : "all"
@@ -86,14 +76,6 @@ export default function DashboardShell(props: Props) {
   const activeTeamName = activeTeamId === "all" ? "All Teams" : activeTeam ? getTeamDisplayName(activeTeam) : props.activeTeamName || TEAM.name
   const activeColour = activeTeam?.primaryColour || "#38bdf8"
   const showClubDashboard = tab === "home" && isAdmin && activeTeamId === "all"
-
-  function setActiveTeam(nextTeamId: string) {
-    setLocalActiveTeamId(nextTeamId)
-    try {
-      window.localStorage.setItem(TEAM_WORKSPACE_KEY, nextTeamId)
-    } catch {}
-    props.setActiveTeamId?.(nextTeamId)
-  }
 
   const scopedProps = useMemo(() => ({
     ...props,
@@ -106,6 +88,24 @@ export default function DashboardShell(props: Props) {
     playerRatings: filterByTeam(props.playerRatings, activeTeamId),
     matchReports: filterByTeam(props.matchReports, activeTeamId),
   }), [props, activeTeamId, activeTeamName])
+
+  function setActiveTeam(nextTeamId: string) {
+    setLocalActiveTeamId(nextTeamId)
+    try {
+      window.localStorage.setItem(TEAM_WORKSPACE_KEY, nextTeamId)
+    } catch {}
+    props.setActiveTeamId?.(nextTeamId)
+  }
+
+  if (loading) {
+    return (
+      <main style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)" }}>
+        <ClubBrandBackdrop />
+        <AppPolishFrame />
+        <div style={{ ...cardStyle(), position: "relative", zIndex: 1, maxWidth: 840, margin: "0 auto", borderRadius: 30, padding: 30, background: "rgba(15,23,42,0.86)", color: "white", border: "1px solid rgba(125,211,252,0.20)", boxShadow: "0 25px 70px rgba(0,0,0,0.42)", fontWeight: 900 }}>Loading Sharks Coaching Console...</div>
+      </main>
+    )
+  }
 
   return (
     <main style={{ minHeight: "100vh", padding: 16, paddingBottom: 118, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
