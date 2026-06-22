@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import type { PitchSlot, Player, QuarterPlan } from "../lib/types"
 import { Badge, PageCard, PrimaryButton, SecondaryButton, SectionHeader } from "./ui"
 
@@ -35,26 +36,11 @@ function playerName(players: Player[], id?: string | null) {
 }
 
 function Stat({ label, value, colour = "#7dd3fc" }: { label: string; value: string | number; colour?: string }) {
-  return (
-    <div style={{ borderRadius: 16, background: "rgba(2,6,23,0.46)", border: `1px solid ${colour}55`, padding: 11 }}>
-      <div style={{ fontSize: 10, fontWeight: 1000, letterSpacing: ".09em", color: "#94a3b8", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ marginTop: 5, fontSize: 22, fontWeight: 1000, lineHeight: 1, color: colour }}>{value}</div>
-    </div>
-  )
+  return <div style={{ borderRadius: 16, background: "rgba(2,6,23,0.46)", border: `1px solid ${colour}55`, padding: 11 }}><div style={{ fontSize: 10, fontWeight: 1000, letterSpacing: ".09em", color: "#94a3b8", textTransform: "uppercase" }}>{label}</div><div style={{ marginTop: 5, fontSize: 22, fontWeight: 1000, lineHeight: 1, color: colour }}>{value}</div></div>
 }
 
 function chip(active: boolean) {
-  return {
-    border: active ? "1px solid rgba(125,211,252,0.75)" : "1px solid rgba(148,163,184,0.22)",
-    background: active ? "rgba(14,165,233,0.22)" : "rgba(255,255,255,0.06)",
-    color: active ? "#7dd3fc" : "#cbd5e1",
-    borderRadius: 14,
-    padding: "10px 12px",
-    fontWeight: 1000 as const,
-    fontSize: 13,
-    minWidth: 58,
-    cursor: "pointer",
-  }
+  return { border: active ? "1px solid rgba(125,211,252,0.75)" : "1px solid rgba(148,163,184,0.22)", background: active ? "rgba(14,165,233,0.22)" : "rgba(255,255,255,0.06)", color: active ? "#7dd3fc" : "#cbd5e1", borderRadius: 14, padding: "10px 12px", fontWeight: 1000 as const, fontSize: 13, minWidth: 58, cursor: "pointer" }
 }
 
 function getPlanPlayerIds(plan?: QuarterPlan) {
@@ -66,22 +52,13 @@ function getMinuteRows(players: Player[], quarterPlans: Record<number, QuarterPl
   return players.map((player) => {
     const periodsOn: number[] = []
     const periodsBenched: number[] = []
-
     for (let period = 1; period <= periodCount; period += 1) {
       const plannedIds = getPlanPlayerIds(quarterPlans[period])
       if (plannedIds.has(player.id)) periodsOn.push(period)
       else if (quarterPlans[period]) periodsBenched.push(period)
     }
-
     const consecutiveBench = periodsBenched.some((period, index) => index > 0 && period === periodsBenched[index - 1] + 1)
-
-    return {
-      player,
-      minutes: periodsOn.length * periodLength,
-      periodsOn,
-      periodsBenched,
-      consecutiveBench,
-    }
+    return { player, minutes: periodsOn.length * periodLength, periodsOn, periodsBenched, consecutiveBench }
   })
 }
 
@@ -92,20 +69,45 @@ function getTone(value: number, average: number) {
   return "#22c55e"
 }
 
-function buildRecommendation(row: PlayerMinuteRow, shortLabel: string) {
-  if (!row.periodsBenched.length) return "Rotation looks strong."
-  const bestPeriod = row.periodsBenched[0]
-  return `Consider moving ${row.player.name.split(" ")[0]} into ${shortLabel}${bestPeriod}.`
+function firstName(name: string) {
+  return name.split(" ")[0]
+}
+
+function findLockedGoalkeeper(players: Player[], currentSlots: PitchSlot[], lineupMap: Record<string, string | null>) {
+  const gkSlot = currentSlots.find((slot) => slot.position === "GK")
+  const currentGkId = lineupMap[gkSlot?.id || ""]
+  return players.find((player) => player.id === currentGkId) || players.find((player) => player.mainGK) || players.find((player) => player.name.toLowerCase().includes("darcy-rae")) || null
+}
+
+function RotationHealth({ savedPeriods, fairnessScore, lowRows, benchRows, shortLabel, averageMinutes, warnings }: { savedPeriods: number; fairnessScore: number; lowRows: PlayerMinuteRow[]; benchRows: PlayerMinuteRow[]; shortLabel: string; averageMinutes: number; warnings: string[] }) {
+  if (savedPeriods === 0) return <div style={{ borderRadius: 16, padding: 12, background: "rgba(14,165,233,0.12)", border: "1px solid rgba(56,189,248,0.32)", color: "#bae6fd", fontWeight: 900 }}>Auto-generate or save the rotation to see outfield minutes and fairness checks.</div>
+  const tone = fairnessScore >= 85 ? "#22c55e" : fairnessScore >= 65 ? "#f59e0b" : "#ef4444"
+  const label = fairnessScore >= 85 ? "Excellent" : fairnessScore >= 65 ? "Warning" : "Needs Work"
+  const issueNames = [...lowRows.slice(0, 3).map((row) => `${row.player.name} below target (${row.minutes}m vs ${averageMinutes}m)`), ...benchRows.slice(0, 3).map((row) => `${row.player.name} benched ${row.periodsBenched.map((period) => `${shortLabel}${period}`).join(", ")}`)]
+  return (
+    <div style={{ borderRadius: 18, padding: 13, background: `${tone}16`, border: `1px solid ${tone}66`, display: "grid", gap: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}><div style={{ color: "white", fontWeight: 1000, fontSize: 18 }}>Rotation Health: {label}</div><Badge tone={fairnessScore >= 85 ? "green" : fairnessScore >= 65 ? "yellow" : "red"}>{fairnessScore}%</Badge></div>
+      {issueNames.length === 0 && warnings.length === 0 ? <div style={{ color: "#bbf7d0", fontWeight: 850 }}>Outfield rotation looks strong. No player is below target and no bench runs are flagged.</div> : <div style={{ display: "grid", gap: 6 }}>{issueNames.map((issue) => <div key={issue} style={{ color: tone === "#ef4444" ? "#fecdd3" : "#fde68a", fontWeight: 850 }}>• {issue}</div>)}{warnings.slice(0, 2).map((warning, index) => <div key={index} style={{ color: "#fde68a", fontWeight: 850 }}>• {warning}</div>)}</div>}
+    </div>
+  )
 }
 
 export default function QuarterPlanner({ isAdmin, currentQuarter, setCurrentQuarter, quarterPlans, quarterWarnings, currentSlots, players, lineupMap, benchIds, onSaveCurrentQuarter, onLoadQuarter, onAutoGenerate, periodMode, periodLength }: Props) {
+  const [matchdaySize, setMatchdaySize] = useState(11)
   const periodCount = periodMode === "quarters" ? 4 : 2
   const periodName = periodMode === "quarters" ? "Quarter" : "Half"
   const shortLabel = periodMode === "quarters" ? "Q" : "H"
   const currentFilledCount = currentSlots.filter((slot) => lineupMap[slot.id]).length
-  const gkSlot = currentSlots.find((slot) => slot.position === "GK")
-  const currentGoalkeeper = playerName(players, lineupMap[gkSlot?.id || ""])
-  const rows = getMinuteRows(players, quarterPlans, periodCount, periodLength)
+  const lockedGoalkeeper = findLockedGoalkeeper(players, currentSlots, lineupMap)
+  const currentGoalkeeper = lockedGoalkeeper?.name || "Empty"
+  const matchdayPlayers = useMemo(() => {
+    if (!lockedGoalkeeper) return players.slice(0, matchdaySize)
+    const outfield = players.filter((player) => player.id !== lockedGoalkeeper.id)
+    return [lockedGoalkeeper, ...outfield.slice(0, Math.max(0, matchdaySize - 1))]
+  }, [players, lockedGoalkeeper, matchdaySize])
+  const outfieldPlayers = lockedGoalkeeper ? matchdayPlayers.filter((player) => player.id !== lockedGoalkeeper.id) : matchdayPlayers
+  const gkRows = lockedGoalkeeper ? getMinuteRows([lockedGoalkeeper], quarterPlans, periodCount, periodLength) : []
+  const rows = getMinuteRows(outfieldPlayers, quarterPlans, periodCount, periodLength)
   const savedPeriods = Object.keys(quarterPlans).length
   const totalMinutes = rows.reduce((sum, row) => sum + row.minutes, 0)
   const averageMinutes = rows.length ? Math.round(totalMinutes / rows.length) : 0
@@ -113,47 +115,25 @@ export default function QuarterPlanner({ isAdmin, currentQuarter, setCurrentQuar
   const severeRows = rows.filter((row) => averageMinutes > 0 && row.minutes < averageMinutes - 8)
   const consecutiveRows = rows.filter((row) => row.consecutiveBench)
   const fairnessIssues = severeRows.length + consecutiveRows.length + quarterWarnings.length
-  const fairnessScore = savedPeriods === 0 ? 0 : Math.max(0, Math.min(100, 100 - severeRows.length * 14 - consecutiveRows.length * 9 - quarterWarnings.length * 6))
+  const fairnessScore = savedPeriods === 0 ? 0 : Math.max(0, Math.min(100, 100 - severeRows.length * 14 - consecutiveRows.length * 9 - quarterWarnings.length * 4))
   const sortedRows = [...rows].sort((a, b) => a.minutes - b.minutes || a.player.name.localeCompare(b.player.name))
+  const fixedGkMinutes = periodCount * periodLength
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <PageCard>
-        <SectionHeader title={`${periodName} Intelligence`} subtitle={`${periodCount} periods • ${periodLength} minutes • fairness view`} />
+        <SectionHeader title="Matchday Rotation Centre" subtitle="Fixed goalkeeper • 10/11 player squad • outfield fairness" />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
-          <Stat label="Fairness" value={savedPeriods ? `${fairnessScore}%` : "Plan"} colour={fairnessScore >= 85 ? "#22c55e" : fairnessScore >= 65 ? "#f59e0b" : "#ef4444"} />
-          <Stat label="Average" value={`${averageMinutes}m`} />
+          <Stat label="Squad" value={matchdaySize} />
+          <Stat label="Outfield Avg" value={`${averageMinutes}m`} />
           <Stat label="Low mins" value={lowMinuteRows.length} colour={lowMinuteRows.length ? "#f59e0b" : "#22c55e"} />
           <Stat label="Bench runs" value={consecutiveRows.length} colour={consecutiveRows.length ? "#ef4444" : "#22c55e"} />
         </div>
-
-        <div style={{ display: "grid", gap: 8 }}>
-          {savedPeriods === 0 ? (
-            <div style={{ borderRadius: 16, padding: 12, background: "rgba(14,165,233,0.12)", border: "1px solid rgba(56,189,248,0.32)", color: "#bae6fd", fontWeight: 900 }}>
-              Auto-generate the rotation to see minutes, bench runs and fairness checks.
-            </div>
-          ) : fairnessIssues === 0 ? (
-            <div style={{ borderRadius: 16, padding: 12, background: "rgba(34,197,94,0.13)", border: "1px solid rgba(34,197,94,0.38)", color: "#bbf7d0", fontWeight: 900 }}>
-              Balanced rotation: minutes and benching look fair.
-            </div>
-          ) : null}
-
-          {severeRows.slice(0, 3).map((row) => (
-            <div key={row.player.id} style={{ borderRadius: 16, padding: 12, background: "rgba(239,68,68,0.14)", border: "1px solid rgba(248,113,113,0.44)", color: "#fecdd3", display: "grid", gap: 5 }}>
-              <div style={{ color: "white", fontWeight: 1000 }}>Severe minutes gap: {row.player.name}</div>
-              <div style={{ fontSize: 13, fontWeight: 850 }}>Projected: {row.minutes}m • Team average: {averageMinutes}m</div>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>{buildRecommendation(row, shortLabel)}</div>
-            </div>
-          ))}
-
-          {consecutiveRows.slice(0, 3).map((row) => (
-            <div key={`bench-${row.player.id}`} style={{ borderRadius: 16, padding: 12, background: "rgba(245,158,11,0.14)", border: "1px solid rgba(251,191,36,0.44)", color: "#fde68a", display: "grid", gap: 5 }}>
-              <div style={{ color: "white", fontWeight: 1000 }}>Consecutive bench: {row.player.name}</div>
-              <div style={{ fontSize: 13, fontWeight: 850 }}>Benched: {row.periodsBenched.map((period) => `${shortLabel}${period}`).join(", ")}</div>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>{buildRecommendation(row, shortLabel)}</div>
-            </div>
-          ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginBottom: 12 }}>
+          {[10, 11, 12].map((size) => <button key={size} onClick={() => setMatchdaySize(size)} style={chip(matchdaySize === size)}>{size} Players</button>)}
         </div>
+        {lockedGoalkeeper ? <div style={{ borderRadius: 16, padding: 12, background: "rgba(250,204,21,0.12)", border: "1px solid rgba(250,204,21,0.36)", color: "#fde68a", fontWeight: 900, marginBottom: 12 }}>Goalkeeper locked: {lockedGoalkeeper.name} • {fixedGkMinutes}m • excluded from fairness checks</div> : null}
+        <RotationHealth savedPeriods={savedPeriods} fairnessScore={fairnessScore} lowRows={severeRows} benchRows={consecutiveRows} shortLabel={shortLabel} averageMinutes={averageMinutes} warnings={quarterWarnings} />
       </PageCard>
 
       <PageCard>
@@ -164,57 +144,26 @@ export default function QuarterPlanner({ isAdmin, currentQuarter, setCurrentQuar
           <Stat label="Bench" value={benchIds.length} />
           <Stat label="Length" value={`${periodLength}m`} />
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          {Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => <button key={q} onClick={() => setCurrentQuarter(q)} style={chip(currentQuarter === q)}>{shortLabel}{q}</button>)}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: isAdmin ? "repeat(3, minmax(0,1fr))" : "1fr", gap: 8 }}>
-          {isAdmin ? <><PrimaryButton onClick={() => void onSaveCurrentQuarter()}>Save</PrimaryButton><SecondaryButton onClick={() => onLoadQuarter(currentQuarter)}>Load</SecondaryButton><SecondaryButton onClick={() => void onAutoGenerate()}>Auto Balance</SecondaryButton></> : <div style={{ color: "#94a3b8" }}>Admin only.</div>}
-        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => <button key={q} onClick={() => setCurrentQuarter(q)} style={chip(currentQuarter === q)}>{shortLabel}{q}</button>)}</div>
+        <div style={{ display: "grid", gridTemplateColumns: isAdmin ? "repeat(3, minmax(0,1fr))" : "1fr", gap: 8 }}>{isAdmin ? <><PrimaryButton onClick={() => void onSaveCurrentQuarter()}>Save</PrimaryButton><SecondaryButton onClick={() => onLoadQuarter(currentQuarter)}>Load</SecondaryButton><SecondaryButton onClick={() => void onAutoGenerate()}>Auto Balance</SecondaryButton></> : <div style={{ color: "#94a3b8" }}>Admin only.</div>}</div>
       </PageCard>
 
-      {quarterWarnings.length > 0 ? (
-        <PageCard tone="softYellow">
-          <SectionHeader title={`${quarterWarnings.length} Rotation Checks`} subtitle="Extra checks from the rotation builder" />
-          <div style={{ display: "grid", gap: 8 }}>
-            {quarterWarnings.slice(0, 4).map((warning, index) => <div key={index} style={{ color: "#fdba74", fontWeight: 1000, borderRadius: 14, background: "rgba(154,52,18,0.18)", padding: 12, border: "1px solid rgba(251,146,60,0.42)" }}>{warning}</div>)}
-          </div>
-        </PageCard>
-      ) : null}
-
       <PageCard>
-        <SectionHeader title="Projected Minutes" subtitle="Lowest minutes shown first" />
+        <SectionHeader title="Projected Outfield Minutes" subtitle="Lowest minutes first. Goalkeeper is shown separately." />
         <div style={{ display: "grid", gap: 8 }}>
-          {sortedRows.map((row) => {
-            const colour = getTone(row.minutes, averageMinutes)
-            return (
-              <div key={row.player.id} style={{ borderRadius: 16, padding: 11, background: "rgba(15,23,42,0.72)", border: `1px solid ${colour}55`, display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: "white", fontWeight: 1000, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.player.name}</div>
-                  <div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 850, marginTop: 2 }}>{row.periodsOn.length ? row.periodsOn.map((period) => `${shortLabel}${period}`).join(", ") : "No planned minutes"}</div>
-                </div>
-                <div style={{ color: colour, fontWeight: 1000, fontSize: 18 }}>{row.minutes}m</div>
-              </div>
-            )
-          })}
+          {sortedRows.map((row) => { const colour = getTone(row.minutes, averageMinutes); return <div key={row.player.id} style={{ borderRadius: 16, padding: 11, background: "rgba(15,23,42,0.72)", border: `1px solid ${colour}55`, display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center" }}><div style={{ minWidth: 0 }}><div style={{ color: "white", fontWeight: 1000, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.player.name}</div><div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 850, marginTop: 2 }}>{row.periodsOn.length ? row.periodsOn.map((period) => `${shortLabel}${period}`).join(", ") : "No planned minutes"}</div></div><div style={{ color: colour, fontWeight: 1000, fontSize: 18 }}>{row.minutes}m</div></div> })}
+          {gkRows.map((row) => <div key={row.player.id} style={{ borderRadius: 16, padding: 11, background: "rgba(250,204,21,0.12)", border: "1px solid rgba(250,204,21,0.44)", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", gap: 10, alignItems: "center" }}><div><div style={{ color: "white", fontWeight: 1000 }}>{row.player.name}</div><div style={{ color: "#fde68a", fontSize: 12, fontWeight: 850 }}>Locked goalkeeper • excluded from fairness</div></div><div style={{ color: "#facc15", fontWeight: 1000, fontSize: 18 }}>{row.minutes || fixedGkMinutes}m</div></div>)}
         </div>
       </PageCard>
 
       <PageCard>
         <SectionHeader title={`Current ${periodName}`} subtitle="Quick snapshot" />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Badge tone="blue">{shortLabel}{currentQuarter}</Badge>
-          <Badge tone="green">Starters {currentFilledCount}</Badge>
-          <Badge tone="yellow">Bench {benchIds.length}</Badge>
-          {currentGoalkeeper !== "Empty" ? <Badge>GK {currentGoalkeeper}</Badge> : null}
-        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Badge tone="blue">{shortLabel}{currentQuarter}</Badge><Badge tone="green">Starters {currentFilledCount}</Badge><Badge tone="yellow">Bench {benchIds.length}</Badge>{currentGoalkeeper !== "Empty" ? <Badge>GK {currentGoalkeeper}</Badge> : null}</div>
       </PageCard>
 
       <PageCard>
         <SectionHeader title={`Saved ${periodName} Plans`} subtitle="Load a saved rotation" />
-        <div style={{ display: "grid", gap: 10 }}>{Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => {
-          const plan = quarterPlans[q]
-          return <div key={q} style={{ borderRadius: 18, padding: 13, background: "rgba(15,23,42,0.74)", border: "1px solid rgba(125,211,252,0.18)", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}><div><div style={{ color: "white", fontWeight: 1000 }}>{periodName} {q}</div><div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 800 }}>{plan ? "Saved" : "No saved plan"}</div></div><div style={{ minWidth: 78 }}><SecondaryButton onClick={() => onLoadQuarter(q)}>Load</SecondaryButton></div></div>
-        })}</div>
+        <div style={{ display: "grid", gap: 10 }}>{Array.from({ length: periodCount }, (_, i) => i + 1).map((q) => { const plan = quarterPlans[q]; return <div key={q} style={{ borderRadius: 18, padding: 13, background: "rgba(15,23,42,0.74)", border: "1px solid rgba(125,211,252,0.18)", display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}><div><div style={{ color: "white", fontWeight: 1000 }}>{periodName} {q}</div><div style={{ color: "#94a3b8", fontSize: 12, fontWeight: 800 }}>{plan ? "Saved" : "No saved plan"}</div></div><div style={{ minWidth: 78 }}><SecondaryButton onClick={() => onLoadQuarter(q)}>Load</SecondaryButton></div></div> })}</div>
       </PageCard>
     </div>
   )
