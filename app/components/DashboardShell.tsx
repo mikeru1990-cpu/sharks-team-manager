@@ -31,68 +31,30 @@ type Props = any
 const U10_PLAYER_NAMES = new Set(["bailee dowler-rowles", "elsy harmer", "evelyn evans", "selena", "selina", "selena / selina"])
 const U11_PLAYER_NAMES = new Set(["lyra twinning", "bella bainbridge", "betsy rowland", "connie luff", "darcy-rae russell", "ella wilson", "isabella ogden", "martha scrivens", "olivia hassall", "poppy bennett", "ruby salter"])
 
-function ShellSection({ children }: { children: React.ReactNode }) {
-  return <section style={{ minWidth: 0, display: "grid", gap: 14 }}>{children}</section>
+function ShellSection({ children }: { children: React.ReactNode }) { return <section style={{ minWidth: 0, display: "grid", gap: 14 }}>{children}</section> }
+function PageIntro({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) { return <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 16, borderRadius: 22, display: "grid", gap: 6, overflow: "hidden" }}><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".16em", textTransform: "uppercase" }}>{eyebrow}</div><div style={{ color: "white", fontSize: 26, fontWeight: 1000, lineHeight: 1, letterSpacing: "-0.045em" }}>{title}</div><div style={{ color: "#cbd5e1", fontWeight: 700, lineHeight: 1.42, maxWidth: 760 }}>{subtitle}</div></div> }
+function tabLabel(value?: string) { if (value === "players") return "Players"; if (value === "match") return "Matchday"; if (value === "coaches") return "Club"; if (value === "stats") return "Insights"; if (value === "events") return "Training"; const safe = String(value || "Home"); return safe.charAt(0).toUpperCase() + safe.slice(1) }
+function normaliseName(value?: string | null) { return String(value || "").trim().toLowerCase() }
+function itemTeamId(item: unknown) { const value = item as { teamId?: string | null; team_id?: string | null }; return value?.teamId || value?.team_id || null }
+function inferPlayerTeamId(player: any) { const name = normaliseName(player?.name); if (U10_PLAYER_NAMES.has(name)) return "u10-girls-sharks"; if (U11_PLAYER_NAMES.has(name)) return "u11-girls-lionesses"; return null }
+function filterPlayersByTeam(players: any[] = [], activeTeamId: string) { if (activeTeamId === "all") return players; const direct = players.filter((player) => itemTeamId(player) === activeTeamId); if (direct.length) return direct; if (activeTeamId === "u10-girls-sharks") return players.filter((player) => inferPlayerTeamId(player) === "u10-girls-sharks"); if (activeTeamId === "u11-girls-lionesses") return players.filter((player) => inferPlayerTeamId(player) === "u11-girls-lionesses"); return [] }
+function filterByTeam<T>(items: T[] = [], activeTeamId: string) { if (activeTeamId === "all") return items; return items.filter((item) => itemTeamId(item) === activeTeamId) }
+function filterAttendanceByPlayers(attendance: any[] = [], players: any[] = []) { const ids = new Set(players.map((player) => player.id)); return attendance.filter((item) => ids.has(item.playerId)) }
+function todayKey() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}` }
+function nextEvent(events: any[] = [], type?: string) { const today = todayKey(); return events.filter((event) => (!type || event.type === type) && event.date >= today).sort((a, b) => `${a.date}${a.startTime || ""}`.localeCompare(`${b.date}${b.startTime || ""}`))[0] || null }
+function formatEvent(event: any) { if (!event) return "Not scheduled"; return `${event.title || event.opponent || "Event"}${event.startTime ? ` • ${event.startTime}` : ""}` }
+function WorkspaceCommandCentre({ activeTeamName, players, events, setTab, openCreateEvent }: { activeTeamName: string; players: any[]; events: any[]; setTab: (tab: MainTab) => void; openCreateEvent?: () => void }) {
+  const match = nextEvent(events, "match")
+  const training = nextEvent(events, "training")
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short" })
+  return <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 16, borderRadius: 24, display: "grid", gap: 13, overflow: "hidden" }}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "start" }}><div><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".16em", textTransform: "uppercase" }}>Coach Command Centre</div><div style={{ color: "white", fontSize: 25, fontWeight: 1000, lineHeight: 1, marginTop: 5 }}>{activeTeamName}</div><div style={{ color: "#cbd5e1", fontWeight: 800, marginTop: 5 }}>{today}</div></div><div style={{ borderRadius: 999, padding: "8px 11px", background: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.36)", color: "#86efac", fontWeight: 1000, fontSize: 12 }}>Live Workspace</div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}><div style={{ borderRadius: 18, padding: 12, background: "rgba(2,6,23,0.48)", border: "1px solid rgba(125,211,252,0.18)" }}><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000 }}>NEXT MATCH</div><div style={{ color: "white", fontWeight: 950, marginTop: 6 }}>{formatEvent(match)}</div></div><div style={{ borderRadius: 18, padding: 12, background: "rgba(2,6,23,0.48)", border: "1px solid rgba(125,211,252,0.18)" }}><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000 }}>NEXT TRAINING</div><div style={{ color: "white", fontWeight: 950, marginTop: 6 }}>{formatEvent(training)}</div></div><div style={{ borderRadius: 18, padding: 12, background: "rgba(2,6,23,0.48)", border: "1px solid rgba(125,211,252,0.18)" }}><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000 }}>SQUAD</div><div style={{ color: "white", fontWeight: 950, marginTop: 6 }}>{players.length} players</div></div></div><div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}><button onClick={() => setTab("match")} style={quickButtonStyle()}>⚽ Matchday</button><button onClick={() => setTab("events")} style={quickButtonStyle()}>🏃 Training</button><button onClick={() => setTab("players")} style={quickButtonStyle()}>👥 Players</button><button onClick={() => openCreateEvent ? openCreateEvent() : setTab("events")} style={quickButtonStyle()}>＋ New</button></div></div>
 }
-
-function PageIntro({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
-  return <div className="sharks-elite-panel sharks-card-shine" style={{ padding: 16, borderRadius: 22, display: "grid", gap: 6, overflow: "hidden" }}><div style={{ color: "#7dd3fc", fontSize: 10, fontWeight: 1000, letterSpacing: ".16em", textTransform: "uppercase" }}>{eyebrow}</div><div style={{ color: "white", fontSize: 26, fontWeight: 1000, lineHeight: 1, letterSpacing: "-0.045em" }}>{title}</div><div style={{ color: "#cbd5e1", fontWeight: 700, lineHeight: 1.42, maxWidth: 760 }}>{subtitle}</div></div>
-}
-
-function tabLabel(value?: string) {
-  if (value === "players") return "Squad"
-  if (value === "match") return "Matchday"
-  if (value === "coaches") return "Admin"
-  const safe = String(value || "Home")
-  return safe.charAt(0).toUpperCase() + safe.slice(1)
-}
-
-function normaliseName(value?: string | null) {
-  return String(value || "").trim().toLowerCase()
-}
-
-function itemTeamId(item: unknown) {
-  const value = item as { teamId?: string | null; team_id?: string | null }
-  return value?.teamId || value?.team_id || null
-}
-
-function inferPlayerTeamId(player: any) {
-  const name = normaliseName(player?.name)
-  if (U10_PLAYER_NAMES.has(name)) return "u10-girls-sharks"
-  if (U11_PLAYER_NAMES.has(name)) return "u11-girls-lionesses"
-  return null
-}
-
-function filterPlayersByTeam(players: any[] = [], activeTeamId: string) {
-  if (activeTeamId === "all") return players
-  const direct = players.filter((player) => itemTeamId(player) === activeTeamId)
-  if (direct.length) return direct
-  if (activeTeamId === "u10-girls-sharks") return players.filter((player) => inferPlayerTeamId(player) === "u10-girls-sharks")
-  if (activeTeamId === "u11-girls-lionesses") return players.filter((player) => inferPlayerTeamId(player) === "u11-girls-lionesses")
-  return []
-}
-
-function filterByTeam<T>(items: T[] = [], activeTeamId: string) {
-  if (activeTeamId === "all") return items
-  return items.filter((item) => itemTeamId(item) === activeTeamId)
-}
-
-function filterAttendanceByPlayers(attendance: any[] = [], players: any[] = []) {
-  const ids = new Set(players.map((player) => player.id))
-  return attendance.filter((item) => ids.has(item.playerId))
-}
+function quickButtonStyle(): React.CSSProperties { return { border: "1px solid rgba(125,211,252,0.28)", background: "rgba(14,165,233,0.10)", color: "white", borderRadius: 16, padding: "11px 6px", fontWeight: 1000, cursor: "pointer", minHeight: 44 } }
 
 export default function DashboardShell(props: Props) {
   const { loading, tab, isAdmin } = props
   const [localActiveTeamId, setLocalActiveTeamId] = useState("all")
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(TEAM_WORKSPACE_KEY)
-      if (saved) setLocalActiveTeamId(saved)
-    } catch {}
-  }, [])
-
+  useEffect(() => { try { const saved = window.localStorage.getItem(TEAM_WORKSPACE_KEY); if (saved) setLocalActiveTeamId(saved) } catch {} }, [])
   const switcherTeams = props.clubTeams || defaultClubTeams
   const validIds = new Set(["all", ...switcherTeams.map((team: any) => team.id)])
   const activeTeamId = validIds.has(props.activeTeamId || localActiveTeamId) ? props.activeTeamId || localActiveTeamId : "all"
@@ -100,41 +62,8 @@ export default function DashboardShell(props: Props) {
   const activeTeamName = activeTeamId === "all" ? "All Teams" : activeTeam ? getTeamDisplayName(activeTeam) : props.activeTeamName || TEAM.name
   const activeColour = activeTeam?.primaryColour || "#38bdf8"
   const showClubDashboard = tab === "home" && isAdmin && activeTeamId === "all"
-
-  const scopedProps = useMemo(() => {
-    const scopedPlayers = filterPlayersByTeam(props.players, activeTeamId)
-    return { ...props, activeTeamId, activeTeamName, players: scopedPlayers, matchPlayers: filterPlayersByTeam(props.matchPlayers || props.players, activeTeamId), maybePlayers: filterPlayersByTeam(props.maybePlayers || [], activeTeamId), unavailablePlayers: filterPlayersByTeam(props.unavailablePlayers || [], activeTeamId), attendance: filterAttendanceByPlayers(props.attendance, scopedPlayers), coaches: filterByTeam(props.coaches, activeTeamId), events: filterByTeam(props.events, activeTeamId), leagueResults: filterByTeam(props.leagueResults, activeTeamId), playerRatings: filterByTeam(props.playerRatings, activeTeamId), matchReports: filterByTeam(props.matchReports, activeTeamId) }
-  }, [props, activeTeamId, activeTeamName])
-
-  function setActiveTeam(nextTeamId: string) {
-    setLocalActiveTeamId(nextTeamId)
-    try { window.localStorage.setItem(TEAM_WORKSPACE_KEY, nextTeamId) } catch {}
-    props.setActiveTeamId?.(nextTeamId)
-  }
-
-  if (loading) {
-    return <main style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)" }}><ClubBrandBackdrop /><AppPolishFrame /><div style={{ ...cardStyle(), position: "relative", zIndex: 1, maxWidth: 840, margin: "0 auto", borderRadius: 30, padding: 30, background: "rgba(15,23,42,0.86)", color: "white", border: "1px solid rgba(125,211,252,0.20)", boxShadow: "0 25px 70px rgba(0,0,0,0.42)", fontWeight: 900 }}>Loading Sharks Coaching Console...</div></main>
-  }
-
-  return (
-    <main style={{ minHeight: "100vh", padding: 14, paddingBottom: 112, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}>
-      <ClubBrandBackdrop />
-      <AppPolishFrame />
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 12, minWidth: 0 }}>
-        <TeamLocationBadge teamName={activeTeamName} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={tabLabel(tab)} modeLabel={activeTeamId === "all" ? "Club-wide view" : "Team workspace"} primaryColour={activeColour} />
-        <TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={setActiveTeam} />
-        {showClubDashboard ? <ClubDashboard teams={switcherTeams} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} onOpenTeam={setActiveTeam} /> : null}
-        {tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={activeTeamName} players={scopedProps.players} events={scopedProps.events} attendance={scopedProps.attendance} results={scopedProps.leagueResults} ratings={scopedProps.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}
-        {tab === "players" ? <PlayersManager players={scopedProps.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /> : null}
-        {tab === "events" ? <ShellSection><PageIntro eyebrow="Events" title="Events Command" subtitle="Training, fixtures, attendance and recurring weekly sessions." /><EventsTabContent {...scopedProps} /></ShellSection> : null}
-        {tab === "coaches" ? <ShellSection><PageIntro eyebrow="Admin" title="Club Admin" subtitle="Coaches, team setup, approvals and club management." /><CoachesTabContent {...scopedProps} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection> : null}
-        {tab === "match" ? <ShellSection><MatchLineupSnapshot {...scopedProps} /><MatchTabContent {...scopedProps} /></ShellSection> : null}
-        {tab === "stats" ? <ShellSection><PageIntro eyebrow="Stats" title="Analytics Hub" subtitle="Team form, results, head-to-head records and performance trends." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(activeTeamName) : activeTeamName} results={scopedProps.leagueResults} players={scopedProps.players} ratings={scopedProps.playerRatings} timeline={props.timeline || []} /></ShellSection> : null}
-      </div>
-      <BottomNav tab={props.tab as MainTab} setTab={props.setTab} />
-      <EventFormModal {...props} open={props.showEventForm} onSave={props.addEvent} onClose={() => props.setShowEventForm(false)} />
-      <MatchEventModal open={props.showMatchEventModal} editingTimelineId={props.editingTimelineId} eventDraft={props.eventDraft || ({} as MatchEventDraft)} setEventDraft={props.setEventDraft as MatchEventDraftSetter} matchPlayers={scopedProps.matchPlayers || scopedProps.players} onSave={props.saveMatchEvent} onClose={() => props.setShowMatchEventModal(false)} />
-      {props.setShowSeasonModal ? <SeasonModal open={props.showSeasonModal} value={props.seasonForm} setValue={props.setSeasonForm} onSave={props.handleCreateSeason} onClose={() => props.setShowSeasonModal(false)} /> : null}
-    </main>
-  )
+  const scopedProps = useMemo(() => { const scopedPlayers = filterPlayersByTeam(props.players, activeTeamId); return { ...props, activeTeamId, activeTeamName, players: scopedPlayers, matchPlayers: filterPlayersByTeam(props.matchPlayers || props.players, activeTeamId), maybePlayers: filterPlayersByTeam(props.maybePlayers || [], activeTeamId), unavailablePlayers: filterPlayersByTeam(props.unavailablePlayers || [], activeTeamId), attendance: filterAttendanceByPlayers(props.attendance, scopedPlayers), coaches: filterByTeam(props.coaches, activeTeamId), events: filterByTeam(props.events, activeTeamId), leagueResults: filterByTeam(props.leagueResults, activeTeamId), playerRatings: filterByTeam(props.playerRatings, activeTeamId), matchReports: filterByTeam(props.matchReports, activeTeamId) } }, [props, activeTeamId, activeTeamName])
+  function setActiveTeam(nextTeamId: string) { setLocalActiveTeamId(nextTeamId); try { window.localStorage.setItem(TEAM_WORKSPACE_KEY, nextTeamId) } catch {}; props.setActiveTeamId?.(nextTeamId) }
+  if (loading) { return <main style={{ minHeight: "100vh", padding: 24, background: "radial-gradient(circle at top, rgba(37,99,235,0.28), transparent 34%), linear-gradient(180deg, #020617 0%, #0f172a 100%)" }}><ClubBrandBackdrop /><AppPolishFrame /><div style={{ ...cardStyle(), position: "relative", zIndex: 1, maxWidth: 840, margin: "0 auto", borderRadius: 30, padding: 30, background: "rgba(15,23,42,0.86)", color: "white", border: "1px solid rgba(125,211,252,0.20)", boxShadow: "0 25px 70px rgba(0,0,0,0.42)", fontWeight: 900 }}>Loading Sharks Coaching Console...</div></main> }
+  return <main style={{ minHeight: "100vh", padding: 14, paddingBottom: 112, background: "radial-gradient(circle at top left, rgba(37,99,235,0.24), transparent 34%), radial-gradient(circle at top right, rgba(14,165,233,0.18), transparent 34%), linear-gradient(180deg, #020617 0%, #07111f 48%, #020617 100%)", overflowX: "hidden", boxSizing: "border-box", position: "relative", color: "#e5eefc" }}><ClubBrandBackdrop /><AppPolishFrame /><div style={{ position: "relative", zIndex: 1, maxWidth: 1140, margin: "0 auto", display: "grid", gap: 12, minWidth: 0 }}><TeamLocationBadge teamName={activeTeamName} roleLabel={isAdmin ? "Club Admin" : "Coach"} sectionLabel={tabLabel(tab)} modeLabel={activeTeamId === "all" ? "Club-wide view" : "Team workspace"} primaryColour={activeColour} /><TeamSwitcherBar teams={switcherTeams} activeTeamId={activeTeamId} canSwitch={Boolean(isAdmin)} onChangeTeam={setActiveTeam} />{tab === "home" && !showClubDashboard ? <WorkspaceCommandCentre activeTeamName={activeTeamName} players={scopedProps.players} events={scopedProps.events} setTab={props.setTab} openCreateEvent={props.openCreateEvent} /> : null}{showClubDashboard ? <ClubDashboard teams={switcherTeams} players={props.players} events={props.events} attendance={props.attendance} results={props.leagueResults} onOpenTeam={setActiveTeam} /> : null}{tab === "home" && !showClubDashboard ? <FootballHomeDashboard teamName={activeTeamName} players={scopedProps.players} events={scopedProps.events} attendance={scopedProps.attendance} results={scopedProps.leagueResults} ratings={scopedProps.playerRatings} activeMatchEventId={props.activeMatchEventId} onOpenTab={props.setTab} /> : null}{tab === "players" ? <PlayersManager players={scopedProps.players} isAdmin={props.isAdmin} onSavePlayers={props.savePlayers} /> : null}{tab === "events" ? <ShellSection><PageIntro eyebrow="Training" title="Training & Calendar" subtitle="Session plans, fixtures, attendance and recurring weekly events." /><EventsTabContent {...scopedProps} /></ShellSection> : null}{tab === "coaches" ? <ShellSection><PageIntro eyebrow="Club" title="Club Workspace" subtitle="Teams, coaches, approvals and administration." /><CoachesTabContent {...scopedProps} />{props.isAdmin ? <><TeamsAdminPanel teams={switcherTeams} /><UserApprovalCentre /></> : null}</ShellSection> : null}{tab === "match" ? <ShellSection><MatchLineupSnapshot {...scopedProps} /><MatchTabContent {...scopedProps} /></ShellSection> : null}{tab === "stats" ? <ShellSection><PageIntro eyebrow="Insights" title="Insights Hub" subtitle="Season minutes, attendance trends, player statistics and match reports." /><StatsTab teamName={props.normalizeTeamName ? props.normalizeTeamName(activeTeamName) : activeTeamName} results={scopedProps.leagueResults} players={scopedProps.players} ratings={scopedProps.playerRatings} timeline={props.timeline || []} /></ShellSection> : null}</div><BottomNav tab={props.tab as MainTab} setTab={props.setTab} /><EventFormModal {...props} open={props.showEventForm} onSave={props.addEvent} onClose={() => props.setShowEventForm(false)} /><MatchEventModal open={props.showMatchEventModal} editingTimelineId={props.editingTimelineId} eventDraft={props.eventDraft || ({} as MatchEventDraft)} setEventDraft={props.setEventDraft as MatchEventDraftSetter} matchPlayers={scopedProps.matchPlayers || scopedProps.players} onSave={props.saveMatchEvent} onClose={() => props.setShowMatchEventModal(false)} />{props.setShowSeasonModal ? <SeasonModal open={props.showSeasonModal} value={props.seasonForm} setValue={props.setSeasonForm} onSave={props.handleCreateSeason} onClose={() => props.setShowSeasonModal(false)} /> : null}</main>
 }
