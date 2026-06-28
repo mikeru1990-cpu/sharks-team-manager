@@ -6,17 +6,18 @@ import PlayersScreen from "./app/components/players/PlayersScreen"
 import EventsScreen from "./app/components/events/EventsScreen"
 
 import type { MainTab } from "./app/lib/types"
+import type { WorkspaceTab } from "./app/lib/workspaces"
 
 type Props = {
   activeTab: MainTab
 }
 
-export default function AppRouter({
-  activeTab,
-}: Props) {
+const noopNavigate = (_tab: WorkspaceTab) => {}
+
+export default function AppRouter({ activeTab }: Props) {
   switch (activeTab) {
     case "home":
-      return <HomeMissionControl />
+      return <HomeMissionControl onNavigate={noopNavigate} />
 
     case "match":
       return <MatchdayScreen />
@@ -28,6 +29,6 @@ export default function AppRouter({
       return <EventsScreen />
 
     default:
-      return <HomeMissionControl />
+      return <HomeMissionControl onNavigate={noopNavigate} />
   }
 }
