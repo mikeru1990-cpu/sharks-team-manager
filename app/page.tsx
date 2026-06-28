@@ -8,7 +8,7 @@ import AuthGate from "./components/AuthGate"
 import PremiumAppShell from "./components/layout/PremiumAppShell"
 import AppRouter from "./components/navigation/AppRouter"
 
-import type { MainTab } from "./lib/types"
+import type { WorkspaceTab } from "./lib/workspaces"
 
 function AppDashboard({
   isAdmin,
@@ -17,8 +17,7 @@ function AppDashboard({
   isAdmin: boolean
   signOut: () => Promise<void>
 }) {
-  const [activeTab, setActiveTab] =
-    useState<MainTab>("home")
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("home")
 
   return (
     <PremiumAppShell
