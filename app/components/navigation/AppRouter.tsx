@@ -11,12 +11,13 @@ import type { WorkspaceTab } from "../../lib/workspaces"
 
 type Props = {
   activeTab: WorkspaceTab
+  onNavigate: (tab: WorkspaceTab) => void
 }
 
-export default function AppRouter({ activeTab }: Props) {
+export default function AppRouter({ activeTab, onNavigate }: Props) {
   switch (activeTab) {
     case "home":
-      return <HomeMissionControl />
+      return <HomeMissionControl onNavigate={onNavigate} />
 
     case "matchday":
       return <MatchdayScreen />
@@ -34,6 +35,6 @@ export default function AppRouter({ activeTab }: Props) {
       return <ClubScreen />
 
     default:
-      return <HomeMissionControl />
+      return <HomeMissionControl onNavigate={onNavigate} />
   }
 }
