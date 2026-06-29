@@ -27,7 +27,7 @@ export default function PremiumAppShell({ children, activeTab, onTabChange }: Pr
             <div style={{ fontSize: 18, fontWeight: 900 }}>{context.club.name}</div>
             <div style={{ marginTop: 2, color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 800 }}>{context.team.name} · {context.team.season}</div>
           </div>
-          <div style={{ borderRadius: 999, padding: "7px 10px", background: "rgba(37,99,235,0.2)", border: "1px solid rgba(96,165,250,0.25)", fontSize: 12, fontWeight: 800 }}>Build 22.2</div>
+          <div style={{ borderRadius: 999, padding: "7px 10px", background: "rgba(37,99,235,0.2)", border: "1px solid rgba(96,165,250,0.25)", fontSize: 12, fontWeight: 800 }}>Recovery 23</div>
         </div>
       </header>
 
