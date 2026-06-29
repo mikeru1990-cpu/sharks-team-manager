@@ -1,27 +1,15 @@
 "use client"
 
+import TeamScopeBanner from "../layout/TeamScopeBanner"
 import { getActiveU11Players } from "../../lib/realTeamData"
 
 const players = getActiveU11Players()
-const seasonStats = {
-  played: 0,
-  won: 0,
-  drawn: 0,
-  lost: 0,
-  goalsFor: 0,
-  goalsAgainst: 0,
-}
+const seasonStats = { played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0 }
 
 export default function InsightsScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18, paddingBottom: 132 }}>
-      <div>
-        <div style={{ opacity: 0.72, fontSize: 12, fontWeight: 900, letterSpacing: 0.8 }}>REAL INSIGHTS</div>
-        <h1 style={{ margin: "6px 0 4px", fontSize: 34, letterSpacing: -1.2 }}>Insights</h1>
-        <p style={{ margin: 0, color: "rgba(226,232,240,0.72)", lineHeight: 1.5 }}>
-          Real Leonard Stanley U11 Girls season data only. Fake results, league tables and generated statistics have been removed.
-        </p>
-      </div>
+      <TeamScopeBanner section="Insights" detail="U11 season data only. No fake results, fake league tables or generated opponent records are shown." />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12 }}>
         <Tile label="Squad" value={players.length.toString()} note="active U11 players" />
