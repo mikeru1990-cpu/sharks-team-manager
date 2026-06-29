@@ -49,23 +49,8 @@ export const leonardStanleyCoaches: RealCoach[] = [
 ]
 
 export const leonardStanleyEvents: RealEvent[] = [
-  {
-    id: "training-restart-2026-07-08",
-    title: "Training restarts",
-    type: "training",
-    dateLabel: "8 July 2026",
-    timeLabel: "17:45",
-    location: "Leonard Stanley pitch",
-    notes: "Training restart after pitch maintenance break.",
-  },
-  {
-    id: "dursley-town-tournament-2026-06-14",
-    title: "Dursley Town Girls FC Tournament",
-    type: "tournament",
-    dateLabel: "14 June 2026",
-    location: "Rednock School, Kingshill Road, Dursley GL11 4BY",
-    notes: "U10 competition, 6-a-side plus 4 subs, 10 player squad limit.",
-  },
+  { id: "training-restart-2026-07-08", title: "Training restarts", type: "training", dateLabel: "8 July 2026", timeLabel: "17:45", location: "Leonard Stanley pitch", notes: "Training restart after pitch maintenance break." },
+  { id: "dursley-town-tournament-2026-06-14", title: "Dursley Town Girls FC Tournament", type: "tournament", dateLabel: "14 June 2026", location: "Rednock School, Kingshill Road, Dursley GL11 4BY", notes: "U10 competition, 6-a-side plus 4 subs, 10 player squad limit." },
 ]
 
 export function getPlayersForTeam(team: RealPlayer["team"]) {
@@ -74,4 +59,12 @@ export function getPlayersForTeam(team: RealPlayer["team"]) {
 
 export function getActiveU11Players() {
   return leonardStanleyPlayers.filter((player) => player.team === "U11 Girls" && player.status === "active")
+}
+
+export function getAllKnownPlayers() {
+  return leonardStanleyPlayers
+}
+
+export function getPlayersByStatus(status: RealPlayer["status"]) {
+  return leonardStanleyPlayers.filter((player) => player.status === status)
 }
