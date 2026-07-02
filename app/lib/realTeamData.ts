@@ -2,8 +2,8 @@ export type RealPlayer = {
   id: string
   name: string
   knownAs?: string
-  team: "U10 Girls" | "U11 Girls" | "Pending"
-  status: "active" | "pending" | "unknown"
+  team: "U10 Girls" | "U11 Girls" | "Team TBC"
+  status: "confirmed" | "continuing_tbc" | "unknown"
   notes?: string
 }
 
@@ -26,20 +26,17 @@ export type RealEvent = {
 }
 
 export const leonardStanleyPlayers: RealPlayer[] = [
-  { id: "bailee-dowler-rowles", name: "Bailee Dowler-Rowles", team: "U10 Girls", status: "unknown" },
-  { id: "bella-bainbridge", name: "Bella Bainbridge", knownAs: "Bella B", team: "U11 Girls", status: "active" },
-  { id: "betsy-rowland", name: "Betsy Rowland", team: "U10 Girls", status: "unknown" },
-  { id: "connie-luff", name: "Connie Luff", team: "U11 Girls", status: "active" },
-  { id: "darcy-rae-russell", name: "Darcy-Rae Russell", team: "U11 Girls", status: "active", notes: "Confirmed continuing with U11s." },
-  { id: "ella-wilson", name: "Ella Wilson", team: "U11 Girls", status: "active" },
-  { id: "elsy-harmer", name: "Elsy Harmer", team: "U10 Girls", status: "unknown" },
-  { id: "evelyn-evans", name: "Evelyn Evans", team: "U10 Girls", status: "unknown" },
-  { id: "isabella-ogden", name: "Isabella Ogden", knownAs: "Bella O", team: "U11 Girls", status: "active", notes: "Known as Bella O, not Bella Bainbridge." },
-  { id: "lyra-twinning", name: "Lyra Twinning", team: "Pending", status: "pending", notes: "Could play up an age group." },
-  { id: "martha-scrivens", name: "Martha Scrivens", team: "U11 Girls", status: "active" },
-  { id: "olivia-hassall", name: "Olivia Hassall", team: "U11 Girls", status: "active" },
-  { id: "poppy-bennett", name: "Poppy Bennett", team: "U10 Girls", status: "unknown" },
-  { id: "ruby-salter", name: "Ruby Salter", team: "U11 Girls", status: "active" },
+  { id: "darcy-rae-russell", name: "Darcy-Rae Russell", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "betsy-rowland", name: "Betsy Rowland", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "poppy-bennett", name: "Poppy Bennett", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "martha-scrivens", name: "Martha Scrivens", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "isabella-ogden", name: "Isabella Ogden", knownAs: "Bella O", team: "U11 Girls", status: "confirmed", notes: "Known as Bella O, not Bella Bainbridge." },
+  { id: "olivia-hassall", name: "Olivia Hassall", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "ella-wilson", name: "Ella Wilson", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "bella-bainbridge", name: "Bella Bainbridge", knownAs: "Bella B", team: "U11 Girls", status: "confirmed", notes: "Known as Bella B." },
+  { id: "ruby-salter", name: "Ruby Salter", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "connie-luff", name: "Connie Luff", team: "U11 Girls", status: "confirmed", notes: "Confirmed U11 Lioness." },
+  { id: "lyra-twinning", name: "Lyra Twinning", team: "Team TBC", status: "continuing_tbc", notes: "Continuing. Training arrangements will determine whether she joins U10, U11 or both." },
 ]
 
 export const leonardStanleyCoaches: RealCoach[] = [
@@ -58,7 +55,15 @@ export function getPlayersForTeam(team: RealPlayer["team"]) {
 }
 
 export function getActiveU11Players() {
-  return leonardStanleyPlayers.filter((player) => player.team === "U11 Girls" && player.status === "active")
+  return leonardStanleyPlayers.filter((player) => player.team === "U11 Girls" && player.status === "confirmed")
+}
+
+export function getConfirmedU11Players() {
+  return getActiveU11Players()
+}
+
+export function getContinuingTeamTbcPlayers() {
+  return leonardStanleyPlayers.filter((player) => player.status === "continuing_tbc")
 }
 
 export function getAllKnownPlayers() {
