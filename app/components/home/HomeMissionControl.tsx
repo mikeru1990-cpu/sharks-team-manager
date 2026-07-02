@@ -3,12 +3,12 @@
 import { CalendarDays, ClipboardCheck, Dumbbell, MessageSquare, Trophy, Users } from "lucide-react"
 import TeamContextHeader from "../layout/TeamContextHeader"
 import type { WorkspaceTab } from "../../lib/workspaces"
-import { getActiveU11Players, leonardStanleyEvents, leonardStanleyPlayers } from "../../lib/realTeamData"
+import { getActiveU11Players, getContinuingTeamTbcPlayers, leonardStanleyEvents } from "../../lib/realTeamData"
 
 type Props = { onNavigate: (tab: WorkspaceTab) => void }
 
 const players = getActiveU11Players()
-const pending = leonardStanleyPlayers.filter((player) => player.status === "pending")
+const continuingTbc = getContinuingTeamTbcPlayers()
 const nextEvent = leonardStanleyEvents[0]
 
 const cardStyle = {
@@ -36,8 +36,8 @@ export default function HomeMissionControl({ onNavigate }: Props) {
       <TeamContextHeader currentSection="Home" nextEventLabel={`${nextEvent.title}: ${nextEvent.dateLabel}`} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10 }}>
-        <StatTile label="U11 Players" value={players.length.toString()} />
-        <StatTile label="Pending" value={pending.length.toString()} />
+        <StatTile label="Confirmed" value={players.length.toString()} />
+        <StatTile label="Team TBC" value={continuingTbc.length.toString()} />
         <StatTile label="Matches" value="0" />
         <StatTile label="Training" value="1" />
       </div>
@@ -62,7 +62,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
 
       <section style={cardStyle}>
         <h2 style={{ margin: 0, fontSize: 21 }}>Real Data Status</h2>
-        <Feed items={["Fake home availability removed", "Fake AI alerts removed", "Season stats will stay empty until real matches are recorded"]} />
+        <Feed items={["10 confirmed U11 Lionesses", "1 continuing player with final team TBC", "Season stats will stay empty until real matches are recorded"]} />
       </section>
     </div>
   )
