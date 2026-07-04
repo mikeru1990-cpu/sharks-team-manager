@@ -1,7 +1,7 @@
 "use client"
 
-import MatchCentreWorkflow from "./MatchCentreWorkflow"
+import PremiumMatchCentre from "./PremiumMatchCentre"
 
 export default function MatchdayScreen() {
-  return <MatchCentreWorkflow />
+  return <PremiumMatchCentre />
 }
