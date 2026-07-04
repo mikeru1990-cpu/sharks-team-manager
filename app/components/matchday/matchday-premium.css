@@ -1,0 +1,76 @@
+.matchday-premium-shell {
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 4px clamp(2px, 1vw, 12px) 0;
+}
+
+.matchday-premium-shell * {
+  box-sizing: border-box;
+}
+
+.matchday-premium-shell button {
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.matchday-premium-shell button:active {
+  transform: scale(.975);
+}
+
+.matchday-premium-shell section {
+  isolation: isolate;
+}
+
+@media (min-width: 900px) {
+  .matchday-premium-shell > div {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .matchday-premium-shell > div > section:nth-of-type(1),
+  .matchday-premium-shell > div > section:nth-of-type(2),
+  .matchday-premium-shell > div > div:nth-of-type(1),
+  .matchday-premium-shell > div > section:nth-of-type(3),
+  .matchday-premium-shell > div > section:nth-of-type(4),
+  .matchday-premium-shell > div > section:nth-last-of-type(1) {
+    grid-column: 1 / -1;
+  }
+
+  .matchday-premium-shell > div > section:nth-of-type(5),
+  .matchday-premium-shell > div > section:nth-of-type(7) {
+    grid-column: span 7;
+  }
+
+  .matchday-premium-shell > div > section:nth-of-type(6),
+  .matchday-premium-shell > div > section:nth-of-type(8) {
+    grid-column: span 5;
+  }
+}
+
+@media (max-width: 680px) {
+  .matchday-premium-shell {
+    padding-inline: 0;
+  }
+
+  .matchday-premium-shell h1 {
+    font-size: clamp(25px, 8vw, 33px) !important;
+  }
+
+  .matchday-premium-shell h2 {
+    font-size: 20px !important;
+  }
+
+  .matchday-premium-shell button {
+    font-size: 13px;
+  }
+}
+
+@media (hover: hover) {
+  .matchday-premium-shell button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(191, 219, 254, .34) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, .2);
+  }
+}
