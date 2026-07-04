@@ -1,7 +1,7 @@
 "use client"
 
-import PremiumMatchCentre from "./PremiumMatchCentre"
+import MatchdayCockpit from "./MatchdayCockpit"
 
 export default function MatchdayScreen() {
-  return <PremiumMatchCentre />
+  return <MatchdayCockpit />
 }
