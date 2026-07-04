@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { getActiveU11Players } from "../../lib/realTeamData"
+import { getPlayerRole, getPlayerRoleLabel } from "../../lib/playerRoles"
 
 const players = getActiveU11Players()
 const quarterMinutes = 15
@@ -67,7 +68,7 @@ export default function MatchdayCockpit() {
         <div>
           <div style={eyebrow}>FOOTBALL OS / MATCHDAY</div>
           <h1 style={title}>Leonard Stanley U11</h1>
-          <div style={subtle}>Live cockpit · rotation engine · 2-3-1 shape</div>
+          <div style={subtle}>Live cockpit · roles restored · rotation engine · 2-3-1 shape</div>
         </div>
         <div style={scoreBlock}>
           <div style={score}>{home}<span style={{ opacity: 0.35 }}>-</span>{away}</div>
@@ -100,12 +101,12 @@ export default function MatchdayCockpit() {
             <div style={eyebrow}>COACH INTELLIGENCE</div>
             <h2 style={sectionTitle}>Rotation read</h2>
           </div>
-          <div style={softPill}>Fairness live</div>
+          <div style={softPill}>Roles visible</div>
         </div>
         <div style={insightGrid}>
           <Insight title="Active block" text={`Q${activeQuarter + 1}: ${starters.length} on, ${bench.length} rotating.`} />
           <Insight title="Lowest minutes" text={`${fairness} currently planned for ${lowestMinutes} minutes.`} />
-          <Insight title="Goalkeeper" text="Darcy-Rae remains locked as the goalkeeper block across quarters." />
+          <Insight title="Goalkeeper" text="Darcy-Rae is locked as GK. Player roles are now visible across the match cockpit." />
         </div>
       </section>
 
@@ -121,7 +122,7 @@ export default function MatchdayCockpit() {
           <div style={pitch}>
             <div style={halfway} />
             <div style={circle} />
-            {starters.map((player, index) => <PlayerDot key={player.id} name={player.name} index={index} />)}
+            {starters.map((player, index) => <PlayerDot key={player.id} id={player.id} name={player.name} index={index} />)}
           </div>
         </div>
 
@@ -143,7 +144,7 @@ export default function MatchdayCockpit() {
             {rotation.map((quarter, index) => (
               <div key={index} style={index === activeQuarter ? rotationRowActive : rotationRow}>
                 <strong>Q{index + 1}</strong>
-                <span>{quarter.map((player) => shortName(player.name)).join(" · ")}</span>
+                <span>{quarter.map((player) => `${shortName(player.name)} (${getPlayerRole(player.id).matchRole})`).join(" · ")}</span>
               </div>
             ))}
           </div>
@@ -153,7 +154,7 @@ export default function MatchdayCockpit() {
       <section style={splitGrid}>
         <div style={glassPanel}>
           <div style={sectionHeader}><h2 style={sectionTitle}>Q{activeQuarter + 1} bench</h2><div style={softPill}>{bench.length} ready</div></div>
-          <div style={playerList}>{bench.map((player) => <PlayerChip key={player.id} label={player.name} prefix="↻" />)}</div>
+          <div style={playerList}>{bench.map((player) => <PlayerChip key={player.id} id={player.id} label={player.name} prefix="↻" minutes={minutesMap[player.id]} />)}</div>
         </div>
         <div style={glassPanel}>
           <div style={sectionHeader}><h2 style={sectionTitle}>Touchline actions</h2><div style={softPill}>One tap</div></div>
@@ -168,12 +169,12 @@ export default function MatchdayCockpit() {
 
       <section style={glassPanel}>
         <div style={sectionHeader}><h2 style={sectionTitle}>Record goal</h2><div style={softPill}>Player picker</div></div>
-        <div style={goalGrid}>{players.map((player) => <button key={player.id} style={goalButton} onClick={() => scoreGoal(player.name)}>⚽ {player.name}</button>)}</div>
+        <div style={goalGrid}>{players.map((player) => <button key={player.id} style={goalButton} onClick={() => scoreGoal(player.name)}>⚽ <strong>{player.name}</strong><span>{getPlayerRoleLabel(player.id)}</span></button>)}</div>
       </section>
 
       <section style={glassPanel}>
-        <div style={sectionHeader}><h2 style={sectionTitle}>Planned minutes</h2><div style={softPill}>Auto calculated</div></div>
-        <div style={minutesGrid}>{players.map((player) => <div key={player.id} style={minuteCard}><span>{shortName(player.name)}</span><strong>{minutesMap[player.id]}m</strong></div>)}</div>
+        <div style={sectionHeader}><h2 style={sectionTitle}>Planned minutes and roles</h2><div style={softPill}>Auto calculated</div></div>
+        <div style={minutesGrid}>{players.map((player) => <div key={player.id} style={minuteCard}><span><strong>{shortName(player.name)}</strong><em>{getPlayerRoleLabel(player.id)}</em></span><strong>{minutesMap[player.id]}m</strong></div>)}</div>
       </section>
 
       <section style={glassPanel}>
@@ -186,8 +187,8 @@ export default function MatchdayCockpit() {
 
 function Metric({ label, value }: { label: string; value: string }) { return <div style={metric}><span>{label}</span><strong>{value}</strong></div> }
 function Insight({ title, text }: { title: string; text: string }) { return <div style={insight}><strong>{title}</strong><span>{text}</span></div> }
-function PlayerChip({ label, prefix }: { label: string; prefix: string }) { return <div style={playerChip}><span>{prefix}</span>{label}</div> }
-function PlayerDot({ name, index }: { name: string; index: number }) { const pos = [[50,88],[31,67],[69,67],[50,49],[25,30],[75,30],[50,13]][index] || [50,50]; return <div style={{ ...playerDot, left: `${pos[0]}%`, top: `${pos[1]}%` }}>{shortName(name)}</div> }
+function PlayerChip({ id, label, prefix, minutes }: { id: string; label: string; prefix: string; minutes: number }) { const role = getPlayerRole(id); return <div style={playerChip}><span>{prefix}</span><div><strong>{label}</strong><em>{getPlayerRoleLabel(id)}</em></div><b>{role.matchRole} · {minutes}m</b></div> }
+function PlayerDot({ id, name, index }: { id: string; name: string; index: number }) { const pos = [[50,88],[31,67],[69,67],[50,49],[25,30],[75,30],[50,13]][index] || [50,50]; const role = getPlayerRole(id); return <div style={{ ...playerDot, left: `${pos[0]}%`, top: `${pos[1]}%` }}><small>{role.matchRole}</small><strong>{shortName(name)}</strong></div> }
 
 const shell = { display: "grid", gap: 14, paddingBottom: 144, color: "white" }
 const scoreboard = { borderRadius: 32, padding: 20, background: "radial-gradient(circle at top left, rgba(59,130,246,0.52), transparent 32%), linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,41,59,0.94))", border: "1px solid rgba(191,219,254,0.18)", boxShadow: "0 26px 60px rgba(0,0,0,0.35)", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }
@@ -215,7 +216,7 @@ const rotationCard = { ...glassPanel }
 const pitch = { position: "relative" as const, height: 420, marginTop: 14, borderRadius: 28, overflow: "hidden", background: "repeating-linear-gradient(90deg, rgba(22,163,74,0.92) 0 52px, rgba(21,128,61,0.92) 52px 104px)", border: "2px solid rgba(255,255,255,0.24)" }
 const halfway = { position: "absolute" as const, left: 0, right: 0, top: "50%", height: 2, background: "rgba(255,255,255,0.24)" }
 const circle = { position: "absolute" as const, left: "50%", top: "50%", width: 102, height: 102, borderRadius: 999, border: "2px solid rgba(255,255,255,0.24)", transform: "translate(-50%,-50%)" }
-const playerDot = { position: "absolute" as const, transform: "translate(-50%,-50%)", width: 82, minHeight: 58, borderRadius: 21, background: "linear-gradient(135deg,#2563eb,#7c3aed)", border: "1px solid rgba(255,255,255,0.30)", display: "grid", placeItems: "center", textAlign: "center" as const, padding: 7, boxShadow: "0 18px 32px rgba(0,0,0,0.32)", fontWeight: 950, fontSize: 11 }
+const playerDot = { position: "absolute" as const, transform: "translate(-50%,-50%)", width: 86, minHeight: 64, borderRadius: 21, background: "linear-gradient(135deg,#2563eb,#7c3aed)", border: "1px solid rgba(255,255,255,0.30)", display: "grid", placeItems: "center", textAlign: "center" as const, padding: 7, boxShadow: "0 18px 32px rgba(0,0,0,0.32)", fontWeight: 950, fontSize: 11 }
 const quarterTabs = { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 14 }
 const quarterButton = { border: "1px solid rgba(148,163,184,0.14)", borderRadius: 18, padding: 12, background: "rgba(2,6,23,0.48)", color: "white", cursor: "pointer", fontWeight: 950, display: "grid", gap: 4 }
 const activeQuarterButton = { ...quarterButton, background: "linear-gradient(135deg,rgba(37,99,235,0.48),rgba(124,58,237,0.36))", border: "1px solid rgba(147,197,253,0.28)" }
@@ -224,13 +225,13 @@ const rotationRow = { borderRadius: 18, padding: 13, background: "rgba(2,6,23,0.
 const rotationRowActive = { ...rotationRow, border: "1px solid rgba(147,197,253,0.26)", background: "rgba(37,99,235,0.16)", color: "white" }
 const splitGrid = { display: "grid", gap: 14 }
 const playerList = { display: "grid", gap: 8, marginTop: 12 }
-const playerChip = { borderRadius: 18, padding: 13, background: "rgba(2,6,23,0.46)", border: "1px solid rgba(148,163,184,0.10)", fontWeight: 900, display: "flex", gap: 10, alignItems: "center" }
+const playerChip = { borderRadius: 18, padding: 13, background: "rgba(2,6,23,0.46)", border: "1px solid rgba(148,163,184,0.10)", fontWeight: 900, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 10, alignItems: "center" }
 const buttonGrid = { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, marginTop: 12 }
 const action = { border: "1px solid rgba(147,197,253,0.16)", borderRadius: 18, padding: 14, background: "rgba(15,23,42,0.74)", color: "white", fontWeight: 950, cursor: "pointer" }
 const primaryAction = { ...action, background: "linear-gradient(135deg,#2563eb,#7c3aed)", boxShadow: "0 14px 28px rgba(37,99,235,0.24)" }
 const dangerAction = { ...action, background: "rgba(127,29,29,0.42)", border: "1px solid rgba(248,113,113,0.20)" }
 const goalGrid = { display: "grid", gap: 8, marginTop: 12 }
-const goalButton = { width: "100%", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: 14, background: "rgba(5,46,22,0.46)", color: "white", fontWeight: 950, textAlign: "left" as const, cursor: "pointer" }
+const goalButton = { width: "100%", border: "1px solid rgba(34,197,94,0.18)", borderRadius: 18, padding: 14, background: "rgba(5,46,22,0.46)", color: "white", fontWeight: 950, textAlign: "left" as const, cursor: "pointer", display: "grid", gap: 4 }
 const minutesGrid = { display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8, marginTop: 12 }
 const minuteCard = { borderRadius: 18, padding: 12, background: "rgba(2,6,23,0.46)", border: "1px solid rgba(148,163,184,0.10)", display: "flex", justifyContent: "space-between", gap: 10, fontWeight: 900 }
 const timeline = { display: "grid", gap: 8, marginTop: 12 }
