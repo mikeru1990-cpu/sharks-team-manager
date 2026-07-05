@@ -6,18 +6,13 @@ import { getPlayerRole, getPlayerRoleLabel } from "../../lib/playerRoles"
 
 const players = getActiveU11Players()
 const quarterMinutes = 15
+const storageKey = "football-os-matchday-state-v1"
 const matchModes = ["Control", "Lineup", "Live", "Quarters", "Stats"] as const
 
 type MatchMode = typeof matchModes[number]
 type MatchEventType = "goal" | "opp-goal" | "sub" | "injury" | "card" | "note"
-type MatchEvent = {
-  id: number
-  minute: number
-  quarter: number
-  type: MatchEventType
-  label: string
-  score: string
-}
+type MatchEvent = { id: number; minute: number; quarter: number; type: MatchEventType; label: string; score: string }
+type SavedMatchState = { seconds: number; home: number; away: number; activeQuarter: number; events: MatchEvent[] }
 
 function shortName(name: string) {
   if (name === "Darcy-Rae Russell") return "Darcy-Rae"
@@ -43,6 +38,28 @@ export default function MatchdayCockpit() {
   const [activeQuarter, setActiveQuarter] = useState(0)
   const [events, setEvents] = useState<MatchEvent[]>([])
   const [selectedGoalPlayer, setSelectedGoalPlayer] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (raw) {
+        const saved = JSON.parse(raw) as SavedMatchState
+        setSeconds(saved.seconds ?? 0)
+        setHome(saved.home ?? 0)
+        setAway(saved.away ?? 0)
+        setActiveQuarter(saved.activeQuarter ?? 0)
+        setEvents(Array.isArray(saved.events) ? saved.events : [])
+      }
+    } catch {}
+    setLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (!loaded) return
+    const saved: SavedMatchState = { seconds, home, away, activeQuarter, events }
+    window.localStorage.setItem(storageKey, JSON.stringify(saved))
+  }, [loaded, seconds, home, away, activeQuarter, events])
 
   useEffect(() => {
     if (!running) return
@@ -56,6 +73,7 @@ export default function MatchdayCockpit() {
   const clock = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`
   const minute = Math.max(1, Math.floor(seconds / 60))
   const matchState = seconds === 0 ? "READY" : running ? "LIVE" : "PAUSED"
+  const latestEvent = events[0]
 
   const minutesMap = useMemo(() => {
     const map: Record<string, number> = {}
@@ -67,10 +85,7 @@ export default function MatchdayCockpit() {
   const lowestMinutes = Math.min(...Object.values(minutesMap))
   const fairnessPlayers = players.filter((player) => minutesMap[player.id] === lowestMinutes)
   const nextQuarterIndex = Math.min(activeQuarter + 1, rotation.length - 1)
-  const nextQuarter = rotation[nextQuarterIndex]
-  const nextRotationText = nextQuarterIndex === activeQuarter
-    ? "Final quarter active"
-    : `${bench[0] ? shortName(bench[0].name) : "Bench"} ready for Q${nextQuarterIndex + 1}`
+  const nextRotationText = nextQuarterIndex === activeQuarter ? "Final quarter active" : `${bench[0] ? shortName(bench[0].name) : "Bench"} ready for Q${nextQuarterIndex + 1}`
 
   function addEvent(type: MatchEventType, label: string, nextScore = `${home}-${away}`) {
     setEvents((current) => [{ id: Date.now(), minute, quarter: activeQuarter + 1, type, label, score: nextScore }, ...current])
@@ -91,6 +106,14 @@ export default function MatchdayCockpit() {
     addEvent("opp-goal", "Opposition goal", `${home}-${nextAway}`)
   }
 
+  function undoLastEvent() {
+    const last = events[0]
+    if (!last) return
+    if (last.type === "goal") setHome((value) => Math.max(0, value - 1))
+    if (last.type === "opp-goal") setAway((value) => Math.max(0, value - 1))
+    setEvents((current) => current.slice(1))
+  }
+
   function resetMatch() {
     setRunning(false)
     setSeconds(0)
@@ -100,6 +123,7 @@ export default function MatchdayCockpit() {
     setEvents([])
     setSelectedGoalPlayer(null)
     setMode("Control")
+    window.localStorage.removeItem(storageKey)
   }
 
   return (
@@ -108,7 +132,7 @@ export default function MatchdayCockpit() {
         <div>
           <div style={eyebrow}>FOOTBALL OS / MATCHDAY</div>
           <h1 style={title}>Leonard Stanley U11</h1>
-          <div style={subtle}>Focused cockpit · live rotation · role-aware match control</div>
+          <div style={subtle}>Focused cockpit · saved on device · role-aware match control</div>
         </div>
         <div style={scoreBlock}>
           <div style={score}>{home}<span style={{ opacity: 0.35 }}>-</span>{away}</div>
@@ -117,25 +141,15 @@ export default function MatchdayCockpit() {
       </section>
 
       <nav style={modeBar}>
-        {matchModes.map((item) => (
-          <button key={item} type="button" onClick={() => setMode(item)} style={mode === item ? activeModeButton : modeButton}>
-            {item}
-          </button>
-        ))}
+        {matchModes.map((item) => <button key={item} type="button" onClick={() => setMode(item)} style={mode === item ? activeModeButton : modeButton}>{item}</button>)}
       </nav>
 
       {mode === "Control" && (
         <>
           <section style={controlDock}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center" }}>
-              <div>
-                <div style={eyebrow}>Q{activeQuarter + 1} · MATCH CLOCK</div>
-                <div style={clockText}>{clock}</div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 900 }}>ON PITCH</div>
-                <div style={{ fontSize: 28, fontWeight: 950 }}>{starters.length}/7</div>
-              </div>
+              <div><div style={eyebrow}>Q{activeQuarter + 1} · MATCH CLOCK</div><div style={clockText}>{clock}</div></div>
+              <div style={{ textAlign: "right" }}><div style={{ color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 900 }}>ON PITCH</div><div style={{ fontSize: 28, fontWeight: 950 }}>{starters.length}/7</div></div>
             </div>
             <div style={controlGrid}>
               <button style={primaryAction} onClick={() => setRunning(!running)}>{running ? "Pause" : "Start"}</button>
@@ -151,51 +165,28 @@ export default function MatchdayCockpit() {
 
           <section style={glassPanel}>
             <div style={coachAlertIcon}>↻</div>
-            <div>
-              <div style={eyebrow}>NEXT ROTATION</div>
-              <h2 style={{ ...sectionTitle, marginTop: 4 }}>{nextRotationText}</h2>
-              <p style={paragraph}>{fairnessPlayers.map((player) => shortName(player.name)).join(" · ")} lowest planned minutes at {lowestMinutes}m.</p>
-            </div>
+            <div><div style={eyebrow}>NEXT ROTATION</div><h2 style={{ ...sectionTitle, marginTop: 4 }}>{nextRotationText}</h2><p style={paragraph}>{fairnessPlayers.map((player) => shortName(player.name)).join(" · ")} lowest planned minutes at {lowestMinutes}m.</p></div>
             <button style={primaryAction} onClick={() => setMode("Quarters")}>Open planner</button>
           </section>
 
           <section style={glassPanel}>
-            <div style={sectionHeader}><h2 style={sectionTitle}>Coach alert</h2><div style={softPill}>Live read</div></div>
-            <p style={paragraph}>Darcy-Rae is locked as goalkeeper. Roles and planned minutes are visible in Lineup and Stats.</p>
+            <div style={sectionHeader}><h2 style={sectionTitle}>Last action</h2><button style={action} onClick={undoLastEvent} disabled={!latestEvent}>Undo</button></div>
+            <p style={paragraph}>{latestEvent ? `${latestEvent.minute}' · ${latestEvent.label} · ${latestEvent.score}` : "No match actions recorded yet. Match state will stay saved if the page refreshes."}</p>
           </section>
         </>
       )}
 
       {mode === "Lineup" && (
         <>
-          <section style={pitchCard}>
-            <div style={sectionHeader}>
-              <div>
-                <div style={eyebrow}>TACTICAL PITCH</div>
-                <h2 style={sectionTitle}>Q{activeQuarter + 1} lineup</h2>
-              </div>
-              <div style={softPill}>2-3-1</div>
-            </div>
-            <div style={pitch}>
-              <div style={halfway} />
-              <div style={circle} />
-              {starters.map((player, index) => <PlayerDot key={player.id} id={player.id} name={player.name} index={index} />)}
-            </div>
-          </section>
-          <section style={glassPanel}>
-            <div style={sectionHeader}><h2 style={sectionTitle}>Bench tray</h2><div style={softPill}>{bench.length} ready</div></div>
-            <div style={benchTray}>{bench.map((player) => <PlayerChip key={player.id} id={player.id} label={player.name} minutes={minutesMap[player.id]} />)}</div>
-          </section>
+          <section style={pitchCard}><div style={sectionHeader}><div><div style={eyebrow}>TACTICAL PITCH</div><h2 style={sectionTitle}>Q{activeQuarter + 1} lineup</h2></div><div style={softPill}>2-3-1</div></div><div style={pitch}><div style={halfway} /><div style={circle} />{starters.map((player, index) => <PlayerDot key={player.id} id={player.id} name={player.name} index={index} />)}</div></section>
+          <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Bench tray</h2><div style={softPill}>{bench.length} ready</div></div><div style={benchTray}>{bench.map((player) => <PlayerChip key={player.id} id={player.id} label={player.name} minutes={minutesMap[player.id]} />)}</div></section>
         </>
       )}
 
       {mode === "Live" && (
         <>
           <section style={controlDock}>
-            <div style={sectionHeader}>
-              <div><div style={eyebrow}>LIVE ACTIONS</div><h2 style={sectionTitle}>Record key moments</h2></div>
-              <div style={softPill}>Q{activeQuarter + 1} · {clock}</div>
-            </div>
+            <div style={sectionHeader}><div><div style={eyebrow}>LIVE ACTIONS</div><h2 style={sectionTitle}>Record key moments</h2></div><div style={softPill}>Q{activeQuarter + 1} · {clock}</div></div>
             <div style={liveActionGrid}>
               <button style={primaryAction} onClick={() => addEvent("sub", `Q${activeQuarter + 1} substitution`)}>Substitution</button>
               <button style={goalAction} onClick={() => setSelectedGoalPlayer(selectedGoalPlayer ? null : "open")}>Goal</button>
@@ -205,66 +196,25 @@ export default function MatchdayCockpit() {
               <button style={action} onClick={() => addEvent("note", "Coach note")}>Note</button>
             </div>
           </section>
-
-          {selectedGoalPlayer && (
-            <section style={glassPanel}>
-              <div style={sectionHeader}><h2 style={sectionTitle}>Who scored?</h2><button style={action} onClick={() => setSelectedGoalPlayer(null)}>Close</button></div>
-              <div style={goalPickerGrid}>{players.map((player) => <button key={player.id} style={goalButton} onClick={() => scoreGoal(player.id)}>⚽ <strong>{player.name}</strong><span>{getPlayerRoleLabel(player.id)}</span></button>)}</div>
-            </section>
-          )}
-
-          <TimelinePanel events={events} />
+          {selectedGoalPlayer && <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Who scored?</h2><button style={action} onClick={() => setSelectedGoalPlayer(null)}>Close</button></div><div style={goalPickerGrid}>{players.map((player) => <button key={player.id} style={goalButton} onClick={() => scoreGoal(player.id)}>⚽ <strong>{player.name}</strong><span>{getPlayerRoleLabel(player.id)}</span></button>)}</div></section>}
+          <TimelinePanel events={events} onUndo={undoLastEvent} />
         </>
       )}
 
       {mode === "Quarters" && (
         <>
-          <section style={glassPanel}>
-            <div style={sectionHeader}>
-              <div><div style={eyebrow}>QUARTER PLANNER</div><h2 style={sectionTitle}>Q1–Q4 rotation</h2></div>
-              <div style={softPill}>{quarterMinutes}m blocks</div>
-            </div>
-            <div style={quarterTabs}>
-              {rotation.map((quarter, index) => (
-                <button key={index} onClick={() => setActiveQuarter(index)} style={activeQuarter === index ? activeQuarterButton : quarterButton}>Q{index + 1}<span>{quarter.length} on</span></button>
-              ))}
-            </div>
-            <div style={quickControls}>
-              <button style={primaryAction} onClick={() => addEvent("note", `Saved Q${activeQuarter + 1} plan`)}>Save</button>
-              <button style={action} onClick={() => addEvent("note", "Loaded saved quarter plan")}>Load</button>
-              <button style={action} onClick={() => addEvent("note", "Auto-generated fair rotation")}>Auto</button>
-            </div>
-          </section>
-
-          <section style={glassPanel}>
-            <div style={sectionHeader}><h2 style={sectionTitle}>Current quarter</h2><div style={softPill}>Q{activeQuarter + 1}</div></div>
-            <div style={summaryPills}>
-              <span>Starters {starters.length}</span>
-              <span>Bench {bench.length}</span>
-              <span>GK Darcy-Rae Russell</span>
-            </div>
-          </section>
-
-          <section style={glassPanel}>
-            <div style={sectionHeader}><h2 style={sectionTitle}>Saved quarter plans</h2><div style={softPill}>Load / save</div></div>
-            <div style={rotationList}>{rotation.map((quarter, index) => <div key={index} style={index === activeQuarter ? rotationRowActive : rotationRow}><strong>Quarter {index + 1}</strong><span>{quarter.map((player) => `${shortName(player.name)} (${getPlayerRole(player.id).matchRole})`).join(" · ")}</span><button style={action} onClick={() => setActiveQuarter(index)}>Load</button></div>)}</div>
-          </section>
+          <section style={glassPanel}><div style={sectionHeader}><div><div style={eyebrow}>QUARTER PLANNER</div><h2 style={sectionTitle}>Q1–Q4 rotation</h2></div><div style={softPill}>{quarterMinutes}m blocks</div></div><div style={quarterTabs}>{rotation.map((quarter, index) => <button key={index} onClick={() => setActiveQuarter(index)} style={activeQuarter === index ? activeQuarterButton : quarterButton}>Q{index + 1}<span>{quarter.length} on</span></button>)}</div><div style={quickControls}><button style={primaryAction} onClick={() => addEvent("note", `Saved Q${activeQuarter + 1} plan`)}>Save</button><button style={action} onClick={() => addEvent("note", "Loaded saved quarter plan")}>Load</button><button style={action} onClick={() => addEvent("note", "Auto-generated fair rotation")}>Auto</button></div></section>
+          <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Current quarter</h2><div style={softPill}>Q{activeQuarter + 1}</div></div><div style={summaryPills}><span>Starters {starters.length}</span><span>Bench {bench.length}</span><span>GK Darcy-Rae Russell</span></div></section>
+          <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Saved quarter plans</h2><div style={softPill}>Load / save</div></div><div style={rotationList}>{rotation.map((quarter, index) => <div key={index} style={index === activeQuarter ? rotationRowActive : rotationRow}><strong>Quarter {index + 1}</strong><span>{quarter.map((player) => `${shortName(player.name)} (${getPlayerRole(player.id).matchRole})`).join(" · ")}</span><button style={action} onClick={() => setActiveQuarter(index)}>Load</button></div>)}</div></section>
         </>
       )}
 
       {mode === "Stats" && (
         <>
-          <section style={statsGrid}>
-            <Metric label="Total time" value="60:00" />
-            <Metric label="Score" value={`${home}-${away}`} />
-            <Metric label="Events" value={events.length.toString()} />
-            <Metric label="Lowest mins" value={`${lowestMinutes}`} />
-          </section>
-          <section style={glassPanel}>
-            <div style={sectionHeader}><h2 style={sectionTitle}>Player minutes</h2><div style={softPill}>Planned</div></div>
-            <div style={minutesList}>{players.map((player) => <div key={player.id} style={minuteRow}><span><strong>{player.name}</strong><em>{getPlayerRoleLabel(player.id)}</em></span><strong>{minutesMap[player.id]}m</strong></div>)}</div>
-          </section>
-          <TimelinePanel events={events} />
+          <section style={statsGrid}><Metric label="Total time" value="60:00" /><Metric label="Score" value={`${home}-${away}`} /><Metric label="Events" value={events.length.toString()} /><Metric label="Lowest mins" value={`${lowestMinutes}`} /></section>
+          <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Player minutes</h2><div style={softPill}>Planned</div></div><div style={minutesList}>{players.map((player) => <div key={player.id} style={minuteRow}><span><strong>{player.name}</strong><em>{getPlayerRoleLabel(player.id)}</em></span><strong>{minutesMap[player.id]}m</strong></div>)}</div></section>
+          <TimelinePanel events={events} onUndo={undoLastEvent} />
+          <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Match state</h2><button style={dangerAction} onClick={resetMatch}>Clear match</button></div><p style={paragraph}>Score, clock, quarter and timeline are saved on this device.</p></section>
         </>
       )}
     </div>
@@ -275,7 +225,7 @@ function Metric({ label, value }: { label: string; value: string }) { return <di
 function PlayerMini({ id, name, number }: { id: string; name: string; number: number }) { return <div style={playerMini}><span>{number}</span><strong>{shortName(name)}</strong><em>{getPlayerRole(id).matchRole}</em></div> }
 function PlayerChip({ id, label, minutes }: { id: string; label: string; minutes: number }) { return <div style={playerChip}><div><strong>{label}</strong><em>{getPlayerRoleLabel(id)}</em></div><b>{getPlayerRole(id).matchRole} · {minutes}m</b></div> }
 function PlayerDot({ id, name, index }: { id: string; name: string; index: number }) { const pos = [[50,88],[31,67],[69,67],[50,49],[25,30],[75,30],[50,13]][index] || [50,50]; const role = getPlayerRole(id); return <div style={{ ...playerDot, left: `${pos[0]}%`, top: `${pos[1]}%` }}><small>{role.matchRole}</small><strong>{shortName(name)}</strong></div> }
-function TimelinePanel({ events }: { events: MatchEvent[] }) { return <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Match timeline</h2><div style={softPill}>{events.length} events</div></div><div style={timeline}>{events.length === 0 ? <div style={emptyState}>No match events yet.</div> : events.map((event) => <div key={event.id} style={eventRow}><span>{event.minute}' · Q{event.quarter}</span><strong>{event.label}</strong><b>{event.score}</b></div>)}</div></section> }
+function TimelinePanel({ events, onUndo }: { events: MatchEvent[]; onUndo: () => void }) { return <section style={glassPanel}><div style={sectionHeader}><h2 style={sectionTitle}>Match timeline</h2><button style={action} onClick={onUndo} disabled={events.length === 0}>Undo last</button></div><div style={timeline}>{events.length === 0 ? <div style={emptyState}>No match events yet.</div> : events.map((event) => <div key={event.id} style={eventRow}><span>{event.minute}' · Q{event.quarter}</span><strong>{event.label}</strong><b>{event.score}</b></div>)}</div></section> }
 
 const shell = { display: "grid", gap: 14, paddingBottom: 144, color: "white" }
 const scoreboard = { borderRadius: 32, padding: 20, background: "radial-gradient(circle at top left, rgba(59,130,246,0.52), transparent 32%), linear-gradient(135deg, rgba(15,23,42,0.98), rgba(30,41,59,0.94))", border: "1px solid rgba(191,219,254,0.18)", boxShadow: "0 26px 60px rgba(0,0,0,0.35)", display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }
