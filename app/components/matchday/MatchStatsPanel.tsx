@@ -41,6 +41,7 @@ export default function MatchStatsPanel({ players, stats, homeScore, awayScore, 
             <StatButton label="Assist" value={playerStats.assists} onClick={() => onIncrement(player.id, "assists")} />
             <StatButton label="Save" value={playerStats.saves} onClick={() => onIncrement(player.id, "saves")} />
             <StatButton label="YC" value={playerStats.yellowCards} onClick={() => onIncrement(player.id, "yellowCards")} />
+            <StatButton label="RC" value={playerStats.redCards} onClick={() => onIncrement(player.id, "redCards")} />
             <button type="button" onClick={() => onPlayerOfMatch(player.id)} style={playerStats.playerOfMatch ? selectedPom : pomButton}>{playerStats.playerOfMatch ? "★ POTM" : "☆ POTM"}</button>
           </div>
         </div>
@@ -71,7 +72,7 @@ const summaryGrid = { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap
 const metric = { borderRadius: 16, padding: 12, background: "rgba(2,6,23,.44)", display: "grid", gap: 4 }
 const playerRow = { borderRadius: 18, padding: 12, background: "rgba(2,6,23,.44)", border: "1px solid rgba(148,163,184,.1)", display: "grid", gap: 10 }
 const subtle = { display: "block", color: "rgba(226,232,240,.62)", marginTop: 3 }
-const actions = { display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 6 }
+const actions = { display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", gap: 6 }
 const statButton = { border: "1px solid rgba(147,197,253,.15)", borderRadius: 13, padding: 9, background: "rgba(15,23,42,.74)", color: "white", display: "grid", gap: 2, cursor: "pointer" }
 const pomButton = { ...statButton, color: "#fde68a" }
 const selectedPom = { ...pomButton, background: "rgba(120,53,15,.42)", border: "1px solid rgba(251,191,36,.3)" }
