@@ -12,6 +12,7 @@ import type { WorkspaceTab } from "./lib/workspaces"
 
 const LAST_WORKSPACE_KEY = "football-os:last-workspace"
 const WORKSPACE_TABS: WorkspaceTab[] = ["home", "matchday", "training", "players", "insights", "club"]
+const AUTH_REQUIRED = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true"
 
 function AppDashboard({
   isAdmin,
@@ -51,7 +52,15 @@ function AppDashboard({
   )
 }
 
+async function previewSignOut() {
+  // Authentication is intentionally disabled for the private preview build.
+}
+
 export default function Page() {
+  if (!AUTH_REQUIRED) {
+    return <AppDashboard isAdmin={true} signOut={previewSignOut} />
+  }
+
   return (
     <AuthGate>
       {({ isAdmin, signOut }) => (
