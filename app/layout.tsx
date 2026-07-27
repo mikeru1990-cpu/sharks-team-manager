@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import OfflineSyncManager from "./components/OfflineSyncManager"
 import PwaRegister from "./components/PwaRegister"
 
 export const metadata: Metadata = {
@@ -45,6 +46,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <PwaRegister />
+        <OfflineSyncManager />
         {children}
       </body>
     </html>
