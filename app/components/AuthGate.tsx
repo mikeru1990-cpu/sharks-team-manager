@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
+import { ShieldCheck } from "lucide-react"
 import { loadAuthContext, type AuthContext } from "../lib/auth"
 import { supabase } from "../lib/supabase"
-import { TEAM, buttonPrimary, cardStyle } from "../lib/types"
+import Button from "./ui/Button"
+import Card from "./ui/Card"
+import Field from "./ui/Field"
+import ConnectionStatus from "./system/ConnectionStatus"
 
 type AuthGateProps = {
   children: (args: {
@@ -83,7 +87,7 @@ export default function AuthGate({ children }: AuthGateProps) {
       password,
     })
 
-    if (error) setMessage(error.message)
+    if (error) setMessage("We could not sign you in. Check your details and try again.")
     setSubmitting(false)
   }
 
@@ -95,95 +99,72 @@ export default function AuthGate({ children }: AuthGateProps) {
 
   if (loading) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          Opening Football OS…
-        </div>
+      <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
+        <Card elevated style={{ width: "100%", maxWidth: 420, textAlign: "center" }}>
+          <strong>Starting Football OS…</strong>
+          <p style={{ color: "var(--fos-text-muted)", marginBottom: 0 }}>Connecting securely to your club.</p>
+        </Card>
       </main>
     )
   }
 
   if (!supabase) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          <strong>Football OS is not connected to Supabase.</strong>
-          <p style={{ marginBottom: 0 }}>
+      <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
+        <Card elevated style={{ width: "100%", maxWidth: 460 }}>
+          <h1 style={{ marginTop: 0 }}>Cloud setup required</h1>
+          <p style={{ color: "var(--fos-text-muted)", lineHeight: 1.6 }}>
             Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to the deployment environment.
           </p>
-        </div>
+        </Card>
       </main>
     )
   }
 
   if (!authContext) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          padding: 20,
-          background: "linear-gradient(180deg, #f4f7fb 0%, #eaf0ff 100%)",
-        }}
-      >
-        <div style={{ maxWidth: 420, margin: "40px auto" }}>
-          <div
-            style={{
-              ...cardStyle(`linear-gradient(135deg, ${TEAM.primary} 0%, #0c235f 100%)`),
-              color: "white",
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ fontSize: 28, fontWeight: 900 }}>Football OS</div>
-            <div style={{ marginTop: 8, opacity: 0.85 }}>Private club access</div>
-          </div>
-
-          <div style={cardStyle()}>
-            <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-              Email address
-            </label>
-            <input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void signIn()
-              }}
-              style={{ width: "100%", padding: 12, marginBottom: 12 }}
-            />
-
-            <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
-              Password
-            </label>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") void signIn()
-              }}
-              style={{ width: "100%", padding: 12, marginBottom: 12 }}
-            />
-
-            <button
-              onClick={() => void signIn()}
-              disabled={submitting}
-              style={{ ...buttonPrimary(), opacity: submitting ? 0.65 : 1 }}
-            >
-              {submitting ? "Signing in…" : "Sign in"}
-            </button>
-
-            <p style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.7, marginBottom: 0 }}>
-              Football OS is currently invite-only. Your club administrator will create your access.
-            </p>
-
-            {message && (
-              <div role="alert" style={{ marginTop: 12, fontWeight: 700 }}>
-                {message}
+      <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
+        <div style={{ width: "100%", maxWidth: 430 }}>
+          <Card elevated style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: 24, background: "linear-gradient(135deg, var(--fos-blue-700), var(--fos-navy-950))", color: "white" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: ".12em", opacity: .78 }}>FOOTBALL OS</div>
+                  <h1 style={{ fontSize: 30, margin: "8px 0 6px" }}>Welcome back</h1>
+                  <p style={{ margin: 0, opacity: .82 }}>Your team. Your matchday. One place.</p>
+                </div>
+                <ShieldCheck size={34} aria-hidden="true" />
               </div>
-            )}
-          </div>
+            </div>
+
+            <div style={{ padding: 24, display: "grid", gap: 16 }}>
+              <ConnectionStatus />
+              <Field
+                label="Email address"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <Field
+                label="Password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void signIn()
+                }}
+              />
+              <Button fullWidth size="lg" disabled={submitting} onClick={() => void signIn()}>
+                {submitting ? "Signing in…" : "Sign in"}
+              </Button>
+              {message && <div role="alert" style={{ color: "var(--fos-danger)", fontWeight: 700 }}>{message}</div>}
+              <p style={{ margin: 0, color: "var(--fos-text-muted)", fontSize: 13, lineHeight: 1.5 }}>
+                Football OS is currently invite-only. Your club administrator will create your access.
+              </p>
+            </div>
+          </Card>
         </div>
       </main>
     )
@@ -191,27 +172,17 @@ export default function AuthGate({ children }: AuthGateProps) {
 
   if (!authContext.activeMembership) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24 }}>
-        <div style={{ ...cardStyle(), maxWidth: 520, margin: "40px auto" }}>
+      <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
+        <Card elevated style={{ width: "100%", maxWidth: 460 }}>
           <h1 style={{ marginTop: 0 }}>Your account is ready</h1>
-          <p>
-            This login has not yet been added to a Football OS club. Ask a club administrator to send an invitation.
+          <p style={{ color: "var(--fos-text-muted)", lineHeight: 1.6 }}>
+            You are signed in, but your club has not added you to a team yet. Ask your club administrator to complete your invitation.
           </p>
-          <button onClick={() => void signOut()} style={buttonPrimary()}>
-            Sign out
-          </button>
-        </div>
+          <Button variant="secondary" onClick={() => void signOut()}>Sign out</Button>
+        </Card>
       </main>
     )
   }
 
-  return (
-    <>
-      {children({
-        user: authContext.user,
-        isAdmin: authContext.isAdmin,
-        signOut,
-      })}
-    </>
-  )
+  return <>{children({ user: authContext.user, isAdmin: authContext.isAdmin, signOut })}</>
 }
