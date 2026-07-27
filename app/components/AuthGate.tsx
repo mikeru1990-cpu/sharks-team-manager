@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
+import { loadAuthContext, type AuthContext } from "../lib/auth"
 import { supabase } from "../lib/supabase"
-import { TEAM, buttonPrimary, buttonSecondary, cardStyle } from "../lib/types"
-
-const ADMIN_EMAILS = ["mikeru1990@hotmail.com"]
+import { TEAM, buttonPrimary, cardStyle } from "../lib/types"
 
 type AuthGateProps = {
   children: (args: {
@@ -16,108 +15,108 @@ type AuthGateProps = {
 }
 
 export default function AuthGate({ children }: AuthGateProps) {
-  const [user, setUser] = useState<User | null>(null)
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [message, setMessage] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false)
+      return
+    }
+
     let mounted = true
 
-    async function init() {
+    async function applyUser(user: User | null) {
+      if (!mounted) return
+
+      if (!user) {
+        setAuthContext(null)
+        setLoading(false)
+        return
+      }
+
       try {
-        // 🔥 SAFE GUARD (this is the fix)
-        if (!supabase) {
-          console.error("Supabase is not configured")
-          setLoading(false)
-          return
-        }
-
-        const { data } = await supabase.auth.getUser()
+        const context = await loadAuthContext(user)
         if (!mounted) return
-
-        setUser(data.user ?? null)
-        setLoading(false)
-
-        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-          setUser(session?.user ?? null)
-          setLoading(false)
-        })
-
-        return () => listener.subscription.unsubscribe()
-      } catch (err) {
-        console.error("Auth error:", err)
-        setLoading(false)
+        setAuthContext(context)
+        setMessage("")
+      } catch (error) {
+        if (!mounted) return
+        setAuthContext(null)
+        setMessage(error instanceof Error ? error.message : "Unable to load your club access.")
+      } finally {
+        if (mounted) setLoading(false)
       }
     }
 
-    init()
+    void supabase.auth.getUser().then(({ data }) => applyUser(data.user ?? null))
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoading(true)
+      void applyUser(session?.user ?? null)
+    })
 
     return () => {
       mounted = false
+      listener.subscription.unsubscribe()
     }
   }, [])
 
   async function signIn() {
-    if (!supabase) return setMessage("Supabase not configured")
+    if (!supabase) return
 
+    const cleanEmail = email.trim().toLowerCase()
+    if (!cleanEmail || !password) {
+      setMessage("Enter your email address and password.")
+      return
+    }
+
+    setSubmitting(true)
     setMessage("")
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: cleanEmail,
       password,
     })
-    if (error) setMessage(error.message)
-  }
 
-  async function signUp() {
-    if (!supabase) return setMessage("Supabase not configured")
-
-    setMessage("")
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
     if (error) setMessage(error.message)
-    else setMessage("Account created. Check your email.")
+    setSubmitting(false)
   }
 
   async function signOut() {
     if (!supabase) return
     await supabase.auth.signOut()
+    setAuthContext(null)
   }
 
-  // 🔥 LOADING SCREEN
   if (loading) {
     return (
       <main style={{ minHeight: "100vh", padding: 24 }}>
         <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          Loading...
+          Opening Football OS…
         </div>
       </main>
     )
   }
 
-  // 🔥 IF SUPABASE BROKEN → SHOW MESSAGE INSTEAD OF BLACK SCREEN
   if (!supabase) {
     return (
       <main style={{ minHeight: "100vh", padding: 24 }}>
         <div style={{ ...cardStyle(), maxWidth: 420, margin: "40px auto" }}>
-          ❌ Supabase not configured
-          <br />
-          <br />
-          Add these to Vercel:
-          <br />
-          NEXT_PUBLIC_SUPABASE_URL
-          <br />
-          NEXT_PUBLIC_SUPABASE_ANON_KEY
+          <strong>Football OS is not connected to Supabase.</strong>
+          <p style={{ marginBottom: 0 }}>
+            Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to the deployment environment.
+          </p>
         </div>
       </main>
     )
   }
 
-  // 🔥 LOGIN SCREEN
-  if (!user) {
+  if (!authContext) {
     return (
       <main
         style={{
@@ -134,37 +133,85 @@ export default function AuthGate({ children }: AuthGateProps) {
               marginBottom: 16,
             }}
           >
-            <div style={{ fontSize: 28, fontWeight: 900 }}>Team Manager</div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>Football OS</div>
+            <div style={{ marginTop: 8, opacity: 0.85 }}>Private club access</div>
           </div>
 
           <div style={cardStyle()}>
+            <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
+              Email address
+            </label>
             <input
-              placeholder="Email"
+              type="email"
+              autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ width: "100%", padding: 12, marginBottom: 10 }}
+              onChange={(event) => setEmail(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void signIn()
+              }}
+              style={{ width: "100%", padding: 12, marginBottom: 12 }}
             />
 
+            <label style={{ display: "block", fontWeight: 800, marginBottom: 6 }}>
+              Password
+            </label>
             <input
               type="password"
-              placeholder="Password"
+              autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%", padding: 12, marginBottom: 10 }}
+              onChange={(event) => setPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void signIn()
+              }}
+              style={{ width: "100%", padding: 12, marginBottom: 12 }}
             />
 
-            <button onClick={signIn} style={buttonPrimary()}>
-              Sign In
+            <button
+              onClick={() => void signIn()}
+              disabled={submitting}
+              style={{ ...buttonPrimary(), opacity: submitting ? 0.65 : 1 }}
+            >
+              {submitting ? "Signing in…" : "Sign in"}
             </button>
 
-            {message && <div style={{ marginTop: 10 }}>{message}</div>}
+            <p style={{ fontSize: 13, lineHeight: 1.5, opacity: 0.7, marginBottom: 0 }}>
+              Football OS is currently invite-only. Your club administrator will create your access.
+            </p>
+
+            {message && (
+              <div role="alert" style={{ marginTop: 12, fontWeight: 700 }}>
+                {message}
+              </div>
+            )}
           </div>
         </div>
       </main>
     )
   }
 
-  const isAdmin = ADMIN_EMAILS.includes(user.email || "")
+  if (!authContext.activeMembership) {
+    return (
+      <main style={{ minHeight: "100vh", padding: 24 }}>
+        <div style={{ ...cardStyle(), maxWidth: 520, margin: "40px auto" }}>
+          <h1 style={{ marginTop: 0 }}>Your account is ready</h1>
+          <p>
+            This login has not yet been added to a Football OS club. Ask a club administrator to send an invitation.
+          </p>
+          <button onClick={() => void signOut()} style={buttonPrimary()}>
+            Sign out
+          </button>
+        </div>
+      </main>
+    )
+  }
 
-  return <>{children({ user, isAdmin, signOut })}</>
+  return (
+    <>
+      {children({
+        user: authContext.user,
+        isAdmin: authContext.isAdmin,
+        signOut,
+      })}
+    </>
+  )
 }
