@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import "./premium.css"
 import OfflineSyncManager from "./components/OfflineSyncManager"
 import PwaRegister from "./components/PwaRegister"
 
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0b1f4d",
+  themeColor: "#020617",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
