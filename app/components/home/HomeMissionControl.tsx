@@ -1,8 +1,8 @@
 "use client"
 
-import { CalendarDays, ClipboardCheck, Dumbbell, MessageSquare, Trophy, Users } from "lucide-react"
+import type { ReactNode } from "react"
+import { ArrowUpRight, CalendarDays, ClipboardCheck, Dumbbell, MessageSquare, Sparkles, Trophy, Users } from "lucide-react"
 import TeamContextHeader from "../layout/TeamContextHeader"
-import PremiumWorkspaceHeader from "../ui/PremiumWorkspaceHeader"
 import type { WorkspaceTab } from "../../lib/workspaces"
 import { getActiveU11Players, getContinuingTeamTbcPlayers, leonardStanleyEvents } from "../../lib/realTeamData"
 
@@ -14,123 +14,159 @@ const nextEvent = leonardStanleyEvents[0]
 
 export default function HomeMissionControl({ onNavigate }: Props) {
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? "Good Morning Mike" : hour < 18 ? "Good Afternoon Mike" : "Good Evening Mike"
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
   const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
 
   return (
-    <div style={{ display: "grid", gap: 16, paddingBottom: 120 }}>
-      <PremiumWorkspaceHeader
-        eyebrow="FOOTBALL OS · HOME"
-        title={greeting}
-        description="Your U11 Girls command centre for the next session, squad status and the tools you use most."
-        badge="Real team data"
-        meta={`Leonard Stanley U11 Girls · ${today}`}
-      />
+    <div style={{ display: "grid", gap: 16, paddingBottom: 112 }}>
+      <section style={hero}>
+        <div style={heroGlow} aria-hidden="true" />
+        <div style={heroTopline}>
+          <div style={heroEyebrow}><Sparkles size={13} /> MISSION CONTROL</div>
+          <div style={alphaPill}>PRIVATE ALPHA</div>
+        </div>
+
+        <div style={heroCopy}>
+          <div>
+            <div style={dateText}>{today}</div>
+            <h1 style={heroTitle}>{greeting}, Mike.</h1>
+            <p style={heroSubtitle}>Everything that matters for Leonard Stanley U11 Girls, in one place.</p>
+          </div>
+        </div>
+
+        <div style={heroEvent}>
+          <div style={{ minWidth: 0 }}>
+            <div style={miniLabel}>NEXT UP</div>
+            <div style={eventTitle}>{nextEvent.title}</div>
+            <div style={eventMeta}>{nextEvent.dateLabel} · {nextEvent.timeLabel ?? "TBC"}</div>
+            <div style={eventLocation}>{nextEvent.location ?? "Location TBC"}</div>
+          </div>
+          <button type="button" onClick={() => onNavigate("training")} style={launchButton}>
+            Open <ArrowUpRight size={16} />
+          </button>
+        </div>
+
+        <div style={kpiGrid}>
+          <Kpi label="Confirmed" value={players.length.toString()} note="Active squad" />
+          <Kpi label="Team TBC" value={continuingTbc.length.toString()} note="Needs decision" />
+          <Kpi label="Matches" value="0" note="New season" />
+          <Kpi label="Next session" value="1" note="Ready to plan" />
+        </div>
+      </section>
 
       <TeamContextHeader currentSection="Home" nextEventLabel={`${nextEvent.title}: ${nextEvent.dateLabel}`} />
 
-      <section style={overviewPanel}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={eyebrow}>TEAM SNAPSHOT</div>
-            <h2 style={sectionTitle}>At a glance</h2>
-          </div>
-          <div style={statusPill}>U11 Girls</div>
-        </div>
-        <div style={statsGrid}>
-          <StatTile label="Confirmed" value={players.length.toString()} note="Active squad" />
-          <StatTile label="Team TBC" value={continuingTbc.length.toString()} note="Needs decision" />
-          <StatTile label="Matches" value="0" note="New season" />
-          <StatTile label="Training" value="1" note="Next event" />
-        </div>
-      </section>
-
       <section style={panel}>
         <div style={sectionHeader}>
           <div>
-            <div style={eyebrow}>QUICK ACCESS</div>
+            <div style={sectionEyebrow}>FAST LANE</div>
             <h2 style={sectionTitle}>Coach tools</h2>
+            <p style={sectionCopy}>The actions you need most, designed for one-tap access.</p>
           </div>
           <div style={statusPill}>6 shortcuts</div>
         </div>
+
         <div style={quickGrid}>
-          <QuickAction label="Training" note="Plan & attendance" icon={<Dumbbell size={19} />} onClick={() => onNavigate("training")} />
-          <QuickAction label="Matchday" note="Live match centre" icon={<Trophy size={19} />} onClick={() => onNavigate("matchday")} />
-          <QuickAction label="Attendance" note="Session register" icon={<ClipboardCheck size={19} />} onClick={() => onNavigate("training")} />
-          <QuickAction label="Players" note="Squad & roles" icon={<Users size={19} />} onClick={() => onNavigate("players")} />
-          <QuickAction label="Calendar" note="Fixtures & events" icon={<CalendarDays size={19} />} onClick={() => onNavigate("club")} />
-          <QuickAction label="Parents" note="Club communications" icon={<MessageSquare size={19} />} onClick={() => onNavigate("club")} />
+          <QuickAction label="Matchday" note="Live command centre" icon={<Trophy size={21} />} accent="blue" onClick={() => onNavigate("matchday")} />
+          <QuickAction label="Training" note="Plan & attendance" icon={<Dumbbell size={21} />} accent="violet" onClick={() => onNavigate("training")} />
+          <QuickAction label="Players" note="Squad, roles & profiles" icon={<Users size={21} />} accent="cyan" onClick={() => onNavigate("players")} />
+          <QuickAction label="Attendance" note="Session register" icon={<ClipboardCheck size={21} />} accent="emerald" onClick={() => onNavigate("training")} />
+          <QuickAction label="Calendar" note="Fixtures & events" icon={<CalendarDays size={21} />} accent="amber" onClick={() => onNavigate("club")} />
+          <QuickAction label="Parents" note="Club communications" icon={<MessageSquare size={21} />} accent="rose" onClick={() => onNavigate("club")} />
         </div>
       </section>
 
-      <section style={eventPanel}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={eyebrow}>NEXT EVENT</div>
-            <h2 style={sectionTitle}>{nextEvent.title}</h2>
-          </div>
-          <div style={eventDate}>{nextEvent.dateLabel}</div>
+      <section style={intelPanel}>
+        <div>
+          <div style={sectionEyebrow}>FOOTBALL OS INTELLIGENCE</div>
+          <h2 style={sectionTitle}>Squad health</h2>
+          <p style={sectionCopy}>Real team information only. No invented stats or placeholder performance data.</p>
         </div>
-        <div style={eventGrid}>
-          <EventDetail label="Time" value={nextEvent.timeLabel ?? "TBC"} />
-          <EventDetail label="Location" value={nextEvent.location ?? "TBC"} />
-          <EventDetail label="Notes" value={nextEvent.notes ?? "No notes added"} />
-        </div>
-      </section>
-
-      <section style={panel}>
-        <div style={sectionHeader}>
-          <div>
-            <div style={eyebrow}>DATA STATUS</div>
-            <h2 style={sectionTitle}>Real team record</h2>
-          </div>
-          <div style={goodPill}>Connected</div>
-        </div>
-        <div style={feedGrid}>
-          <FeedItem title="Confirmed squad" detail="10 confirmed U11 Lionesses" />
-          <FeedItem title="Team decision" detail="1 continuing player with final team TBC" />
-          <FeedItem title="Season statistics" detail="Starts empty and grows only from real recorded matches" />
+        <div style={intelGrid}>
+          <IntelItem title="Squad ready" detail={`${players.length} confirmed players are active for the U11 squad.`} tone="good" />
+          <IntelItem title="One decision pending" detail={`${continuingTbc.length} continuing player still needs a final team decision.`} tone="watch" />
+          <IntelItem title="Clean season baseline" detail="Match statistics begin at zero and grow only from matches you actually record." tone="info" />
         </div>
       </section>
     </div>
   )
 }
 
-function StatTile({ label, value, note }: { label: string; value: string; note: string }) {
-  return <div style={statTile}><div style={statLabel}>{label}</div><div style={statValue}>{value}</div><div style={statNote}>{note}</div></div>
+function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div style={kpiCard}>
+      <div style={kpiLabel}>{label}</div>
+      <div style={kpiValue}>{value}</div>
+      <div style={kpiNote}>{note}</div>
+    </div>
+  )
 }
 
-function QuickAction({ label, note, icon, onClick }: { label: string; note: string; icon: React.ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} style={quickAction}><span style={iconBox}>{icon}</span><span><strong style={{ display: "block", fontSize: 15 }}>{label}</strong><small style={{ color: "rgba(226,232,240,.6)", fontWeight: 750 }}>{note}</small></span><span style={arrow}>→</span></button>
+function QuickAction({ label, note, icon, accent, onClick }: { label: string; note: string; icon: ReactNode; accent: keyof typeof accents; onClick: () => void }) {
+  const palette = accents[accent]
+  return (
+    <button type="button" onClick={onClick} style={quickAction}>
+      <span style={{ ...iconBox, background: palette.background, color: palette.color, boxShadow: palette.shadow }}>{icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <strong style={{ display: "block", fontSize: 15.5, letterSpacing: -0.2 }}>{label}</strong>
+        <small style={{ display: "block", marginTop: 3, color: "rgba(226,232,240,.55)", fontWeight: 750, lineHeight: 1.3 }}>{note}</small>
+      </span>
+      <ArrowUpRight size={17} style={{ color: "rgba(191,219,254,.72)" }} />
+    </button>
+  )
 }
 
-function EventDetail({ label, value }: { label: string; value: string }) {
-  return <div style={eventDetail}><div style={statLabel}>{label}</div><div style={{ marginTop: 5, fontWeight: 900, lineHeight: 1.35 }}>{value}</div></div>
+function IntelItem({ title, detail, tone }: { title: string; detail: string; tone: "good" | "watch" | "info" }) {
+  const dot = tone === "good" ? "#4ade80" : tone === "watch" ? "#fbbf24" : "#60a5fa"
+  return (
+    <div style={intelItem}>
+      <span style={{ ...intelDot, background: dot, boxShadow: `0 0 0 5px ${dot}18` }} />
+      <div>
+        <div style={{ fontWeight: 950 }}>{title}</div>
+        <div style={{ marginTop: 4, color: "rgba(226,232,240,.62)", lineHeight: 1.45, fontSize: 12.5 }}>{detail}</div>
+      </div>
+    </div>
+  )
 }
 
-function FeedItem({ title, detail }: { title: string; detail: string }) {
-  return <div style={feedItem}><div style={{ fontWeight: 950 }}>{title}</div><div style={{ marginTop: 4, color: "rgba(226,232,240,.66)", lineHeight: 1.4 }}>{detail}</div></div>
-}
-
-const panel = { borderRadius: 26, padding: 17, background: "rgba(15,23,42,.9)", border: "1px solid rgba(148,163,184,.14)", boxShadow: "0 18px 40px rgba(0,0,0,.16)" }
-const overviewPanel = { ...panel, background: "radial-gradient(circle at top right,rgba(37,99,235,.18),transparent 42%),rgba(15,23,42,.92)" }
-const eventPanel = { ...panel, background: "radial-gradient(circle at top right,rgba(124,58,237,.22),transparent 42%),rgba(15,23,42,.92)" }
+const hero = { position: "relative" as const, overflow: "hidden", borderRadius: 30, padding: 19, border: "1px solid rgba(129,140,248,.2)", background: "linear-gradient(145deg,rgba(15,23,42,.97),rgba(17,24,57,.92) 48%,rgba(23,27,70,.9))", boxShadow: "0 30px 75px rgba(2,6,23,.44),inset 0 1px 0 rgba(255,255,255,.05)" }
+const heroGlow = { position: "absolute" as const, width: 300, height: 300, right: -100, top: -150, borderRadius: 999, background: "radial-gradient(circle,rgba(99,102,241,.42),rgba(37,99,235,.12) 42%,transparent 68%)", filter: "blur(4px)", pointerEvents: "none" as const }
+const heroTopline = { position: "relative" as const, display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }
+const heroEyebrow = { display: "inline-flex", alignItems: "center", gap: 6, color: "#c7d2fe", fontSize: 10.5, fontWeight: 950, letterSpacing: 1.2 }
+const alphaPill = { borderRadius: 999, padding: "6px 9px", border: "1px solid rgba(167,139,250,.2)", background: "rgba(109,40,217,.15)", color: "#ddd6fe", fontSize: 9.5, fontWeight: 950, letterSpacing: .6 }
+const heroCopy = { position: "relative" as const, display: "grid", marginTop: 18 }
+const dateText = { color: "rgba(226,232,240,.52)", fontSize: 11.5, fontWeight: 800 }
+const heroTitle = { margin: "5px 0 0", fontSize: "clamp(30px,8vw,48px)", lineHeight: .98, letterSpacing: -1.8, fontWeight: 980 }
+const heroSubtitle = { margin: "10px 0 0", maxWidth: 580, color: "rgba(226,232,240,.66)", fontSize: 13.5, lineHeight: 1.5, fontWeight: 650 }
+const heroEvent = { position: "relative" as const, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, marginTop: 20, borderRadius: 22, padding: 14, border: "1px solid rgba(96,165,250,.16)", background: "linear-gradient(135deg,rgba(37,99,235,.18),rgba(2,6,23,.32))", boxShadow: "inset 0 1px 0 rgba(255,255,255,.035)" }
+const miniLabel = { color: "#93c5fd", fontSize: 9.5, fontWeight: 950, letterSpacing: 1.1 }
+const eventTitle = { marginTop: 4, fontSize: 18, fontWeight: 950, letterSpacing: -.3 }
+const eventMeta = { marginTop: 5, color: "rgba(226,232,240,.72)", fontSize: 12, fontWeight: 800 }
+const eventLocation = { marginTop: 3, color: "rgba(226,232,240,.45)", fontSize: 11.5, fontWeight: 700 }
+const launchButton = { display: "inline-flex", alignItems: "center", gap: 5, flex: "0 0 auto", minHeight: 40, border: "1px solid rgba(191,219,254,.24)", borderRadius: 13, padding: "0 12px", background: "linear-gradient(145deg,#2563eb,#4f46e5)", boxShadow: "0 10px 24px rgba(37,99,235,.28)", color: "white", fontSize: 12, fontWeight: 950, cursor: "pointer" }
+const kpiGrid = { position: "relative" as const, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 8, marginTop: 12 }
+const kpiCard = { borderRadius: 17, padding: 12, border: "1px solid rgba(148,163,184,.09)", background: "rgba(2,6,23,.38)", backdropFilter: "blur(12px)" }
+const kpiLabel = { color: "rgba(226,232,240,.48)", fontSize: 10, fontWeight: 900 }
+const kpiValue = { marginTop: 4, fontSize: 25, fontWeight: 980, letterSpacing: -.8 }
+const kpiNote = { marginTop: 2, color: "rgba(226,232,240,.42)", fontSize: 10.5, fontWeight: 750 }
+const panel = { borderRadius: 27, padding: 17, border: "1px solid rgba(148,163,184,.11)", background: "rgba(8,15,32,.8)", boxShadow: "0 20px 50px rgba(2,6,23,.24),inset 0 1px 0 rgba(255,255,255,.035)", backdropFilter: "blur(16px)" }
+const intelPanel = { ...panel, background: "radial-gradient(circle at 92% 8%,rgba(16,185,129,.10),transparent 30%),rgba(8,15,32,.84)" }
 const sectionHeader = { display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }
-const eyebrow = { fontSize: 11, fontWeight: 950, letterSpacing: 1, color: "#bfdbfe" }
-const sectionTitle = { margin: "4px 0 0", fontSize: 22, letterSpacing: -.4 }
-const statusPill = { borderRadius: 999, padding: "8px 10px", background: "rgba(37,99,235,.18)", color: "#bfdbfe", fontSize: 11, fontWeight: 950, whiteSpace: "nowrap" as const }
-const goodPill = { ...statusPill, background: "rgba(22,101,52,.28)", color: "#86efac" }
-const statsGrid = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 9, marginTop: 14 }
-const statTile = { borderRadius: 18, padding: 13, background: "rgba(2,6,23,.46)", border: "1px solid rgba(148,163,184,.1)" }
-const statLabel = { color: "rgba(226,232,240,.58)", fontSize: 11, fontWeight: 900 }
-const statValue = { marginTop: 5, fontSize: 27, fontWeight: 950, letterSpacing: -.8 }
-const statNote = { marginTop: 3, color: "rgba(226,232,240,.56)", fontSize: 11, fontWeight: 750 }
-const quickGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 9, marginTop: 14 }
-const quickAction = { border: "1px solid rgba(148,163,184,.11)", borderRadius: 19, padding: 12, background: "rgba(2,6,23,.46)", color: "white", cursor: "pointer", display: "grid", gridTemplateColumns: "40px 1fr auto", gap: 10, alignItems: "center", textAlign: "left" as const, touchAction: "manipulation" }
-const iconBox = { width: 40, height: 40, borderRadius: 14, display: "grid", placeItems: "center", background: "linear-gradient(135deg,rgba(37,99,235,.82),rgba(124,58,237,.78))", color: "white" }
-const arrow = { color: "#93c5fd", fontWeight: 950, fontSize: 18 }
-const eventDate = { ...statusPill, background: "rgba(124,58,237,.2)", color: "#ddd6fe" }
-const eventGrid = { display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 9, marginTop: 14 }
-const eventDetail = { borderRadius: 17, padding: 12, background: "rgba(2,6,23,.42)", border: "1px solid rgba(148,163,184,.09)" }
-const feedGrid = { display: "grid", gap: 8, marginTop: 14 }
-const feedItem = { borderRadius: 17, padding: 12, background: "rgba(2,6,23,.44)", border: "1px solid rgba(148,163,184,.09)" }
+const sectionEyebrow = { color: "#93c5fd", fontSize: 10, fontWeight: 950, letterSpacing: 1.1 }
+const sectionTitle = { margin: "4px 0 0", fontSize: 22, letterSpacing: -.5 }
+const sectionCopy = { margin: "5px 0 0", color: "rgba(226,232,240,.52)", fontSize: 12.5, lineHeight: 1.45, fontWeight: 650 }
+const statusPill = { borderRadius: 999, padding: "7px 9px", background: "rgba(37,99,235,.15)", border: "1px solid rgba(96,165,250,.14)", color: "#bfdbfe", fontSize: 10, fontWeight: 950, whiteSpace: "nowrap" as const }
+const quickGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 9, marginTop: 15 }
+const quickAction = { border: "1px solid rgba(148,163,184,.09)", borderRadius: 20, padding: 12, background: "linear-gradient(145deg,rgba(15,23,42,.62),rgba(2,6,23,.42))", color: "white", cursor: "pointer", display: "grid", gridTemplateColumns: "44px 1fr auto", gap: 11, alignItems: "center", textAlign: "left" as const, minHeight: 70, boxShadow: "inset 0 1px 0 rgba(255,255,255,.025)" }
+const iconBox = { width: 44, height: 44, borderRadius: 15, display: "grid", placeItems: "center", border: "1px solid rgba(255,255,255,.08)" }
+const intelGrid = { display: "grid", gap: 9, marginTop: 15 }
+const intelItem = { display: "grid", gridTemplateColumns: "14px 1fr", gap: 10, alignItems: "start", borderRadius: 17, padding: 12, border: "1px solid rgba(148,163,184,.08)", background: "rgba(2,6,23,.34)" }
+const intelDot = { width: 7, height: 7, marginTop: 5, borderRadius: 999 }
+const accents = {
+  blue: { background: "linear-gradient(145deg,rgba(37,99,235,.9),rgba(29,78,216,.75))", color: "#fff", shadow: "0 8px 20px rgba(37,99,235,.22)" },
+  violet: { background: "linear-gradient(145deg,rgba(124,58,237,.88),rgba(79,70,229,.72))", color: "#fff", shadow: "0 8px 20px rgba(124,58,237,.2)" },
+  cyan: { background: "linear-gradient(145deg,rgba(8,145,178,.85),rgba(14,116,144,.7))", color: "#ecfeff", shadow: "0 8px 20px rgba(8,145,178,.18)" },
+  emerald: { background: "linear-gradient(145deg,rgba(5,150,105,.84),rgba(4,120,87,.7))", color: "#ecfdf5", shadow: "0 8px 20px rgba(5,150,105,.18)" },
+  amber: { background: "linear-gradient(145deg,rgba(217,119,6,.85),rgba(180,83,9,.7))", color: "#fffbeb", shadow: "0 8px 20px rgba(217,119,6,.17)" },
+  rose: { background: "linear-gradient(145deg,rgba(225,29,72,.82),rgba(190,24,93,.7))", color: "#fff1f2", shadow: "0 8px 20px rgba(225,29,72,.17)" },
+}
