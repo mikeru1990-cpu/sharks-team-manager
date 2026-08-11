@@ -7,8 +7,15 @@ import TacticalBoardWorkspace from "./TacticalBoardWorkspace"
 import "./matchday-premium.css"
 
 type Workspace = "match" | "tactics" | "report"
+type SavedMatchSummary = {
+  seconds: number
+  home: number
+  away: number
+  activePeriod: number
+}
 
 const workspaceStorageKey = "football-os-matchday-workspace-v1"
+const matchStateStorageKey = "football-os-matchday-state-v4"
 
 const workspaces: Array<{
   id: Workspace
@@ -40,8 +47,32 @@ const workspaces: Array<{
   },
 ]
 
+function formatClock(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds || 0))
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`
+}
+
+function readSavedMatch(): SavedMatchSummary | null {
+  try {
+    const raw = window.localStorage.getItem(matchStateStorageKey)
+    if (!raw) return null
+    const value = JSON.parse(raw) as Partial<SavedMatchSummary>
+    const summary = {
+      seconds: Number(value.seconds ?? 0),
+      home: Number(value.home ?? 0),
+      away: Number(value.away ?? 0),
+      activePeriod: Number(value.activePeriod ?? 0),
+    }
+    if (!summary.seconds && !summary.home && !summary.away) return null
+    return summary
+  } catch {
+    return null
+  }
+}
+
 export default function MatchdayScreen() {
   const [workspace, setWorkspace] = useState<Workspace>("match")
+  const [savedMatch, setSavedMatch] = useState<SavedMatchSummary | null>(null)
   const active = workspaces.find((item) => item.id === workspace) ?? workspaces[0]
 
   useEffect(() => {
@@ -49,6 +80,18 @@ export default function MatchdayScreen() {
       const saved = window.localStorage.getItem(workspaceStorageKey) as Workspace | null
       if (saved && workspaces.some((item) => item.id === saved)) setWorkspace(saved)
     } catch {}
+
+    const refreshSavedMatch = () => setSavedMatch(readSavedMatch())
+    refreshSavedMatch()
+    window.addEventListener("storage", refreshSavedMatch)
+    window.addEventListener("focus", refreshSavedMatch)
+    const timer = window.setInterval(refreshSavedMatch, 2000)
+
+    return () => {
+      window.removeEventListener("storage", refreshSavedMatch)
+      window.removeEventListener("focus", refreshSavedMatch)
+      window.clearInterval(timer)
+    }
   }, [])
 
   function selectWorkspace(next: Workspace) {
@@ -62,10 +105,22 @@ export default function MatchdayScreen() {
   return (
     <div className="matchday-premium-shell" style={shell}>
       <section style={workspaceHero}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={eyebrow}>MATCHDAY WORKSPACE</div>
           <h1 style={heroTitle}>{active.label}</h1>
           <p style={heroCopy}>{active.description}</p>
+
+          {savedMatch && (
+            <button type="button" onClick={() => selectWorkspace("match")} style={resumeCard}>
+              <span style={resumePulse} aria-hidden="true" />
+              <span style={{ minWidth: 0 }}>
+                <small style={resumeLabel}>MATCH IN PROGRESS · P{savedMatch.activePeriod + 1}</small>
+                <strong style={resumeScore}>{savedMatch.home}–{savedMatch.away}</strong>
+                <span style={resumeClock}>{formatClock(savedMatch.seconds)} · Tap to resume live control</span>
+              </span>
+              <span style={resumeArrow}>→</span>
+            </button>
+          )}
         </div>
         <div style={workspaceBadge}>{active.icon}</div>
       </section>
@@ -128,7 +183,7 @@ const workspaceHero = {
   boxShadow: "0 24px 54px rgba(0,0,0,.25)",
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: 16,
   color: "white",
 }
@@ -166,6 +221,59 @@ const workspaceBadge = {
   border: "1px solid rgba(255,255,255,.22)",
   boxShadow: "0 16px 30px rgba(37,99,235,.25)",
   fontSize: 25,
+  fontWeight: 950,
+}
+
+const resumeCard = {
+  width: "min(100%,430px)",
+  marginTop: 14,
+  display: "grid",
+  gridTemplateColumns: "10px minmax(0,1fr) auto",
+  gap: 10,
+  alignItems: "center",
+  border: "1px solid rgba(74,222,128,.18)",
+  borderRadius: 18,
+  padding: 11,
+  color: "white",
+  background: "linear-gradient(135deg,rgba(22,101,52,.22),rgba(2,6,23,.34))",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,.035)",
+  textAlign: "left" as const,
+  cursor: "pointer",
+}
+
+const resumePulse = {
+  width: 8,
+  height: 8,
+  borderRadius: 999,
+  background: "#4ade80",
+  boxShadow: "0 0 0 5px rgba(74,222,128,.12)",
+}
+
+const resumeLabel = {
+  display: "block",
+  color: "#86efac",
+  fontSize: 9.5,
+  fontWeight: 950,
+  letterSpacing: .8,
+}
+
+const resumeScore = {
+  display: "inline-block",
+  marginTop: 3,
+  marginRight: 8,
+  fontSize: 19,
+  letterSpacing: -.5,
+}
+
+const resumeClock = {
+  color: "rgba(226,232,240,.64)",
+  fontSize: 11,
+  fontWeight: 750,
+}
+
+const resumeArrow = {
+  color: "#86efac",
+  fontSize: 20,
   fontWeight: 950,
 }
 
@@ -230,7 +338,7 @@ const workspaceBody = {
 const mobileQuickBar = {
   position: "fixed" as const,
   left: "50%",
-  bottom: 14,
+  bottom: 92,
   transform: "translateX(-50%)",
   zIndex: 50,
   width: "min(520px,calc(100vw - 28px))",
