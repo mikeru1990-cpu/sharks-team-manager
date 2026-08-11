@@ -3,6 +3,7 @@
 import ClubScreen from "../club/ClubScreen"
 import HomeMissionControl from "../home/HomeMissionControl"
 import InsightsScreen from "../insights/InsightsScreen"
+import ActiveMatchBanner from "../matchday/ActiveMatchBanner"
 import MatchdayScreen from "../matchday/MatchdayScreen"
 import PlayersScreen from "../players/PlayersScreen"
 import TrainingScreen from "../training/TrainingScreen"
@@ -17,7 +18,12 @@ type Props = {
 export default function AppRouter({ activeTab, onNavigate }: Props) {
   switch (activeTab) {
     case "home":
-      return <HomeMissionControl onNavigate={onNavigate} />
+      return (
+        <div style={{ display: "grid", gap: 14 }}>
+          <ActiveMatchBanner onNavigate={onNavigate} />
+          <HomeMissionControl onNavigate={onNavigate} />
+        </div>
+      )
 
     case "matchday":
       return <MatchdayScreen />
@@ -35,6 +41,11 @@ export default function AppRouter({ activeTab, onNavigate }: Props) {
       return <ClubScreen />
 
     default:
-      return <HomeMissionControl onNavigate={onNavigate} />
+      return (
+        <div style={{ display: "grid", gap: 14 }}>
+          <ActiveMatchBanner onNavigate={onNavigate} />
+          <HomeMissionControl onNavigate={onNavigate} />
+        </div>
+      )
   }
 }
