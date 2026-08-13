@@ -3,24 +3,95 @@
   max-width: 1480px;
   margin: 0 auto;
   padding: 4px clamp(2px, 1vw, 12px) 0;
+  --os-blue: #3b82f6;
+  --os-violet: #8b5cf6;
+  --os-cyan: #22d3ee;
+  --os-green: #4ade80;
+  --os-glass: rgba(8, 15, 32, .78);
 }
 
-.matchday-premium-shell * {
-  box-sizing: border-box;
-}
+.matchday-premium-shell * { box-sizing: border-box; }
 
 .matchday-premium-shell button {
   min-height: 48px;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  touch-action: manipulation;
+  transition: transform 160ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
-.matchday-premium-shell button:active {
-  transform: scale(.975);
-}
+.matchday-premium-shell button:active { transform: scale(.965); }
+.matchday-premium-shell button:focus-visible { outline: 3px solid rgba(96,165,250,.42); outline-offset: 2px; }
+.matchday-premium-shell section { isolation: isolate; }
 
+/* Premium depth without turning every surface into another box. */
 .matchday-premium-shell section {
-  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+}
+
+.matchday-premium-shell section::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+/* Live Match Centre: score and clock are the visual anchor on the touchline. */
+.matchday-premium-shell > main > div > section:first-child {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(34,211,238,.13), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(139,92,246,.18), transparent 34%),
+    linear-gradient(145deg, rgba(10,18,39,.98), rgba(15,23,42,.96)) !important;
+  box-shadow: 0 26px 70px rgba(2,6,23,.38), inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+.matchday-premium-shell > main > div > section:first-child h1 {
+  text-wrap: balance;
+}
+
+/* Give live status a subtle pulse so the screen feels alive, not noisy. */
+@keyframes football-os-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+  50% { box-shadow: 0 0 0 7px rgba(74,222,128,.07); }
+}
+
+@keyframes football-os-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.matchday-premium-shell > main {
+  animation: football-os-enter 260ms cubic-bezier(.2,.8,.2,1);
+}
+
+.matchday-premium-shell nav button[aria-pressed="true"] {
+  box-shadow: 0 12px 30px rgba(37,99,235,.22), inset 0 1px 0 rgba(255,255,255,.12) !important;
+}
+
+/* Pitch gains a broadcast-style frame and depth. */
+.matchday-premium-shell [style*="repeating-linear-gradient"] {
+  box-shadow: inset 0 0 70px rgba(0,0,0,.16), 0 20px 44px rgba(2,6,23,.25);
+}
+
+/* Prevent accidental text selection during rapid matchday operation. */
+.matchday-premium-shell button,
+.matchday-premium-shell nav {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Respect people who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .matchday-premium-shell *,
+  .matchday-premium-shell *::before,
+  .matchday-premium-shell *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media (min-width: 900px) {
@@ -34,43 +105,33 @@
   .matchday-premium-shell > div > div:nth-of-type(1),
   .matchday-premium-shell > div > section:nth-of-type(3),
   .matchday-premium-shell > div > section:nth-of-type(4),
-  .matchday-premium-shell > div > section:nth-last-of-type(1) {
-    grid-column: 1 / -1;
-  }
+  .matchday-premium-shell > div > section:nth-last-of-type(1) { grid-column: 1 / -1; }
 
   .matchday-premium-shell > div > section:nth-of-type(5),
-  .matchday-premium-shell > div > section:nth-of-type(7) {
-    grid-column: span 7;
-  }
+  .matchday-premium-shell > div > section:nth-of-type(7) { grid-column: span 7; }
 
   .matchday-premium-shell > div > section:nth-of-type(6),
-  .matchday-premium-shell > div > section:nth-of-type(8) {
-    grid-column: span 5;
-  }
+  .matchday-premium-shell > div > section:nth-of-type(8) { grid-column: span 5; }
 }
 
 @media (max-width: 680px) {
-  .matchday-premium-shell {
-    padding-inline: 0;
-  }
+  .matchday-premium-shell { padding-inline: 0; }
+  .matchday-premium-shell h1 { font-size: clamp(25px, 8vw, 33px) !important; }
+  .matchday-premium-shell h2 { font-size: 20px !important; }
+  .matchday-premium-shell button { font-size: 13px; }
 
-  .matchday-premium-shell h1 {
-    font-size: clamp(25px, 8vw, 33px) !important;
-  }
-
-  .matchday-premium-shell h2 {
-    font-size: 20px !important;
-  }
-
-  .matchday-premium-shell button {
-    font-size: 13px;
-  }
+  /* Touchline mode: larger controls, tighter information, no hover assumptions. */
+  .matchday-premium-shell > main > div { gap: 11px !important; }
+  .matchday-premium-shell > main > div > section { border-radius: 22px !important; }
+  .matchday-premium-shell > main > div > nav { scrollbar-width: none; }
+  .matchday-premium-shell > main > div > nav::-webkit-scrollbar { display: none; }
 }
 
 @media (hover: hover) {
   .matchday-premium-shell button:hover {
     transform: translateY(-1px);
-    border-color: rgba(191, 219, 254, .34) !important;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, .2);
+    border-color: rgba(191,219,254,.34) !important;
+    box-shadow: 0 12px 28px rgba(0,0,0,.2);
+    filter: brightness(1.04);
   }
 }
