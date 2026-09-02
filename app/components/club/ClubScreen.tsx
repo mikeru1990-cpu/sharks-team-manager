@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type CSSProperties } from "react"
+import { getCompetitionRule, type AgeGroup } from "../../lib/competitionRules"
 import { availableClubs, getTeamsForClub, resolvePlatformContext } from "../../lib/platformContext"
 import PremiumWorkspaceHeader from "../ui/PremiumWorkspaceHeader"
 import PrivacyAccountCentre from "./PrivacyAccountCentre"
@@ -12,6 +13,7 @@ export default function ClubScreen() {
   const [view, setView] = useState<ClubView>("overview")
   const context = resolvePlatformContext()
   const teams = getTeamsForClub(context.club.id)
+  const competitionRule = getCompetitionRule(context.team.ageGroup as AgeGroup)
 
   if (view === "respect") {
     return <div style={screen}><WorkspaceNav view={view} setView={setView} /><RespectCodeCentre /></div>
@@ -45,7 +47,7 @@ export default function ClubScreen() {
         <div style={metricGrid}>
           <Metric label="Clubs" value={availableClubs.length.toString()} />
           <Metric label="Teams" value={teams.length.toString()} />
-          <Metric label="Format" value={context.team.format ?? context.team.ageGroup} />
+          <Metric label="Format" value={competitionRule.format} />
         </div>
       </section>
 
