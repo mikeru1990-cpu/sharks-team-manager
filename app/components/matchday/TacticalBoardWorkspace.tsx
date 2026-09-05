@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { loadSquadPlayers, type SquadStorePlayer } from "../../lib/squadStore"
+import type { SquadStorePlayer } from "../../lib/squadStore"\nimport { useSquadPlayers } from "../../lib/useSquadPlayers"
 import { getTeamFormat, loadTeamFormat, type TeamFormatId } from "../../lib/teamFormat"
 import InteractiveTacticalBoard from "./InteractiveTacticalBoard"
 

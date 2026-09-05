@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
-import { getActiveU11Players } from "../../lib/realTeamData"
+import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"\nimport { useSquadPlayers } from "../../lib/useSquadPlayers"
 import {
   getTeamFormat,
   loadTeamFormat,
@@ -276,13 +276,13 @@ export default function MatchCentreWorkflow() {
       if (pos) next[onId] = pos
       return next
     })
-    event("sub", `${playerName(offId)} → ${playerName(onId)}`, { offId, onId })
+    event("sub", `${playerName(players, offId)} → ${playerName(players, onId)}`, { offId, onId })
   }
 
   function goal(scorerId: string) {
     snapshot()
     setHome((value) => value + 1)
-    event("goal", `GOAL · ${playerName(scorerId)}`, { scorerId })
+    event("goal", `GOAL · ${playerName(players, scorerId)}`, { scorerId })
   }
 
   function oppGoal() {
@@ -514,7 +514,7 @@ export default function MatchCentreWorkflow() {
             .sort((a, b) => (minutes[b] ?? 0) - (minutes[a] ?? 0))
             .map((id) => (
               <div key={id} style={playerRow}>
-                <strong>{playerName(id)}</strong>
+                <strong>{playerName(players, id)}</strong>
                 <em>{Math.floor((minutes[id] ?? 0) / 60)} min</em>
               </div>
             ))}
@@ -571,7 +571,7 @@ function Pitch({
   return (
     <div>
       <div style={pitchHelp}>
-        {picked ? `Selected ${playerName(picked)}. Tap another player to swap.` : "Tap a player, then another player to swap positions."}
+        {picked ? `Selected ${playerName(players, picked)}. Tap another player to swap.` : "Tap a player, then another player to swap positions."}
       </div>
       <div style={pitch}>
         <i style={halfwayLine} />
@@ -601,7 +601,7 @@ function Pitch({
               }}
             >
               <small>{spot.label}</small>
-              <strong>{firstName(id)}</strong>
+              <strong>{firstName(players, id)}</strong>
               <span>{Math.floor((minutes[id] ?? 0) / 60)}m</span>
             </button>
           )
@@ -696,7 +696,7 @@ function Live({
         <div style={chooser}>
           <strong>Who scored?</strong>
           {live.filter((id) => positions[id] !== "GK").map((id) => (
-            <button key={id} style={row} onClick={() => { goal(id); setScoring(false) }}>{playerName(id)}</button>
+            <button key={id} style={row} onClick={() => { goal(id); setScoring(false) }}>{playerName(players, id)}</button>
           ))}
           <button style={action} onClick={() => setScoring(false)}>Cancel</button>
         </div>
@@ -708,7 +708,7 @@ function Live({
       {least && most && (
         <div style={fair}>
           <small>FAIR MINUTES SUGGESTION</small>
-          <strong>{playerName(least)} ON · {playerName(most)} OFF</strong>
+          <strong>{playerName(players, least)} ON · {playerName(players, most)} OFF</strong>
           <span>{Math.floor((minutes[least] ?? 0) / 60)}m vs {Math.floor((minutes[most] ?? 0) / 60)}m</span>
         </div>
       )}
@@ -717,12 +717,12 @@ function Live({
       <div style={two}>
         {live.map((id) => (
           <button key={id} onClick={() => setOff(id)} style={{ ...row, background: off === id ? "rgba(239,68,68,.25)" : "rgba(2,6,23,.48)" }}>
-            OFF · {playerName(id)}
+            OFF · {playerName(players, id)}
           </button>
         ))}
         {bench.map((id) => (
           <button disabled={!off} key={id} onClick={() => { sub(off, id); setOff("") }} style={row}>
-            ON · {playerName(id)}
+            ON · {playerName(players, id)}
           </button>
         ))}
       </div>

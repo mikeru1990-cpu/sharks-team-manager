@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import EventsScreen from "../events/EventsScreen"
 import PremiumWorkspaceHeader from "../ui/PremiumWorkspaceHeader"
-import { loadSquadPlayers, type SquadStorePlayer } from "../../lib/squadStore"
+import { useSquadPlayers } from "../../lib/useSquadPlayers"
 
 type Block = {
   id: string
