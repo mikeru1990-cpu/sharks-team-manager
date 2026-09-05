@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import type { SquadStorePlayer } from "../../lib/squadStore"\nimport { useSquadPlayers } from "../../lib/useSquadPlayers"
+import type { SquadStorePlayer } from "../../lib/squadStore"
+import { useSquadPlayers } from "../../lib/useSquadPlayers"
 import { getTeamFormat, loadTeamFormat, type TeamFormatId } from "../../lib/teamFormat"
 import InteractiveTacticalBoard from "./InteractiveTacticalBoard"
 
@@ -13,15 +14,13 @@ type MatchdayState = {
 }
 
 export default function TacticalBoardWorkspace() {
-  const [players, setPlayers] = useState<SquadStorePlayer[]>([])
+  const players = useSquadPlayers()
   const [formatId, setFormatId] = useState<TeamFormatId>("7v7")
   const [liveLineupIds, setLiveLineupIds] = useState<string[]>([])
   const [stintSeconds, setStintSeconds] = useState<Record<string, number>>({})
 
   useEffect(() => {
     function refresh() {
-      const squad = loadSquadPlayers()
-      setPlayers(squad)
       setFormatId(loadTeamFormat())
       try {
         const raw = window.localStorage.getItem(matchdayStorageKey)
