@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
-import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"\nimport { useSquadPlayers } from "../../lib/useSquadPlayers"
+import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"
+import { useSquadPlayers } from "../../lib/useSquadPlayers"
 import {
   getTeamFormat,
   loadTeamFormat,
@@ -12,7 +13,6 @@ import {
   type TeamFormatId,
 } from "../../lib/teamFormat"
 
-const players = getActiveU11Players()
 const tabs = ["Setup", "Squad", "Lineup", "Planner", "Live", "Report"] as const
 const key = "football-os-matchday-workflow-v6"
 const historyKey = "football-os-match-history-v1"
@@ -73,16 +73,18 @@ function formationLayout(formation: string): PitchSlot[] {
   return slots
 }
 
-function firstName(id: string) {
+function firstName(players: SquadStorePlayer[], id: string) {
   const player = players.find((item) => item.id === id)
   return player?.knownAs ?? player?.name.split(" ")[0] ?? "Player"
 }
 
-function playerName(id: string) {
+function playerName(players: SquadStorePlayer[], id: string) {
   return players.find((item) => item.id === id)?.name ?? "Player"
 }
 
 export default function MatchCentreWorkflow() {
+  const squadPlayers = useSquadPlayers()
+  const players = useMemo(() => squadPlayers.filter(isMatchdayEligible), [squadPlayers])
   const [active, setActive] = useState<Tab>("Setup")
   const [format, setFormat] = useState<TeamFormatId>("7v7")
   const [selected, setSelected] = useState<string[]>(players.map((player) => player.id))
@@ -166,6 +168,14 @@ export default function MatchCentreWorkflow() {
       JSON.stringify({ format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished }),
     )
   }, [loaded, format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished])
+
+  useEffect(() => {
+    if (!loaded) return
+    const valid = new Set(players.map((player) => player.id))
+    setSelected((current) => current.filter((id) => valid.has(id)))
+    setStarters((current) => current.filter((id) => valid.has(id)).slice(0, required))
+    setLive((current) => current.filter((id) => valid.has(id)).slice(0, required))
+  }, [loaded, players, required])
 
   useEffect(() => {
     if (!running || finished) return
@@ -565,6 +575,7 @@ function Pitch({
   layout: PitchSlot[]
   expected: number
 }) {
+  const players = useSquadPlayers()
   const [picked, setPicked] = useState("")
   const spots = Object.fromEntries(layout.map((slot) => [slot.key, slot])) as Record<string, PitchSlot>
 
@@ -673,6 +684,7 @@ function Live({
   secondHalf: () => void
   fullTime: () => void
 }) {
+  const players = useSquadPlayers()
   const [off, setOff] = useState("")
   const [scoring, setScoring] = useState(false)
 
