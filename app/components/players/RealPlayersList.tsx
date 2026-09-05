@@ -179,11 +179,6 @@ export default function RealPlayersList() {
   )
 }
 
-function positionLine(player: SquadPlayer) {
-  const secondary = player.secondaryPositions.filter(Boolean)
-  return secondary.length ? `${player.primaryPosition} / ${secondary.join(" / ")}` : player.primaryPosition
-}
-
 function Summary({ label, value }: { label: string; value: string }) {
   return <div style={panel}><div style={{ color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 900 }}>{label}</div><div style={{ marginTop: 8, fontSize: 28, fontWeight: 950 }}>{value}</div></div>
 }
