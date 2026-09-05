@@ -19,24 +19,20 @@ const basePlayers = getDefaultSquadPlayers()
 export default function RealPlayersList() {
   const [players, setPlayers] = useState<SquadStorePlayer[]>(basePlayers)
   const [selectedId, setSelectedId] = useState<string | null>(basePlayers[0]?.id ?? null)
-  const [query, setQuery] = useState("")\n  const [hydrated, setHydrated] = useState(false)
+  const [query, setQuery] = useState("")
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (raw) {
-        const saved = JSON.parse(raw) as SquadPlayer[]
-        if (Array.isArray(saved) && saved.length) {
-          setPlayers(saved)
-          setSelectedId(saved[0].id)
-        }
-      }
-    } catch {}
+    const saved = loadSquadPlayers()
+    setPlayers(saved)
+    setSelectedId(saved[0]?.id ?? null)
+    setHydrated(true)
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(players))
-  }, [players])
+    if (!hydrated) return
+    saveSquadPlayers(players)
+  }, [hydrated, players])
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
