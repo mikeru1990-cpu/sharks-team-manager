@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Capacitor } from "@capacitor/core"
 import Button from "./Button"
 
 type BeforeInstallPromptEvent = Event & {
@@ -26,6 +27,7 @@ function isIos() {
 
 export default function InstallAppBanner() {
   const [mounted, setMounted] = useState(false)
+  const [native, setNative] = useState(false)
   const [installed, setInstalled] = useState(false)
   const [dismissed, setDismissed] = useState(true)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
@@ -33,6 +35,7 @@ export default function InstallAppBanner() {
 
   useEffect(() => {
     setMounted(true)
+    setNative(Capacitor.isNativePlatform())
     setInstalled(isStandalone())
     setIos(isIos())
     setDismissed(window.localStorage.getItem(DISMISS_KEY) === "true")
@@ -60,12 +63,9 @@ export default function InstallAppBanner() {
 
   async function install() {
     if (!installPrompt) return
-
     await installPrompt.prompt()
     const choice = await installPrompt.userChoice
-    if (choice.outcome === "accepted") {
-      setInstalled(true)
-    }
+    if (choice.outcome === "accepted") setInstalled(true)
     setInstallPrompt(null)
   }
 
@@ -74,7 +74,7 @@ export default function InstallAppBanner() {
     setDismissed(true)
   }
 
-  if (!mounted || installed || dismissed) return null
+  if (!mounted || native || installed || dismissed) return null
 
   return (
     <section className="fos-install-banner" aria-label="Install Football OS">
@@ -83,16 +83,14 @@ export default function InstallAppBanner() {
         <strong>Install Football OS</strong>
         <span>
           {installPrompt
-            ? "Add the private alpha to your phone for a faster, full-screen matchday experience."
+            ? "Add Football OS to your phone for a faster full-screen matchday experience."
             : ios
-              ? "On iPhone, open Safari Share and choose Add to Home Screen for the app-style experience."
+              ? "On iPhone, open Safari Share and choose Add to Home Screen."
               : "Add Football OS to your home screen for quick matchday access."}
         </span>
       </div>
       <div className="fos-install-banner__actions">
-        {installPrompt ? (
-          <Button size="sm" onClick={install}>Install</Button>
-        ) : null}
+        {installPrompt ? <Button size="sm" onClick={install}>Install</Button> : null}
         <Button size="sm" variant="ghost" onClick={dismiss}>Not now</Button>
       </div>
     </section>
