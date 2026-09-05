@@ -69,7 +69,7 @@ export default function TrainingScreen() {
   const [sessionTitle, setSessionTitle] = useState("U11 Girls training")
   const [sessionGoal, setSessionGoal] = useState("Confidence, sharp decisions and lots of touches")
   const [blocks, setBlocks] = useState<Block[]>(defaults)
-  const [players, setPlayers] = useState<SquadStorePlayer[]>([])
+  const players = useSquadPlayers()
   const [marks, setMarks] = useState<Marks>({})
   const [notes, setNotes] = useState<Notes>({})
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -81,7 +81,6 @@ export default function TrainingScreen() {
   const [sessionDone, setSessionDone] = useState(false)
 
   useEffect(() => {
-    setPlayers(loadSquadPlayers())
     try {
       const raw = localStorage.getItem(key) ?? localStorage.getItem(legacyKey)
       if (!raw) return
