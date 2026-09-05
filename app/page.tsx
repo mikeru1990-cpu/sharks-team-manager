@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic"
 import { useEffect, useState } from "react"
 
 import AuthGate from "./components/AuthGate"
+import SameTabStorageSync from "./components/SameTabStorageSync"
 import PremiumAppShell from "./components/layout/PremiumAppShell"
 import AppRouter from "./components/navigation/AppRouter"
 
@@ -47,6 +48,7 @@ function AppDashboard({
       isAdmin={isAdmin}
       signOut={signOut}
     >
+      <SameTabStorageSync />
       <AppRouter activeTab={activeTab} onNavigate={handleTabChange} />
     </PremiumAppShell>
   )

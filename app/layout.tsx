@@ -1,15 +1,25 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import "./premium.css"
+import OfflineSyncManager from "./components/OfflineSyncManager"
 import PwaRegister from "./components/PwaRegister"
 
 export const metadata: Metadata = {
-  title: "Sharks Team Manager",
-  description: "Team manager for matches, training, attendance and reports.",
+  applicationName: "Football OS",
+  title: {
+    default: "Football OS",
+    template: "%s | Football OS",
+  },
+  description:
+    "The operating system for grassroots football: squads, training, matchday and player development in one place.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Sharks Team Manager",
+    statusBarStyle: "black-translucent",
+    title: "Football OS",
+  },
+  formatDetection: {
+    telephone: false,
   },
   icons: {
     icon: [
@@ -21,10 +31,11 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: "#123a9b",
+  themeColor: "#020617",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
@@ -36,6 +47,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <PwaRegister />
+        <OfflineSyncManager />
         {children}
       </body>
     </html>

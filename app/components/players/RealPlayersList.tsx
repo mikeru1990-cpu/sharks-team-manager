@@ -1,100 +1,38 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { getPlayersForTeam } from "../../lib/realTeamData"
-import { getPlayerRole } from "../../lib/playerRoles"
-
-const storageKey = "football-os-u11-squad-v2"
-const basePlayers = getPlayersForTeam("U11 Girls")
+import {
+  createSquadPlayer,
+  getDefaultSquadPlayers,
+  loadSquadPlayers,
+  positionLine,
+  saveSquadPlayers,
+  type SquadAvailability,
+  type SquadStorePlayer,
+} from "../../lib/squadStore"
 
 const primaryPositions = ["GK", "CB", "LDEF", "RDEF", "DM", "CM", "LM", "RM", "AM", "LW", "RW", "ST", "UTIL", "TBC"]
 const responsibilities = ["Main Goalkeeper", "Backup Goalkeeper", "Captain", "Vice-Captain", "Set Pieces", "Squad Player"]
-const availabilityOptions = ["Available", "Doubtful", "Injured", "Unavailable"]
-
-type Availability = typeof availabilityOptions[number]
-type SquadPlayer = {
-  id: string
-  name: string
-  knownAs?: string
-  primaryPosition: string
-  secondaryPositions: string[]
-  responsibilities: string[]
-  availability: Availability
-  shirtNumber: string
-  parentContact: string
-  medicalNotes: string
-  developmentNotes: string
-}
-
-const roleSeed: Record<string, Partial<SquadPlayer>> = {
-  "darcy-rae-russell": { primaryPosition: "GK", secondaryPositions: ["CB"], responsibilities: ["Main Goalkeeper"] },
-  "betsy-rowland": { primaryPosition: "CB", secondaryPositions: ["LDEF", "RDEF"], responsibilities: ["Squad Player"] },
-  "poppy-bennett": { primaryPosition: "ST", secondaryPositions: ["RW", "LW"], responsibilities: ["Squad Player"] },
-  "martha-scrivens": { primaryPosition: "ST", secondaryPositions: ["AM"], responsibilities: ["Squad Player"] },
-  "isabella-ogden": { primaryPosition: "CM", secondaryPositions: ["AM", "RM"], responsibilities: ["Squad Player"] },
-  "olivia-hassall": { primaryPosition: "CM", secondaryPositions: ["DM"], responsibilities: ["Squad Player"] },
-  "ella-wilson": { primaryPosition: "RW", secondaryPositions: ["LW", "ST"], responsibilities: ["Squad Player"] },
-  "bella-bainbridge": { primaryPosition: "CB", secondaryPositions: ["DM"], responsibilities: ["Squad Player"] },
-  "ruby-salter": { primaryPosition: "CM", secondaryPositions: ["RW"], responsibilities: ["Squad Player"] },
-  "connie-luff": { primaryPosition: "CB", secondaryPositions: ["CM"], responsibilities: ["Squad Player"] },
-  "lyra-twinning": { primaryPosition: "TBC", secondaryPositions: [], responsibilities: ["Squad Player"] },
-}
-
-function toSquadPlayer(player: (typeof basePlayers)[number], index: number): SquadPlayer {
-  const previousRole = getPlayerRole(player.id)
-  const seeded = roleSeed[player.id]
-  return {
-    id: player.id,
-    name: player.name,
-    knownAs: player.knownAs,
-    primaryPosition: seeded?.primaryPosition ?? previousRole.matchRole ?? "TBC",
-    secondaryPositions: seeded?.secondaryPositions ?? [],
-    responsibilities: seeded?.responsibilities ?? [previousRole.isGoalkeeper ? "Main Goalkeeper" : "Squad Player"],
-    availability: "Available",
-    shirtNumber: `${index + 1}`,
-    parentContact: "",
-    medicalNotes: "",
-    developmentNotes: player.notes ?? "",
-  }
-}
-
-function createBlankPlayer(): SquadPlayer {
-  return {
-    id: `player-${Date.now()}`,
-    name: "New Player",
-    knownAs: "",
-    primaryPosition: "TBC",
-    secondaryPositions: [],
-    responsibilities: ["Squad Player"],
-    availability: "Available",
-    shirtNumber: "",
-    parentContact: "",
-    medicalNotes: "",
-    developmentNotes: "",
-  }
-}
+const availabilityOptions: SquadAvailability[] = ["Available", "Doubtful", "Injured", "Unavailable"]
+const basePlayers = getDefaultSquadPlayers()
 
 export default function RealPlayersList() {
-  const [players, setPlayers] = useState<SquadPlayer[]>(basePlayers.map(toSquadPlayer))
+  const [players, setPlayers] = useState<SquadStorePlayer[]>(basePlayers)
   const [selectedId, setSelectedId] = useState<string | null>(basePlayers[0]?.id ?? null)
   const [query, setQuery] = useState("")
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey)
-      if (raw) {
-        const saved = JSON.parse(raw) as SquadPlayer[]
-        if (Array.isArray(saved) && saved.length) {
-          setPlayers(saved)
-          setSelectedId(saved[0].id)
-        }
-      }
-    } catch {}
+    const saved = loadSquadPlayers()
+    setPlayers(saved)
+    setSelectedId(saved[0]?.id ?? null)
+    setHydrated(true)
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(players))
-  }, [players])
+    if (!hydrated) return
+    saveSquadPlayers(players)
+  }, [hydrated, players])
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -104,12 +42,12 @@ export default function RealPlayersList() {
 
   const selected = players.find((player) => player.id === selectedId) ?? players[0]
 
-  function updatePlayer(id: string, patch: Partial<SquadPlayer>) {
+  function updatePlayer(id: string, patch: Partial<SquadStorePlayer>) {
     setPlayers((current) => current.map((player) => player.id === id ? { ...player, ...patch } : player))
   }
 
   function addPlayer() {
-    const player = createBlankPlayer()
+    const player = createSquadPlayer()
     setPlayers((current) => [player, ...current])
     setSelectedId(player.id)
   }
@@ -123,10 +61,10 @@ export default function RealPlayersList() {
   }
 
   function restoreRealSquad() {
-    const restored = basePlayers.map(toSquadPlayer)
+    const restored = getDefaultSquadPlayers()
     setPlayers(restored)
     setSelectedId(restored[0]?.id ?? null)
-    window.localStorage.setItem(storageKey, JSON.stringify(restored))
+    saveSquadPlayers(restored)
   }
 
   function toggleSecondary(id: string, position: string) {
@@ -216,7 +154,7 @@ export default function RealPlayersList() {
             <Field label="Full name" value={selected.name} onChange={(value) => updatePlayer(selected.id, { name: value })} />
             <Field label="Known as" value={selected.knownAs ?? ""} onChange={(value) => updatePlayer(selected.id, { knownAs: value })} />
             <Field label="Shirt number" value={selected.shirtNumber} onChange={(value) => updatePlayer(selected.id, { shirtNumber: value })} />
-            <SelectField label="Availability" value={selected.availability} options={availabilityOptions} onChange={(value) => updatePlayer(selected.id, { availability: value as Availability })} />
+            <SelectField label="Availability" value={selected.availability} options={availabilityOptions} onChange={(value) => updatePlayer(selected.id, { availability: value as SquadAvailability })} />
             <SelectField label="Primary position" value={selected.primaryPosition} options={primaryPositions} onChange={(value) => updatePlayer(selected.id, { primaryPosition: value })} />
           </div>
 
@@ -239,11 +177,6 @@ export default function RealPlayersList() {
       )}
     </div>
   )
-}
-
-function positionLine(player: SquadPlayer) {
-  const secondary = player.secondaryPositions.filter(Boolean)
-  return secondary.length ? `${player.primaryPosition} / ${secondary.join(" / ")}` : player.primaryPosition
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
