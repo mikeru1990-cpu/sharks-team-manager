@@ -4,11 +4,13 @@ export const squadStorageKey = "football-os-u11-squad-v2"
 export const squadChangeEvent = "football-os-squad-change"
 
 const basePlayers = getPlayersForTeam("U11 Girls")
+const authRequired = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true"
 
 export type SquadAvailability = "Available" | "Doubtful" | "Injured" | "Unavailable"
 
 export type SquadStorePlayer = {
   id: string
+  cloudId?: string
   name: string
   knownAs?: string
   primaryPosition: string
@@ -48,6 +50,7 @@ export function getDefaultSquadPlayers(): SquadStorePlayer[] {
     const seeded = roleSeed[player.id]
     return {
       id: player.id,
+      cloudId: undefined,
       name: player.name,
       knownAs: player.knownAs,
       primaryPosition: seeded?.primaryPosition ?? "TBC",
@@ -72,6 +75,7 @@ function normalisePlayer(value: unknown, fallback?: SquadStorePlayer): SquadStor
   const responsibilities = uniqueStrings(candidate.responsibilities)
   return {
     id,
+    cloudId: typeof candidate.cloudId === "string" && candidate.cloudId.trim() ? candidate.cloudId : fallback?.cloudId,
     name,
     knownAs: typeof candidate.knownAs === "string" ? candidate.knownAs : fallback?.knownAs,
     primaryPosition:
@@ -125,6 +129,26 @@ export function loadSquadPlayers(): SquadStorePlayer[] {
 export function saveSquadPlayers(players: SquadStorePlayer[]) {
   if (typeof window === "undefined") return
   const safe = normaliseSquad(players)
+  const diskSafe = authRequired
+    ? safe.map((player) => ({
+        ...player,
+        parentContact: "",
+        medicalNotes: "",
+        developmentNotes: "",
+      }))
+    : safe
+  window.localStorage.setItem(squadStorageKey, JSON.stringify(diskSafe))
+  window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: safe }))
+}
+
+export function scrubSensitiveSquadCache() {
+  if (typeof window === "undefined") return
+  const safe = loadSquadPlayers().map((player) => ({
+    ...player,
+    parentContact: "",
+    medicalNotes: "",
+    developmentNotes: "",
+  }))
   window.localStorage.setItem(squadStorageKey, JSON.stringify(safe))
   window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: safe }))
 }
@@ -137,6 +161,7 @@ export function createSquadPlayer(): SquadStorePlayer {
 
   return {
     id,
+    cloudId: undefined,
     name: "New Player",
     knownAs: "",
     primaryPosition: "TBC",
