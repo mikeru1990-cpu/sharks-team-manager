@@ -10,6 +10,7 @@ import {
   type SquadAvailability,
   type SquadStorePlayer,
 } from "../../lib/squadStore"
+import { useSquadCloudStatus } from "../../lib/squadCloud"
 
 const primaryPositions = ["GK", "CB", "LDEF", "RDEF", "DM", "CM", "LM", "RM", "AM", "LW", "RW", "ST", "UTIL", "TBC"]
 const responsibilities = ["Main Goalkeeper", "Backup Goalkeeper", "Captain", "Vice-Captain", "Set Pieces", "Squad Player"]
@@ -17,6 +18,8 @@ const availabilityOptions: SquadAvailability[] = ["Available", "Doubtful", "Inju
 const basePlayers = getDefaultSquadPlayers()
 
 export default function RealPlayersList() {
+  const cloud = useSquadCloudStatus()
+  const readOnly = cloud.mode !== "local" && !cloud.canManage
   const [players, setPlayers] = useState<SquadStorePlayer[]>(basePlayers)
   const [selectedId, setSelectedId] = useState<string | null>(basePlayers[0]?.id ?? null)
   const [query, setQuery] = useState("")
@@ -43,16 +46,19 @@ export default function RealPlayersList() {
   const selected = players.find((player) => player.id === selectedId) ?? players[0]
 
   function updatePlayer(id: string, patch: Partial<SquadStorePlayer>) {
+    if (readOnly) return
     setPlayers((current) => current.map((player) => player.id === id ? { ...player, ...patch } : player))
   }
 
   function addPlayer() {
+    if (readOnly) return
     const player = createSquadPlayer()
     setPlayers((current) => [player, ...current])
     setSelectedId(player.id)
   }
 
   function deletePlayer(id: string) {
+    if (readOnly) return
     setPlayers((current) => {
       const next = current.filter((player) => player.id !== id)
       setSelectedId(next[0]?.id ?? null)
@@ -61,6 +67,7 @@ export default function RealPlayersList() {
   }
 
   function restoreRealSquad() {
+    if (readOnly) return
     const restored = getDefaultSquadPlayers()
     setPlayers(restored)
     setSelectedId(restored[0]?.id ?? null)
@@ -68,6 +75,7 @@ export default function RealPlayersList() {
   }
 
   function toggleSecondary(id: string, position: string) {
+    if (readOnly) return
     const player = players.find((item) => item.id === id)
     if (!player) return
     const next = player.secondaryPositions.includes(position)
@@ -77,6 +85,7 @@ export default function RealPlayersList() {
   }
 
   function toggleResponsibility(id: string, responsibility: string) {
+    if (readOnly) return
     const player = players.find((item) => item.id === id)
     if (!player) return
     const next = player.responsibilities.includes(responsibility)
@@ -91,22 +100,22 @@ export default function RealPlayersList() {
         <div>
           <div style={eyebrow}>SQUAD MANAGER</div>
           <h1 style={{ margin: "6px 0 4px", fontSize: 32, letterSpacing: -1.1 }}>U11 Girls Players</h1>
-          <p style={muted}>Older squad feel restored, with improved editable football roles.</p>
+          <p style={muted}>{readOnly ? "Team-scoped squad view. Editing is restricted to coaching staff." : "One squad record now drives Matchday, Training and player development."}</p>
         </div>
-        <button type="button" onClick={addPlayer} style={primaryButton}>+ Add</button>
+        {!readOnly && <button type="button" onClick={addPlayer} style={primaryButton}>+ Add</button>}
       </section>
 
       <div style={summaryGrid}>
         <Summary label="Players" value={players.length.toString()} />
         <Summary label="Available" value={players.filter((player) => player.availability === "Available").length.toString()} />
         <Summary label="GK" value={players.filter((player) => player.responsibilities.includes("Main Goalkeeper") || player.primaryPosition === "GK").length.toString()} />
-        <Summary label="Positions" value="Editable" />
+        <Summary label="Positions" value={readOnly ? "View only" : "Editable"} />
       </div>
 
       <section style={panel}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search players, positions or roles..." style={input} />
-          <button type="button" onClick={restoreRealSquad} style={secondaryButton}>Restore real squad</button>
+          {!readOnly && <button type="button" onClick={restoreRealSquad} style={secondaryButton}>Restore real squad</button>}
         </div>
       </section>
 
@@ -131,15 +140,15 @@ export default function RealPlayersList() {
                 <span style={player.availability === "Available" ? greenBadge : amberBadge}>{player.availability}</span>
               </div>
               <div style={cardActions}>
-                <button type="button" onClick={() => setSelectedId(player.id)} style={editButton}>Edit</button>
-                <button type="button" onClick={() => deletePlayer(player.id)} style={removeButton}>Remove</button>
+                <button type="button" onClick={() => setSelectedId(player.id)} style={editButton}>{readOnly ? "View" : "Edit"}</button>
+                {!readOnly && <button type="button" onClick={() => deletePlayer(player.id)} style={removeButton}>Remove</button>}
               </div>
             </article>
           ))}
         </div>
       </section>
 
-      {selected && (
+      {selected && !readOnly && (
         <section style={editorPanel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
             <div>
