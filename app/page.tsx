@@ -8,6 +8,7 @@ import AuthGate from "./components/AuthGate"
 import SameTabStorageSync from "./components/SameTabStorageSync"
 import PremiumAppShell from "./components/layout/PremiumAppShell"
 import AppRouter from "./components/navigation/AppRouter"
+import SquadCloudBridge from "./components/system/SquadCloudBridge"
 
 import type { WorkspaceTab } from "./lib/workspaces"
 
@@ -49,6 +50,7 @@ function AppDashboard({
       signOut={signOut}
     >
       <SameTabStorageSync />
+      <SquadCloudBridge />
       <AppRouter activeTab={activeTab} onNavigate={handleTabChange} />
     </PremiumAppShell>
   )
