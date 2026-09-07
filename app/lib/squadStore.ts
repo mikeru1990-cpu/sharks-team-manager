@@ -112,7 +112,7 @@ function normaliseSquad(value: unknown): SquadStorePlayer[] {
     next.push(player)
   }
 
-  return next.length ? next : getDefaultSquadPlayers()
+  return next
 }
 
 export function loadSquadPlayers(): SquadStorePlayer[] {
