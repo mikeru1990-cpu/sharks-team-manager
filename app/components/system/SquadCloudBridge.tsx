@@ -169,9 +169,13 @@ export default function SquadCloudBridge() {
     }
 
     function handleAuth() {
-      scrubSensitiveSquadCache()
       teamIdRef.current = null
       canManageRef.current = false
+      applyingRemote.current = true
+      scrubSensitiveSquadCache()
+      queueMicrotask(() => {
+        applyingRemote.current = false
+      })
       void syncFromCloud(true)
     }
 
