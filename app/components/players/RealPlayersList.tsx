@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   createSquadPlayer,
   getDefaultSquadPlayers,
   loadSquadPlayers,
   positionLine,
   saveSquadPlayers,
+  subscribeSquadPlayers,
   type SquadAvailability,
   type SquadStorePlayer,
 } from "../../lib/squadStore"
@@ -24,6 +25,7 @@ export default function RealPlayersList() {
   const [selectedId, setSelectedId] = useState<string | null>(basePlayers[0]?.id ?? null)
   const [query, setQuery] = useState("")
   const [hydrated, setHydrated] = useState(false)
+  const externalUpdate = useRef(false)
 
   useEffect(() => {
     const saved = loadSquadPlayers()
@@ -33,7 +35,21 @@ export default function RealPlayersList() {
   }, [])
 
   useEffect(() => {
+    return subscribeSquadPlayers((next) => {
+      setPlayers((current) => {
+        if (JSON.stringify(current) === JSON.stringify(next)) return current
+        externalUpdate.current = true
+        return next
+      })
+    })
+  }, [])
+
+  useEffect(() => {
     if (!hydrated) return
+    if (externalUpdate.current) {
+      externalUpdate.current = false
+      return
+    }
     saveSquadPlayers(players)
   }, [hydrated, players])
 
