@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js"
 import { ShieldCheck } from "lucide-react"
 import { loadAuthContext, type AuthContext } from "../lib/auth"
 import { supabase } from "../lib/supabase"
+import { scrubSensitiveSquadCache } from "../lib/squadStore"
 import Button from "./ui/Button"
 import Card from "./ui/Card"
 import Field from "./ui/Field"
@@ -93,6 +94,7 @@ export default function AuthGate({ children }: AuthGateProps) {
 
   async function signOut() {
     if (!supabase) return
+    scrubSensitiveSquadCache()
     await supabase.auth.signOut()
     setAuthContext(null)
   }
