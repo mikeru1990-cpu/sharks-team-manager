@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { ShieldCheck } from "lucide-react"
-import { loadAuthContext, type AuthContext } from "../lib/auth"
+import { loadAuthContext, type AuthContext, type TeamAccess } from "../lib/auth"
 import { supabase } from "../lib/supabase"
 import { scrubSensitiveSquadCache } from "../lib/squadStore"
 import Button from "./ui/Button"
@@ -15,12 +15,18 @@ type AuthGateProps = {
   children: (args: {
     user: User
     isAdmin: boolean
+    teams: TeamAccess[]
+    activeTeam: TeamAccess
+    setActiveTeamId: (teamId: string) => void
     signOut: () => Promise<void>
   }) => React.ReactNode
 }
 
+const ACTIVE_TEAM_KEY = "football-os:active-team-id"
+
 export default function AuthGate({ children }: AuthGateProps) {
   const [authContext, setAuthContext] = useState<AuthContext | null>(null)
+  const [activeTeamId, setActiveTeamIdState] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -48,6 +54,12 @@ export default function AuthGate({ children }: AuthGateProps) {
         const context = await loadAuthContext(user)
         if (!mounted) return
         setAuthContext(context)
+        const savedTeamId = window.localStorage.getItem(ACTIVE_TEAM_KEY)
+        const nextTeamId = context.teams.some((team) => team.teamId === savedTeamId)
+          ? savedTeamId
+          : context.teams[0]?.teamId ?? null
+        setActiveTeamIdState(nextTeamId)
+        if (nextTeamId) window.localStorage.setItem(ACTIVE_TEAM_KEY, nextTeamId)
         setMessage("")
       } catch (error) {
         if (!mounted) return
@@ -92,10 +104,19 @@ export default function AuthGate({ children }: AuthGateProps) {
     setSubmitting(false)
   }
 
+  function setActiveTeamId(teamId: string) {
+    if (!authContext?.teams.some((team) => team.teamId === teamId)) return
+    scrubSensitiveSquadCache()
+    setActiveTeamIdState(teamId)
+    window.localStorage.setItem(ACTIVE_TEAM_KEY, teamId)
+  }
+
   async function signOut() {
     if (!supabase) return
     scrubSensitiveSquadCache()
+    window.localStorage.removeItem(ACTIVE_TEAM_KEY)
     await supabase.auth.signOut()
+    setActiveTeamIdState(null)
     setAuthContext(null)
   }
 
@@ -172,13 +193,14 @@ export default function AuthGate({ children }: AuthGateProps) {
     )
   }
 
-  if (!authContext.activeMembership) {
+  if (!authContext.memberships.length && !authContext.teams.length) {
     return (
       <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
         <Card elevated style={{ width: "100%", maxWidth: 460 }}>
-          <h1 style={{ marginTop: 0 }}>Your account is ready</h1>
+          <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: ".1em", color: "var(--fos-blue-400)" }}>ACCESS PENDING</div>
+          <h1 style={{ margin: "8px 0" }}>Your Football OS account is ready</h1>
           <p style={{ color: "var(--fos-text-muted)", lineHeight: 1.6 }}>
-            You are signed in, but your club has not added you to a team yet. Ask your club administrator to complete your invitation.
+            Your account is secure, but it has not been linked to a club or team yet. Ask the club administrator to complete your invitation.
           </p>
           <Button variant="secondary" onClick={() => void signOut()}>Sign out</Button>
         </Card>
@@ -186,5 +208,29 @@ export default function AuthGate({ children }: AuthGateProps) {
     )
   }
 
-  return <>{children({ user: authContext.user, isAdmin: authContext.isAdmin, signOut })}</>
+  if (!authContext.teams.length) {
+    return (
+      <main style={{ minHeight: "100vh", padding: 20, display: "grid", placeItems: "center" }}>
+        <Card elevated style={{ width: "100%", maxWidth: 460 }}>
+          <div style={{ fontSize: 12, fontWeight: 950, letterSpacing: ".1em", color: "var(--fos-blue-400)" }}>TEAM ASSIGNMENT</div>
+          <h1 style={{ margin: "8px 0" }}>Club access confirmed</h1>
+          <p style={{ color: "var(--fos-text-muted)", lineHeight: 1.6 }}>
+            You are linked to {authContext.activeMembership?.clubName ?? "your club"}, but no team has been assigned to your account yet.
+          </p>
+          <Button variant="secondary" onClick={() => void signOut()}>Sign out</Button>
+        </Card>
+      </main>
+    )
+  }
+
+  const activeTeam = authContext.teams.find((team) => team.teamId === activeTeamId) ?? authContext.teams[0]
+
+  return <>{children({
+    user: authContext.user,
+    isAdmin: authContext.isAdmin,
+    teams: authContext.teams,
+    activeTeam,
+    setActiveTeamId,
+    signOut,
+  })}</>
 }
