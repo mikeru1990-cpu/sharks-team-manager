@@ -1,12 +1,16 @@
 {
-  "name": "Sharks Team Manager",
-  "short_name": "Sharks",
-  "description": "Team manager for matches, training, attendance and reports.",
-  "start_url": "/",
+  "id": "/",
+  "name": "Football OS",
+  "short_name": "Football OS",
+  "description": "The operating system for grassroots football.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#eef2ff",
-  "theme_color": "#123a9b",
-  "orientation": "portrait",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#f5f7fb",
+  "theme_color": "#0b1f4d",
+  "orientation": "portrait-primary",
+  "categories": ["sports", "productivity"],
   "icons": [
     {
       "src": "/icon-192.png",

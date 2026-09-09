@@ -1,62 +1,56 @@
-import { NextResponse } from "next/server"
-import { getSupabaseAdmin } from "../../lib/supabase-admin"
+import { privateJson, requireStaffRequest } from "../../lib/apiAuth"
 
 export const dynamic = "force-dynamic"
 
-export async function POST(req: Request) {
-  try {
-    const supabaseAdmin = getSupabaseAdmin()
+export async function POST(request: Request) {
+  const auth = await requireStaffRequest(request)
+  if (!auth.ok) return auth.response
 
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: "Missing Supabase admin environment variables" },
-        { status: 500 }
-      )
+  try {
+    const body = await request.json()
+    const playedOn = typeof body.playedOn === "string" ? body.playedOn : ""
+    const eventId = typeof body.eventId === "string" ? body.eventId : null
+    const competition = typeof body.competition === "string" ? body.competition.slice(0, 160) : ""
+    const homeTeam = typeof body.homeTeam === "string" ? body.homeTeam.trim().slice(0, 160) : ""
+    const awayTeam = typeof body.awayTeam === "string" ? body.awayTeam.trim().slice(0, 160) : ""
+    const venue = typeof body.venue === "string" ? body.venue.slice(0, 240) : ""
+    const notes = typeof body.notes === "string" ? body.notes.slice(0, 2000) : ""
+    const homeScore = Number(body.homeScore)
+    const awayScore = Number(body.awayScore)
+
+    if (!playedOn || !homeTeam || !awayTeam) {
+      return privateJson({ error: "Date, home team and away team are required" }, { status: 400 })
     }
 
-    const body = await req.json()
-
-    const {
-      playedOn,
-      eventId,
-      competition,
-      homeTeam,
-      awayTeam,
-      homeScore,
-      awayScore,
-      venue,
-      notes,
-      isFinal,
-    } = body
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 99 || awayScore > 99) {
+      return privateJson({ error: "Scores must be whole numbers between 0 and 99" }, { status: 400 })
+    }
 
     const payload = {
       played_on: playedOn,
-      event_id: eventId || null,
-      competition: competition || "",
+      event_id: eventId,
+      competition,
       home_team: homeTeam,
       away_team: awayTeam,
-      home_score: Number(homeScore ?? 0),
-      away_score: Number(awayScore ?? 0),
-      venue: venue || "",
-      notes: notes || "",
-      is_final: Boolean(isFinal),
-      opponent: awayTeam || "",
+      home_score: homeScore,
+      away_score: awayScore,
+      venue,
+      notes,
+      is_final: Boolean(body.isFinal),
+      opponent: awayTeam,
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await auth.admin
       .from("league_results")
       .upsert(payload)
       .select()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return privateJson({ error: "Unable to save result" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unexpected server error"
-
-    return NextResponse.json({ error: message }, { status: 500 })
+    return privateJson({ success: true, data })
+  } catch {
+    return privateJson({ error: "Invalid result request" }, { status: 400 })
   }
 }

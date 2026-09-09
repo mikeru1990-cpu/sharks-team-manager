@@ -1,0 +1,61 @@
+name: Football OS Native iOS CI
+
+on:
+  push:
+    branches:
+      - feat/football-os-foundation
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: football-os-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-simulator-build:
+    name: Native iOS simulator build
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Show native toolchain
+        run: |
+          node --version
+          npm --version
+          xcodebuild -version
+          npx cap --version
+
+      - name: Generate iOS project
+        env:
+          CAPACITOR_APP_ID: app.footballos.mobile
+        run: npm run native:ios:generate
+
+      - name: Sync native project
+        env:
+          CAPACITOR_APP_ID: app.footballos.mobile
+        run: npm run native:ios:sync
+
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project ios/App/App.xcodeproj -scheme App
+
+      - name: Compile iOS simulator app
+        run: |
+          xcodebuild             -project ios/App/App.xcodeproj             -scheme App             -configuration Debug             -sdk iphonesimulator             -destination 'generic/platform=iOS Simulator'             CODE_SIGNING_ALLOWED=NO             build
