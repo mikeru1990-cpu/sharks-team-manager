@@ -2,6 +2,9 @@ import { getPlayersForTeam } from "./realTeamData"
 
 export const squadStorageKey = "football-os-u11-squad-v2"
 export const squadChangeEvent = "football-os-squad-change"
+const scopedSquadPrefix = "football-os-squad-v3"
+const squadScopeStateKey = "football-os:active-squad-scope"
+let activeSquadScope = "preview"
 
 const basePlayers = getPlayersForTeam("U11 Girls")
 const authRequired = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true"
@@ -115,14 +118,45 @@ function normaliseSquad(value: unknown): SquadStorePlayer[] {
   return next
 }
 
-export function loadSquadPlayers(): SquadStorePlayer[] {
-  if (typeof window === "undefined") return getDefaultSquadPlayers()
+function currentSquadStorageKey() {
+  if (!authRequired) return squadStorageKey
+  return `${scopedSquadPrefix}:${encodeURIComponent(activeSquadScope)}`
+}
+
+export function setSquadStorageScope(scope: string | null) {
+  if (typeof window === "undefined") return
+  activeSquadScope = scope?.trim() || "unassigned"
+  window.localStorage.setItem(squadScopeStateKey, activeSquadScope)
+  window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: loadSquadPlayers() }))
+}
+
+export function getSquadStorageScope() {
+  if (typeof window === "undefined") return activeSquadScope
+  return window.localStorage.getItem(squadScopeStateKey) ?? activeSquadScope
+}
+
+export function loadLegacySquadForMigration(): SquadStorePlayer[] {
+  if (typeof window === "undefined") return []
   try {
     const raw = window.localStorage.getItem(squadStorageKey)
-    if (!raw) return getDefaultSquadPlayers()
+    if (!raw) return []
     return normaliseSquad(JSON.parse(raw))
   } catch {
-    return getDefaultSquadPlayers()
+    return []
+  }
+}
+
+export function loadSquadPlayers(): SquadStorePlayer[] {
+  if (typeof window === "undefined") return authRequired ? [] : getDefaultSquadPlayers()
+  try {
+    if (authRequired) {
+      activeSquadScope = window.localStorage.getItem(squadScopeStateKey) ?? activeSquadScope
+    }
+    const raw = window.localStorage.getItem(currentSquadStorageKey())
+    if (!raw) return authRequired ? [] : getDefaultSquadPlayers()
+    return normaliseSquad(JSON.parse(raw))
+  } catch {
+    return authRequired ? [] : getDefaultSquadPlayers()
   }
 }
 
@@ -137,7 +171,7 @@ export function saveSquadPlayers(players: SquadStorePlayer[]) {
         developmentNotes: "",
       }))
     : safe
-  window.localStorage.setItem(squadStorageKey, JSON.stringify(diskSafe))
+  window.localStorage.setItem(currentSquadStorageKey(), JSON.stringify(diskSafe))
   window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: safe }))
 }
 
@@ -149,7 +183,7 @@ export function scrubSensitiveSquadCache() {
     medicalNotes: "",
     developmentNotes: "",
   }))
-  window.localStorage.setItem(squadStorageKey, JSON.stringify(safe))
+  window.localStorage.setItem(currentSquadStorageKey(), JSON.stringify(safe))
   window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: safe }))
 }
 
@@ -184,7 +218,7 @@ export function subscribeSquadPlayers(listener: (players: SquadStorePlayer[]) =>
   }
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === squadStorageKey) listener(loadSquadPlayers())
+    if (event.key === currentSquadStorageKey()) listener(loadSquadPlayers())
   }
 
   window.addEventListener(squadChangeEvent, handleChange)
