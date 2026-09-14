@@ -1,18 +1,20 @@
 # Football OS — App Store Release Gate
 
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-14
 
 This is the release gate for Football OS. A release is not signed off until every P0 item is green and the candidate has completed device testing through TestFlight.
 
 ## P0 — submission blockers
 
-- [ ] Production build passes with no TypeScript, lint or runtime errors.
+- [ ] Production build passes with no TypeScript, lint or runtime errors on the frozen release-candidate commit.
 - [ ] iOS distribution project exists and produces an installable signed archive.
 - [ ] The iOS build provides genuine app value beyond a thin website wrapper.
 - [ ] Production Supabase migrations are applied and verified.
 - [ ] Authentication is enabled for private club/team data.
 - [x] Privileged league-result APIs require authenticated staff access.
 - [x] Team write RLS is restricted to management/coaching roles rather than parents/viewers.
+- [x] Authenticated coach / assistant / parent access-regression harness exists.
+- [ ] Current staging Supabase environment passes the authenticated access-regression workflow.
 - [x] In-app account deletion path exists in the product and database migration.
 - [ ] Account deletion has been tested end-to-end against production-like data.
 - [ ] Public Privacy Policy URL is final and configured.
@@ -29,12 +31,12 @@ This is the release gate for Football OS. A release is not signed off until ever
 
 - [ ] Matchday uses competition-driven 5v5 / 7v7 / 9v9 / 11v11 rules rather than hard-coded player counts.
 - [ ] Matchday touch interactions are reliable on physical iPhones.
-- [ ] True tactical free-move behaviour is separated from semantic formation-slot movement.
-- [ ] Training builder is compact, quick and comfortable on a phone.
-- [ ] Squad data is one source of truth for players, positions, roles and availability.
+- [x] True tactical free-move behaviour is separated from semantic formation-slot movement.
+- [x] Training builder is compact, quick and comfortable in the mobile layout.
+- [x] Squad data is one source of truth for players, positions, roles and availability in the app.
 - [ ] Offline Matchday sync is conflict-safe and visibly communicates sync state.
 - [ ] Respect Code acknowledgements sync to the cloud and admins can see current-version completion.
-- [ ] Parent access is team-scoped and never exposes other teams' player data.
+- [ ] Parent access is team-scoped and never exposes other teams' player data in the validated staging environment.
 - [ ] Accessibility review covers text sizing, contrast, touch target size, VoiceOver labels and reduced motion.
 - [ ] Empty, loading, offline and error states are designed for every primary workspace.
 - [ ] Destructive actions require clear confirmation and recoverability where appropriate.
@@ -54,14 +56,16 @@ This is the release gate for Football OS. A release is not signed off until ever
 1. Freeze the release candidate branch.
 2. Run production web build and automated checks.
 3. Apply/test database migrations in staging.
-4. Create iOS candidate and distribute with TestFlight.
-5. Run coach Matchday scenario offline and online on a physical iPhone.
-6. Run parent/privacy/account-deletion scenario.
-7. Run safeguarding/privacy review for youth data.
-8. Complete App Store Connect metadata and privacy disclosures.
-9. Sign off P0, P1 and App Store presentation checklist.
-10. Submit one final release candidate to App Review.
+4. Run the authenticated Supabase access smoke test for Coach, Assistant Coach and Parent.
+5. Create iOS candidate and distribute with TestFlight.
+6. Run coach Matchday scenario offline and online on a physical iPhone.
+7. Run parent/privacy/account-deletion scenario.
+8. Run safeguarding/privacy review for youth data.
+9. Complete App Store Connect metadata and privacy disclosures.
+10. Sign off P0, P1 and App Store presentation checklist, then submit one final release candidate to App Review.
 
 ## Current release position
 
-Football OS has a substantial product foundation, but it is not yet an App Store release candidate. The immediate programme is: security/privacy hardening → Matchday rule integration and reliability → whole-app mobile polish → native iOS packaging → TestFlight QA → App Store submission.
+Football OS now has a native iOS compile gate, role-aware team scoping, protected youth-player private data, and an automated authenticated access-control test harness. It is not yet an App Store release candidate because the Supabase migrations and role journeys still need to pass in a connected staging environment, authentication must be enabled for the release build, and a signed TestFlight archive still needs physical-device QA.
+
+See `docs/SUPABASE_RELEASE_VALIDATION.md` for the exact staging setup and evidence required before the access/privacy items can be signed off.
