@@ -39,6 +39,9 @@ jobs:
       - name: TypeScript check
         run: npx tsc --noEmit
 
+      - name: Release-script syntax check
+        run: node --check scripts/verify-role-access.mjs
+
       - name: Next.js production build
         env:
           NEXT_PUBLIC_AUTH_REQUIRED: "false"
