@@ -1,45 +1,187 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { WORKSPACES } from "../../lib/workspaces"
-import type { WorkspaceTab } from "../../lib/workspaces"
-import { defaultPlatformContext } from "../../lib/platform"
-
-const shellBackground = "radial-gradient(circle at top, rgba(37,99,235,0.22), transparent 34%), #020617"
+import { BarChart3, Dumbbell, Home, Settings, Trophy, Users } from "lucide-react"
+import type { TeamAccess } from "../../lib/auth"
+import { WORKSPACES, type WorkspaceTab } from "../../lib/workspaces"
+import InstallAppBanner from "../ui/InstallAppBanner"
 
 type Props = {
   children: ReactNode
   activeTab: WorkspaceTab
   onTabChange: (tab: WorkspaceTab) => void
+  allowedTabs: WorkspaceTab[]
+  activeTeam: TeamAccess
+  teams: TeamAccess[]
+  onTeamChange: (teamId: string) => void
   isAdmin?: boolean
   signOut?: () => Promise<void>
 }
 
-export default function PremiumAppShell({ children, activeTab, onTabChange }: Props) {
-  const context = defaultPlatformContext
+const icons: Record<WorkspaceTab, ReactNode> = {
+  home: <Home />,
+  matchday: <Trophy />,
+  training: <Dumbbell />,
+  players: <Users />,
+  insights: <BarChart3 />,
+  club: <Settings />,
+}
+
+function roleLabel(role: TeamAccess["role"]) {
+  return role
+    .replaceAll("_", " ")
+    .replace(/w/g, (letter) => letter.toUpperCase())
+}
+
+export default function PremiumAppShell({
+  children,
+  activeTab,
+  onTabChange,
+  allowedTabs,
+  activeTeam,
+  teams,
+  onTeamChange,
+  signOut,
+}: Props) {
+  const visibleWorkspaces = WORKSPACES.filter((workspace) => allowedTabs.includes(workspace.id))
+  const activeWorkspace =
+    visibleWorkspaces.find((workspace) => workspace.id === activeTab) ??
+    visibleWorkspaces[0] ??
+    WORKSPACES[0]
+
+  const teamLabel = activeTeam.season
+    ? `${activeTeam.teamName} · ${activeTeam.season}`
+    : activeTeam.teamName
 
   return (
-    <div style={{ minHeight: "100vh", background: shellBackground, color: "white", paddingBottom: 92 }}>
-      <header style={{ position: "sticky", top: 0, zIndex: 20, padding: "14px 16px 10px", backdropFilter: "blur(18px)", background: "rgba(2,6,23,0.86)", borderBottom: "1px solid rgba(148,163,184,0.12)" }}>
-        <div style={{ fontSize: 12, opacity: 0.72, fontWeight: 800, letterSpacing: 0.7 }}>FOOTBALL OS</div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+    <div className="fos-app-shell fos-v4">
+      <aside className="fos-desktop-sidebar">
+        <div className="fos-desktop-brand">
+          <div className="fos-desktop-mark">⚽</div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{context.club.name}</div>
-            <div style={{ marginTop: 2, color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 800 }}>{context.team.name} · {context.team.season}</div>
+            <strong>Football OS</strong>
+            <span>{activeTeam.clubName}</span>
           </div>
-          <div style={{ borderRadius: 999, padding: "7px 10px", background: "rgba(37,99,235,0.2)", border: "1px solid rgba(96,165,250,0.25)", fontSize: 12, fontWeight: 800 }}>Recovery 23</div>
         </div>
-      </header>
 
-      <main style={{ padding: 16, width: "100%", maxWidth: 1080, margin: "0 auto" }}>{children}</main>
+        <div className="fos-desktop-team">
+          <small>ACTIVE TEAM</small>
+          {teams.length > 1 ? (
+            <select
+              aria-label="Active team"
+              value={activeTeam.teamId}
+              onChange={(event) => onTeamChange(event.target.value)}
+              style={{
+                width: "100%",
+                minHeight: 42,
+                borderRadius: 12,
+                border: "1px solid rgba(148,163,184,.18)",
+                background: "rgba(2,6,23,.55)",
+                color: "white",
+                padding: "0 10px",
+                fontWeight: 850,
+              }}
+            >
+              {teams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>
+                  {team.teamName}{team.season ? ` · ${team.season}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <strong>{activeTeam.teamName}</strong>
+          )}
+          <span>{roleLabel(activeTeam.role)}{activeTeam.ageGroup ? ` · ${activeTeam.ageGroup}` : ""}</span>
+        </div>
 
-      <nav aria-label="Football OS workspaces" style={{ position: "fixed", left: 0, right: 0, bottom: 0, display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 5, padding: "8px 7px", borderTop: "1px solid rgba(148,163,184,0.14)", background: "rgba(15,23,42,0.98)", zIndex: 100, boxShadow: "0 -18px 44px rgba(2,6,23,0.55)" }}>
-        {WORKSPACES.map((workspace) => {
+        <nav className="fos-desktop-menu" aria-label="Football OS desktop navigation">
+          {visibleWorkspaces.map((workspace) => (
+            <button
+              type="button"
+              key={workspace.id}
+              className={activeTab === workspace.id ? "active" : ""}
+              onClick={() => onTabChange(workspace.id)}
+            >
+              <i>{icons[workspace.id]}</i>
+              <span>
+                <strong>{workspace.label}</strong>
+                <small>{workspace.description}</small>
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="fos-desktop-foot">
+          <span>{activeTeam.clubName}</span>
+          {signOut && <button type="button" onClick={() => void signOut()}>Sign out</button>}
+        </div>
+      </aside>
+
+      <div className="fos-v4-body">
+        <header className="fos-shell-header fos-v4-header">
+          <div className="fos-v4-brand">
+            <div className="fos-v4-mark">⚽</div>
+            <div>
+              <strong>Football OS</strong>
+              {teams.length > 1 ? (
+                <select
+                  aria-label="Active team"
+                  value={activeTeam.teamId}
+                  onChange={(event) => onTeamChange(event.target.value)}
+                  style={{
+                    display: "block",
+                    maxWidth: 190,
+                    minHeight: 30,
+                    border: 0,
+                    background: "transparent",
+                    color: "rgba(226,232,240,.72)",
+                    fontSize: 11,
+                    fontWeight: 800,
+                  }}
+                >
+                  {teams.map((team) => (
+                    <option key={team.teamId} value={team.teamId}>
+                      {team.teamName}{team.season ? ` · ${team.season}` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>{teamLabel}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="fos-v4-context">
+            <span>{icons[activeTab]}</span>
+            <div>
+              <small>{activeTeam.canManage ? "COACH WORKSPACE" : "TEAM VIEW"}</small>
+              <strong>{activeWorkspace.label}</strong>
+            </div>
+          </div>
+        </header>
+
+        <main className="fos-shell-main fos-v4-main">
+          <InstallAppBanner />
+          <div className="fos-workspace-stage" key={`${activeTeam.teamId}:${activeTab}`}>
+            {children}
+          </div>
+        </main>
+      </div>
+
+      <nav aria-label="Football OS workspaces" className="fos-shell-nav fos-v4-nav">
+        {visibleWorkspaces.map((workspace) => {
           const selected = activeTab === workspace.id
           return (
-            <button type="button" key={workspace.id} aria-label={workspace.label} onClick={() => onTabChange(workspace.id)} style={{ background: selected ? "#2563eb" : "rgba(2,6,23,0.24)", color: "white", border: selected ? "1px solid rgba(147,197,253,0.36)" : "1px solid rgba(148,163,184,0.1)", borderRadius: 15, padding: "7px 2px", cursor: "pointer", minHeight: 55, touchAction: "manipulation" }}>
-              <div style={{ fontSize: 18, lineHeight: 1 }}>{workspace.icon}</div>
-              <div style={{ marginTop: 5, fontSize: 10.5, fontWeight: 900 }}>{workspace.shortLabel}</div>
+            <button
+              type="button"
+              key={workspace.id}
+              aria-label={workspace.label}
+              aria-current={selected ? "page" : undefined}
+              onClick={() => onTabChange(workspace.id)}
+              className={`fos-shell-nav__item ${selected ? "fos-shell-nav__item--active" : ""}`}
+            >
+              <span className="fos-shell-nav__icon">{icons[workspace.id]}</span>
+              <span className="fos-shell-nav__label">{workspace.shortLabel}</span>
             </button>
           )
         })}

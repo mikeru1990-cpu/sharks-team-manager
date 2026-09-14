@@ -1,12 +1,19 @@
-const CACHE_NAME = "sharks-team-manager-v1"
+const CACHE_VERSION = "football-os-v1"
+const STATIC_CACHE = `${CACHE_VERSION}-static`
+const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
+const OFFLINE_URL = "/offline.html"
+
 const APP_SHELL = [
   "/",
-  "/manifest.json"
+  "/manifest.json",
+  "/offline.html",
+  "/icon-192.png",
+  "/icon-512.png"
 ]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL))
   )
   self.skipWaiting()
 })
@@ -16,7 +23,7 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME)
+          .filter((key) => ![STATIC_CACHE, RUNTIME_CACHE].includes(key))
           .map((key) => caches.delete(key))
       )
     )
@@ -30,43 +37,44 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
 
   const url = new URL(request.url)
-
   if (url.origin !== self.location.origin) return
 
-  if (
-    url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/_next/image")
-  ) {
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_next/image")) {
+    return
+  }
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone()
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy))
+          return response
+        })
+        .catch(async () => {
+          return (await caches.match(request)) || (await caches.match(OFFLINE_URL))
+        })
+    )
     return
   }
 
   event.respondWith(
     caches.match(request).then((cached) => {
-      if (cached) return cached
-
-      return fetch(request)
+      const networkFetch = fetch(request)
         .then((response) => {
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response
+          if (response && response.status === 200 && response.type === "basic") {
+            const copy = response.clone()
+            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy))
           }
-
-          const responseClone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone)
-          })
-
           return response
         })
-        .catch(async () => {
-          const fallback = await caches.match("/")
-          return (
-            fallback ||
-            new Response("Offline", {
-              status: 503,
-              headers: { "Content-Type": "text/plain" }
-            })
-          )
-        })
+        .catch(() => cached)
+
+      return cached || networkFetch
     })
   )
+})
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting()
 })

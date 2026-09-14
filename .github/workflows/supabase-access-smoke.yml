@@ -1,0 +1,93 @@
+name: Football OS Supabase Access Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: football-os-access-smoke
+  cancel-in-progress: false
+
+jobs:
+  access-boundaries:
+    name: Coach / assistant / parent access boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release-validation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify required release-test secrets
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+          FOOTBALL_OS_TEST_TEAM_ID: ${{ secrets.FOOTBALL_OS_TEST_TEAM_ID }}
+          FOOTBALL_OS_OTHER_TEAM_ID: ${{ secrets.FOOTBALL_OS_OTHER_TEAM_ID }}
+          FOOTBALL_OS_COACH_EMAIL: ${{ secrets.FOOTBALL_OS_COACH_EMAIL }}
+          FOOTBALL_OS_COACH_PASSWORD: ${{ secrets.FOOTBALL_OS_COACH_PASSWORD }}
+          FOOTBALL_OS_ASSISTANT_EMAIL: ${{ secrets.FOOTBALL_OS_ASSISTANT_EMAIL }}
+          FOOTBALL_OS_ASSISTANT_PASSWORD: ${{ secrets.FOOTBALL_OS_ASSISTANT_PASSWORD }}
+          FOOTBALL_OS_PARENT_EMAIL: ${{ secrets.FOOTBALL_OS_PARENT_EMAIL }}
+          FOOTBALL_OS_PARENT_PASSWORD: ${{ secrets.FOOTBALL_OS_PARENT_PASSWORD }}
+        run: |
+          missing=0
+          for name in \
+            SUPABASE_TEST_URL \
+            SUPABASE_TEST_ANON_KEY \
+            FOOTBALL_OS_TEST_TEAM_ID \
+            FOOTBALL_OS_OTHER_TEAM_ID \
+            FOOTBALL_OS_COACH_EMAIL \
+            FOOTBALL_OS_COACH_PASSWORD \
+            FOOTBALL_OS_ASSISTANT_EMAIL \
+            FOOTBALL_OS_ASSISTANT_PASSWORD \
+            FOOTBALL_OS_PARENT_EMAIL \
+            FOOTBALL_OS_PARENT_PASSWORD
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing release-validation secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Run authenticated access regression
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+          FOOTBALL_OS_TEST_TEAM_ID: ${{ secrets.FOOTBALL_OS_TEST_TEAM_ID }}
+          FOOTBALL_OS_OTHER_TEAM_ID: ${{ secrets.FOOTBALL_OS_OTHER_TEAM_ID }}
+          FOOTBALL_OS_COACH_EMAIL: ${{ secrets.FOOTBALL_OS_COACH_EMAIL }}
+          FOOTBALL_OS_COACH_PASSWORD: ${{ secrets.FOOTBALL_OS_COACH_PASSWORD }}
+          FOOTBALL_OS_ASSISTANT_EMAIL: ${{ secrets.FOOTBALL_OS_ASSISTANT_EMAIL }}
+          FOOTBALL_OS_ASSISTANT_PASSWORD: ${{ secrets.FOOTBALL_OS_ASSISTANT_PASSWORD }}
+          FOOTBALL_OS_PARENT_EMAIL: ${{ secrets.FOOTBALL_OS_PARENT_EMAIL }}
+          FOOTBALL_OS_PARENT_PASSWORD: ${{ secrets.FOOTBALL_OS_PARENT_PASSWORD }}
+        run: npm run test:access
+
+      - name: Record release-gate result
+        if: always()
+        run: |
+          {
+            echo "## Football OS access-control release check"
+            echo
+            echo "Validated against authenticated Supabase users:"
+            echo "- Coach"
+            echo "- Assistant coach"
+            echo "- Parent / viewer"
+            echo
+            echo "The test covers assigned-team visibility, cross-team isolation, management rights, player-write boundaries and protected player details."
+          } >> "$GITHUB_STEP_SUMMARY"
