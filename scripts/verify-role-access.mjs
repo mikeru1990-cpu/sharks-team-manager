@@ -124,6 +124,12 @@ async function getVisiblePlayer(supabase, scenario) {
   return data[0]
 }
 
+function isExpectedPermissionError(error) {
+  if (!error) return false
+  const message = `${error.code ?? ""} ${error.message ?? ""}`.toLowerCase()
+  return message.includes("42501") || message.includes("permission denied") || message.includes("row-level security")
+}
+
 async function verifyWriteBoundary(supabase, scenario, player) {
   const { data, error } = await supabase
     .from("players")
@@ -131,16 +137,18 @@ async function verifyWriteBoundary(supabase, scenario, player) {
     .eq("id", player.id)
     .select("id")
 
-  if (error && scenario.canManage) {
-    throw new Error(`${scenario.name}: coach write was rejected: ${error.message}`)
+  if (scenario.canManage) {
+    if (error) throw new Error(`${scenario.name}: coach write was rejected: ${error.message}`)
+    assert(data?.length === 1, `${scenario.name}: expected an authorised player write to affect one row`)
+    return
   }
 
-  if (scenario.canManage) {
-    assert(data?.length === 1, `${scenario.name}: expected an authorised player write to affect one row`)
-  } else {
-    assert(!error, `${scenario.name}: parent write check returned an unexpected transport error: ${error.message}`)
-    assert(data?.length === 0, `${scenario.name}: view-only account was able to update a player`)
+  if (error) {
+    assert(isExpectedPermissionError(error), `${scenario.name}: unexpected player-write error: ${error.message}`)
+    return
   }
+
+  assert(data?.length === 0, `${scenario.name}: view-only account was able to update a player`)
 }
 
 async function verifyPrivateDetailsBoundary(supabase, scenario) {
