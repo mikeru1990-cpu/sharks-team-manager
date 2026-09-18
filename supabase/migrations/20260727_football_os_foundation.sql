@@ -115,7 +115,7 @@ create table public.match_events (
   event_type text not null,
   match_second integer not null default 0,
   payload jsonb not null default '{}'::jsonb,
-  client_event_id text,
+  client_event_id uuid,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (match_id, client_event_id)
