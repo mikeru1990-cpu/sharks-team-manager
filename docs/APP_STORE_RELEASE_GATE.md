@@ -1,6 +1,6 @@
 # Football OS — App Store Release Gate
 
-Last reviewed: 2026-09-14
+Last reviewed: 2026-09-18
 
 This is the release gate for Football OS. A release is not signed off until every P0 item is green and the candidate has completed device testing through TestFlight.
 
@@ -9,12 +9,13 @@ This is the release gate for Football OS. A release is not signed off until ever
 - [ ] Production build passes with no TypeScript, lint or runtime errors on the frozen release-candidate commit.
 - [ ] iOS distribution project exists and produces an installable signed archive.
 - [ ] The iOS build provides genuine app value beyond a thin website wrapper.
-- [ ] Production Supabase migrations are applied and verified.
+- [x] Supabase migrations are applied and verified on the connected `sharks-team-manager` project.
 - [ ] Authentication is enabled for private club/team data.
 - [x] Privileged league-result APIs require authenticated staff access.
 - [x] Team write RLS is restricted to management/coaching roles rather than parents/viewers.
 - [x] Authenticated coach / assistant / parent access-regression harness exists.
-- [ ] Current staging Supabase environment passes the authenticated access-regression workflow.
+- [x] Connected Supabase RLS passes Coach / Assistant Coach / Parent team-scope and private-data regression tests.
+- [ ] Credential-backed Coach / Assistant Coach / Parent smoke test passes through the release app.
 - [x] In-app account deletion path exists in the product and database migration.
 - [ ] Account deletion has been tested end-to-end against production-like data.
 - [ ] Public Privacy Policy URL is final and configured.
@@ -36,7 +37,7 @@ This is the release gate for Football OS. A release is not signed off until ever
 - [x] Squad data is one source of truth for players, positions, roles and availability in the app.
 - [ ] Offline Matchday sync is conflict-safe and visibly communicates sync state.
 - [ ] Respect Code acknowledgements sync to the cloud and admins can see current-version completion.
-- [ ] Parent access is team-scoped and never exposes other teams' player data in the validated staging environment.
+- [x] Parent access is team-scoped and the connected Supabase RLS test hides other-team players and protected player details.
 - [ ] Accessibility review covers text sizing, contrast, touch target size, VoiceOver labels and reduced motion.
 - [ ] Empty, loading, offline and error states are designed for every primary workspace.
 - [ ] Destructive actions require clear confirmation and recoverability where appropriate.
@@ -66,6 +67,6 @@ This is the release gate for Football OS. A release is not signed off until ever
 
 ## Current release position
 
-Football OS now has a native iOS compile gate, role-aware team scoping, protected youth-player private data, and an automated authenticated access-control test harness. It is not yet an App Store release candidate because the Supabase migrations and role journeys still need to pass in a connected staging environment, authentication must be enabled for the release build, and a signed TestFlight archive still needs physical-device QA.
+Football OS now has a native iOS compile gate, role-aware team scoping, protected youth-player private data, applied Supabase migrations, locked legacy database tables and validated Coach / Assistant Coach / Parent RLS boundaries. It is not yet an App Store release candidate because release authentication still has to be enabled and tested through real credentials, account deletion needs an end-to-end test, the final public policy/support configuration remains open, and a signed TestFlight archive still needs physical-device QA.
 
-See `docs/SUPABASE_RELEASE_VALIDATION.md` for the exact staging setup and evidence required before the access/privacy items can be signed off.
+See `docs/BACKEND_RELEASE_VALIDATION_2026-09-18.md` for the live backend evidence and `docs/SUPABASE_RELEASE_VALIDATION.md` for the credential-backed smoke-test procedure.
