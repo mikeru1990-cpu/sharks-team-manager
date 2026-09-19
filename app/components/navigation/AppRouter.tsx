@@ -7,6 +7,8 @@ import InsightsScreen from "../insights/InsightsScreen"
 import ActiveMatchBanner from "../matchday/ActiveMatchBanner"
 import MatchdayScreen from "../matchday/MatchdayScreen"
 import PlayersScreen from "../players/PlayersScreen"
+import ScheduleScreen from "../schedule/ScheduleScreen"
+import MoreScreen from "../more/MoreScreen"
 import TrainingScreen from "../training/TrainingScreen"
 import type { WorkspaceTab } from "../../lib/workspaces"
 
@@ -28,7 +30,10 @@ class WorkspaceBoundary extends Component<BoundaryProps, BoundaryState> {
 export default function AppRouter({ activeTab, onNavigate }: Props) {
   let content: ReactNode
   switch (activeTab) {
+    case "schedule": content = <ScheduleScreen onNavigate={onNavigate} />; break
     case "matchday": content = <MatchdayScreen />; break
+    case "team": content = <PlayersScreen />; break
+    case "more": content = <MoreScreen onNavigate={onNavigate} />; break
     case "training": content = <TrainingScreen />; break
     case "players": content = <PlayersScreen />; break
     case "insights": content = <InsightsScreen />; break
