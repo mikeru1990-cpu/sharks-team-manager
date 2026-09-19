@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:access": "node scripts/verify-role-access.mjs",
+    "verify:release-config": "node scripts/verify-release-config.mjs",
     "native:doctor": "cap doctor",
     "native:ios:generate": "cap add ios",
     "native:ios:sync": "cap sync ios",
