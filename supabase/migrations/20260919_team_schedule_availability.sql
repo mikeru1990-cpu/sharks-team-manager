@@ -121,7 +121,7 @@ using (
   or exists (
     select 1
     from public.player_guardians guardian
-    where guardian.player_id = player_id
+    where guardian.player_id = event_responses.player_id
       and guardian.user_id = auth.uid()
       and guardian.can_manage_availability
   )
@@ -137,7 +137,7 @@ with check (
     or exists (
       select 1
       from public.player_guardians guardian
-      where guardian.player_id = player_id
+      where guardian.player_id = event_responses.player_id
         and guardian.user_id = auth.uid()
         and guardian.can_manage_availability
     )
