@@ -1,4 +1,13 @@
-export type WorkspaceTab = "home" | "matchday" | "training" | "players" | "insights" | "club"
+export type WorkspaceTab =
+  | "home"
+  | "schedule"
+  | "matchday"
+  | "team"
+  | "more"
+  | "training"
+  | "players"
+  | "insights"
+  | "club"
 
 export type WorkspaceConfig = {
   id: WorkspaceTab
@@ -6,6 +15,7 @@ export type WorkspaceConfig = {
   shortLabel: string
   icon: string
   description: string
+  primary?: boolean
 }
 
 export const ACTIVE_TEAM_NAME = "Leonard Stanley U11 Girls"
@@ -16,44 +26,72 @@ export const WORKSPACES: WorkspaceConfig[] = [
     label: "Home",
     shortLabel: "Home",
     icon: "🏠",
-    description: "Daily coaching dashboard",
+    description: "What matters today",
+    primary: true,
+  },
+  {
+    id: "schedule",
+    label: "Schedule",
+    shortLabel: "Schedule",
+    icon: "📅",
+    description: "Matches, training and events",
+    primary: true,
   },
   {
     id: "matchday",
     label: "Matchday",
     shortLabel: "Match",
     icon: "⚽",
-    description: "Touchline tools, squad, rotations and reports",
+    description: "Prepare, coach and review",
+    primary: true,
+  },
+  {
+    id: "team",
+    label: "Team",
+    shortLabel: "Team",
+    icon: "👥",
+    description: "Squad, availability and development",
+    primary: true,
+  },
+  {
+    id: "more",
+    label: "More",
+    shortLabel: "More",
+    icon: "•••",
+    description: "Training, insights and club",
+    primary: true,
   },
   {
     id: "training",
     label: "Training",
-    shortLabel: "Train",
+    shortLabel: "Training",
     icon: "🏃",
-    description: "Session plans, attendance and drill history",
+    description: "Plan and run sessions",
   },
   {
     id: "players",
     label: "Players",
     shortLabel: "Players",
     icon: "👥",
-    description: "Player profiles, availability and development",
+    description: "Legacy player route",
   },
   {
     id: "insights",
     label: "Insights",
-    shortLabel: "Stats",
+    shortLabel: "Insights",
     icon: "📊",
-    description: "Statistics, reports and smart alerts",
+    description: "Reports and coaching intelligence",
   },
   {
     id: "club",
     label: "Club",
     shortLabel: "Club",
     icon: "⚙️",
-    description: "Teams, coaches, fixtures and administration",
+    description: "Club standards and administration",
   },
 ]
+
+export const PRIMARY_WORKSPACES = WORKSPACES.filter((workspace) => workspace.primary)
 
 export function getWorkspace(tab: WorkspaceTab) {
   return WORKSPACES.find((workspace) => workspace.id === tab) ?? WORKSPACES[0]
