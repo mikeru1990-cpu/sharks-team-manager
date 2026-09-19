@@ -108,7 +108,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
         />
 
         <section className="fos-command-grid">
-          <button className="fos-command-primary" type="button" onClick={() => onNavigate("players")}>
+          <button className="fos-command-primary" type="button" onClick={() => onNavigate("team")}>
             <div className="fos-command-primary-top">
               <span>YOUR TEAM</span>
               <Users size={20} />
@@ -141,7 +141,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
               title="Team squad"
               detail="View players, positions and availability for your assigned team."
               cta="Open"
-              onClick={() => onNavigate("players")}
+              onClick={() => onNavigate("team")}
             />
             <Action
               tone="navy"
@@ -149,7 +149,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
               title="Policies & Respect"
               detail="Open club information, Respect codes and your account controls."
               cta="Open"
-              onClick={() => onNavigate("club")}
+              onClick={() => onNavigate("more")}
             />
           </div>
         </section>
@@ -260,7 +260,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
               title={nextEvent.title}
               detail={`${nextEvent.dateLabel} · ${nextEvent.timeLabel ?? "TBC"}`}
               cta="Plan"
-              onClick={() => onNavigate("training")}
+              onClick={() => onNavigate("schedule")}
             />
           )}
           {reviewCount > 0 && (
@@ -270,7 +270,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
               title={`${reviewCount} player decision${reviewCount === 1 ? "" : "s"}`}
               detail="Review the continuing squad and confirm the correct team status."
               cta="Review"
-              onClick={() => onNavigate("players")}
+              onClick={() => onNavigate("team")}
             />
           )}
           <Action
@@ -291,11 +291,11 @@ export default function HomeMissionControl({ onNavigate }: Props) {
         </div>
         <div className="fos-command-tools">
           <Tool label="Matchday" note="Squad · lineup · live" icon={<Trophy />} tab="matchday" go={onNavigate} />
-          <Tool label="Training" note="Plan · attendance" icon={<Dumbbell />} tab="training" go={onNavigate} />
-          <Tool label="Players" note="Profiles · development" icon={<Users />} tab="players" go={onNavigate} />
-          <Tool label="Attendance" note="Take the register" icon={<ClipboardCheck />} tab="training" go={onNavigate} />
-          <Tool label="Calendar" note="Fixtures & events" icon={<CalendarDays />} tab="club" go={onNavigate} />
-          <Tool label="Parents" note="Team communication" icon={<MessageSquare />} tab="club" go={onNavigate} />
+          <Tool label="Training" note="Plan · attendance" icon={<Dumbbell />} tab="schedule" go={onNavigate} />
+          <Tool label="Players" note="Profiles · development" icon={<Users />} tab="team" go={onNavigate} />
+          <Tool label="Attendance" note="Take the register" icon={<ClipboardCheck />} tab="schedule" go={onNavigate} />
+          <Tool label="Calendar" note="Fixtures & events" icon={<CalendarDays />} tab="more" go={onNavigate} />
+          <Tool label="Parents" note="Team communication" icon={<MessageSquare />} tab="more" go={onNavigate} />
         </div>
       </section>
 
