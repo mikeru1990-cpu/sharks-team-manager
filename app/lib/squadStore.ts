@@ -1,4 +1,5 @@
 import { getPlayersForTeam } from "./realTeamData"
+import { authRequired } from "./runtimeConfig"
 
 export const squadStorageKey = "football-os-u11-squad-v2"
 export const squadChangeEvent = "football-os-squad-change"
@@ -7,7 +8,6 @@ const squadScopeStateKey = "football-os:active-squad-scope"
 let activeSquadScope = "preview"
 
 const basePlayers = getPlayersForTeam("U11 Girls")
-const authRequired = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true"
 
 export type SquadAvailability = "Available" | "Doubtful" | "Injured" | "Unavailable"
 
@@ -185,6 +185,24 @@ export function scrubSensitiveSquadCache() {
   }))
   window.localStorage.setItem(currentSquadStorageKey(), JSON.stringify(safe))
   window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: safe }))
+}
+
+export function clearAuthenticatedSquadCaches() {
+  if (typeof window === "undefined") return
+
+  const keysToRemove: string[] = []
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (key?.startsWith(`${scopedSquadPrefix}:`)) keysToRemove.push(key)
+  }
+
+  for (const key of keysToRemove) {
+    window.localStorage.removeItem(key)
+  }
+
+  window.localStorage.removeItem(squadScopeStateKey)
+  activeSquadScope = "unassigned"
+  window.dispatchEvent(new CustomEvent(squadChangeEvent, { detail: [] }))
 }
 
 export function createSquadPlayer(): SquadStorePlayer {
