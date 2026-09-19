@@ -13,11 +13,11 @@ import { TeamAccessProvider } from "./components/system/TeamAccessProvider"
 
 import type { TeamAccess } from "./lib/auth"
 import type { WorkspaceTab } from "./lib/workspaces"
+import { authRequired } from "./lib/runtimeConfig"
 
 const LAST_WORKSPACE_KEY = "football-os:last-workspace"
 const WORKSPACE_TABS: WorkspaceTab[] = ["home", "matchday", "training", "players", "insights", "club"]
 const VIEW_ONLY_TABS: WorkspaceTab[] = ["home", "players", "club"]
-const AUTH_REQUIRED = process.env.NEXT_PUBLIC_AUTH_REQUIRED === "true"
 
 const PREVIEW_TEAM: TeamAccess = {
   teamId: "team-u11-girls",
@@ -99,7 +99,7 @@ async function previewSignOut() {
 }
 
 export default function Page() {
-  if (!AUTH_REQUIRED) {
+  if (!authRequired) {
     return (
       <AppDashboard
         isAdmin={true}
