@@ -1,32 +1,72 @@
 "use client"
 
+import { CalendarDays, Clock3, MapPin } from "lucide-react"
 import { leonardStanleyEvents } from "../../lib/realTeamData"
 
+function eventTime(event: (typeof leonardStanleyEvents)[number]) {
+  const timestamp = Date.parse(event.dateLabel)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 export default function EventsScreen() {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const today = now.getTime()
+
+  const upcoming = [...leonardStanleyEvents]
+    .filter((event) => eventTime(event) >= today)
+    .sort((a, b) => eventTime(a) - eventTime(b))
+  const past = [...leonardStanleyEvents]
+    .filter((event) => eventTime(event) < today)
+    .sort((a, b) => eventTime(b) - eventTime(a))
+
   return (
-    <div style={{ paddingBottom: 140, display: "flex", flexDirection: "column", gap: 16, color: "white" }}>
-      <div>
-        <div style={{ opacity: 0.7, fontSize: 12, fontWeight: 900, letterSpacing: 0.8 }}>REAL EVENTS</div>
-        <h1 style={{ margin: "6px 0 0", fontSize: 32 }}>Events</h1>
-        <p style={{ margin: "8px 0 0", color: "rgba(226,232,240,0.72)", lineHeight: 1.5 }}>
-          Real Leonard Stanley training, tournament and admin records only.
-        </p>
-      </div>
+    <div className="fos-events-list">
+      {upcoming.length ? (
+        <div className="fos-event-group">
+          <div className="fos-event-group-title"><span>UPCOMING</span><strong>{upcoming.length}</strong></div>
+          {upcoming.map((event) => <EventCard key={event.id} event={event} />)}
+        </div>
+      ) : (
+        <div className="fos-events-empty">
+          <CalendarDays />
+          <div><strong>No future events recorded yet</strong><span>Add the next match or training event when the club calendar is connected.</span></div>
+        </div>
+      )}
 
-      {leonardStanleyEvents.map((event) => (
-        <article key={event.id} style={{ borderRadius: 24, padding: 18, background: "rgba(15,23,42,0.88)", border: "1px solid rgba(148,163,184,0.12)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>{event.title}</div>
-              <div style={{ marginTop: 6, color: "rgba(226,232,240,0.72)", fontWeight: 800 }}>{event.dateLabel}{event.timeLabel ? ` • ${event.timeLabel}` : ""}</div>
-            </div>
-            <div style={{ height: "fit-content", borderRadius: 999, padding: "8px 10px", background: "rgba(37,99,235,0.18)", color: "#bfdbfe", fontSize: 12, fontWeight: 900 }}>{event.type}</div>
-          </div>
-
-          {event.location && <div style={{ marginTop: 12, borderRadius: 16, padding: 12, background: "rgba(2,6,23,0.7)", color: "rgba(255,255,255,0.9)", fontWeight: 800 }}>{event.location}</div>}
-          {event.notes && <p style={{ margin: "12px 0 0", color: "rgba(226,232,240,0.72)", lineHeight: 1.45 }}>{event.notes}</p>}
-        </article>
-      ))}
+      {past.length > 0 && (
+        <div className="fos-event-group">
+          <div className="fos-event-group-title"><span>RECENT HISTORY</span><strong>{past.length}</strong></div>
+          {past.map((event) => <EventCard key={event.id} event={event} muted />)}
+        </div>
+      )}
     </div>
+  )
+}
+
+function EventCard({
+  event,
+  muted = false,
+}: {
+  event: (typeof leonardStanleyEvents)[number]
+  muted?: boolean
+}) {
+  return (
+    <article className={`fos-event-card ${muted ? "muted" : ""}`}>
+      <div className="fos-event-date">
+        <span>{event.dateLabel.split(" ")[0]}</span>
+        <small>{event.dateLabel.split(" ").slice(1, 2).join("")}</small>
+      </div>
+      <div className="fos-event-main">
+        <div className="fos-event-top">
+          <div><span>{event.type.toUpperCase()}</span><h3>{event.title}</h3></div>
+        </div>
+        <div className="fos-event-meta">
+          {event.timeLabel && <span><Clock3 />{event.timeLabel}</span>}
+          {event.location && <span><MapPin />{event.location}</span>}
+        </div>
+        {event.notes && <p>{event.notes}</p>}
+      </div>
+    </article>
   )
 }

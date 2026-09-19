@@ -1,0 +1,59 @@
+name: Football OS Release CI
+
+on:
+  push:
+    branches:
+      - feat/football-os-foundation
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: football-os-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Release-script syntax check
+        run: |
+          node --check scripts/verify-role-access.mjs
+          node --check scripts/verify-release-config.mjs
+
+      - name: Verify secure release configuration
+        env:
+          NEXT_PUBLIC_AUTH_REQUIRED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: "https://ci-release-check.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "ci-public-anon-key-placeholder"
+        run: node scripts/verify-release-config.mjs
+
+      - name: Next.js secure production build
+        env:
+          NEXT_PUBLIC_AUTH_REQUIRED: "true"
+          NEXT_PUBLIC_SUPABASE_URL: "https://ci-release-check.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "ci-public-anon-key-placeholder"
+        run: npm run build

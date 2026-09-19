@@ -1,45 +1,198 @@
 "use client"
 
-import type { ReactNode } from "react"
-import { WORKSPACES } from "../../lib/workspaces"
-import type { WorkspaceTab } from "../../lib/workspaces"
-import { defaultPlatformContext } from "../../lib/platform"
-
-const shellBackground = "radial-gradient(circle at top, rgba(37,99,235,0.22), transparent 34%), #020617"
+import { useState, type ReactNode } from "react"
+import {
+  BarChart3,
+  Bell,
+  CalendarDays,
+  ChevronDown,
+  Dumbbell,
+  Home,
+  MoreHorizontal,
+  Settings,
+  ShieldCheck,
+  Trophy,
+  Users,
+  X,
+} from "lucide-react"
+import type { TeamAccess } from "../../lib/auth"
+import { PRIMARY_WORKSPACES, getWorkspace, type WorkspaceTab } from "../../lib/workspaces"
+import InstallAppBanner from "../ui/InstallAppBanner"
 
 type Props = {
   children: ReactNode
   activeTab: WorkspaceTab
   onTabChange: (tab: WorkspaceTab) => void
+  allowedTabs: WorkspaceTab[]
+  activeTeam: TeamAccess
+  teams: TeamAccess[]
+  onTeamChange: (teamId: string) => void
   isAdmin?: boolean
   signOut?: () => Promise<void>
 }
 
-export default function PremiumAppShell({ children, activeTab, onTabChange }: Props) {
-  const context = defaultPlatformContext
+const icons: Partial<Record<WorkspaceTab, ReactNode>> = {
+  home: <Home />,
+  schedule: <CalendarDays />,
+  matchday: <Trophy />,
+  team: <Users />,
+  more: <MoreHorizontal />,
+  training: <Dumbbell />,
+  players: <Users />,
+  insights: <BarChart3 />,
+  club: <Settings />,
+}
+
+function roleLabel(role: TeamAccess["role"]) {
+  return role
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function primaryFor(tab: WorkspaceTab): WorkspaceTab {
+  if (tab === "players") return "team"
+  if (tab === "training" || tab === "insights" || tab === "club") return "more"
+  return tab
+}
+
+export default function PremiumAppShell({
+  children,
+  activeTab,
+  onTabChange,
+  allowedTabs,
+  activeTeam,
+  teams,
+  onTeamChange,
+  signOut,
+}: Props) {
+  const [updatesOpen, setUpdatesOpen] = useState(false)
+  const visiblePrimary = PRIMARY_WORKSPACES.filter((workspace) => allowedTabs.includes(workspace.id))
+  const activeWorkspace = getWorkspace(activeTab)
+  const activePrimary = primaryFor(activeTab)
+  const isMatchday = activeTab === "matchday"
 
   return (
-    <div style={{ minHeight: "100vh", background: shellBackground, color: "white", paddingBottom: 92 }}>
-      <header style={{ position: "sticky", top: 0, zIndex: 20, padding: "14px 16px 10px", backdropFilter: "blur(18px)", background: "rgba(2,6,23,0.86)", borderBottom: "1px solid rgba(148,163,184,0.12)" }}>
-        <div style={{ fontSize: 12, opacity: 0.72, fontWeight: 800, letterSpacing: 0.7 }}>FOOTBALL OS</div>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 900 }}>{context.club.name}</div>
-            <div style={{ marginTop: 2, color: "rgba(226,232,240,0.62)", fontSize: 12, fontWeight: 800 }}>{context.team.name} · {context.team.season}</div>
-          </div>
-          <div style={{ borderRadius: 999, padding: "7px 10px", background: "rgba(37,99,235,0.2)", border: "1px solid rgba(96,165,250,0.25)", fontSize: 12, fontWeight: 800 }}>Recovery 23</div>
+    <div className={`fos-market-shell ${isMatchday ? "fos-market-shell--matchday" : ""}`}>
+      <aside className="fos-market-sidebar">
+        <div className="fos-market-brand">
+          <span className="fos-market-logo">⚽</span>
+          <div><strong>Football OS</strong><small>{activeTeam.clubName}</small></div>
         </div>
-      </header>
 
-      <main style={{ padding: 16, width: "100%", maxWidth: 1080, margin: "0 auto" }}>{children}</main>
+        <div className="fos-team-switcher">
+          <span>ACTIVE TEAM</span>
+          {teams.length > 1 ? (
+            <label>
+              <select value={activeTeam.teamId} onChange={(event) => onTeamChange(event.target.value)} aria-label="Active team">
+                {teams.map((team) => (
+                  <option key={team.teamId} value={team.teamId}>
+                    {team.teamName}{team.season ? ` · ${team.season}` : ""}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown aria-hidden="true" />
+            </label>
+          ) : (
+            <strong>{activeTeam.teamName}</strong>
+          )}
+          <small>{roleLabel(activeTeam.role)}{activeTeam.season ? ` · ${activeTeam.season}` : ""}</small>
+        </div>
 
-      <nav aria-label="Football OS workspaces" style={{ position: "fixed", left: 0, right: 0, bottom: 0, display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 5, padding: "8px 7px", borderTop: "1px solid rgba(148,163,184,0.14)", background: "rgba(15,23,42,0.98)", zIndex: 100, boxShadow: "0 -18px 44px rgba(2,6,23,0.55)" }}>
-        {WORKSPACES.map((workspace) => {
-          const selected = activeTab === workspace.id
+        <nav className="fos-market-side-nav" aria-label="Football OS navigation">
+          {visiblePrimary.map((workspace) => {
+            const selected = activePrimary === workspace.id
+            return (
+              <button
+                type="button"
+                key={workspace.id}
+                className={selected ? "active" : ""}
+                onClick={() => onTabChange(workspace.id)}
+                aria-current={selected ? "page" : undefined}
+              >
+                <span>{icons[workspace.id]}</span>
+                <div><strong>{workspace.label}</strong><small>{workspace.description}</small></div>
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="fos-market-side-foot">
+          <div><ShieldCheck /><span>Team-scoped access</span></div>
+          {signOut && <button type="button" onClick={() => void signOut()}>Sign out</button>}
+        </div>
+      </aside>
+
+      <div className="fos-market-body">
+        <header className="fos-market-header">
+          <div className="fos-market-header-team">
+            <span className="fos-market-mobile-logo">⚽</span>
+            <div>
+              <strong>{activeTeam.teamName}</strong>
+              <small>{activeTeam.clubName}</small>
+            </div>
+          </div>
+
+          <div className="fos-market-header-actions">
+            <div className="fos-market-current">
+              <span>{icons[activeTab] ?? icons[activePrimary]}</span>
+              <div><small>{isMatchday ? "FOOTBALL MODE" : "FOOTBALL OS"}</small><strong>{activeWorkspace.label}</strong></div>
+            </div>
+            <button
+              type="button"
+              className="fos-notification-button"
+              aria-label="Open updates"
+              aria-expanded={updatesOpen}
+              onClick={() => setUpdatesOpen((open) => !open)}
+            >
+              <Bell />
+            </button>
+          </div>
+        </header>
+
+        {updatesOpen && (
+          <div className="fos-updates-backdrop" onClick={() => setUpdatesOpen(false)}>
+            <section className="fos-updates-panel" onClick={(event) => event.stopPropagation()} aria-label="Football OS updates">
+              <div className="fos-updates-head">
+                <div><span>UPDATES</span><h2>Your football activity</h2></div>
+                <button type="button" aria-label="Close updates" onClick={() => setUpdatesOpen(false)}><X /></button>
+              </div>
+              <button type="button" onClick={() => { setUpdatesOpen(false); onTabChange("schedule") }}>
+                <CalendarDays /><span><strong>Schedule & availability</strong><small>See matches, training and event responses.</small></span>
+              </button>
+              <button type="button" onClick={() => { setUpdatesOpen(false); onTabChange("team") }}>
+                <Users /><span><strong>Team</strong><small>Check squad availability and player information.</small></span>
+              </button>
+              {activeTeam.canManage && (
+                <button type="button" onClick={() => { setUpdatesOpen(false); onTabChange("matchday") }}>
+                  <Trophy /><span><strong>Matchday</strong><small>Continue preparation or live match work.</small></span>
+                </button>
+              )}
+            </section>
+          </div>
+        )}
+
+        <main className="fos-market-main">
+          <InstallAppBanner />
+          <div className="fos-workspace-stage" key={`${activeTeam.teamId}:${activeTab}`}>
+            {children}
+          </div>
+        </main>
+      </div>
+
+      <nav aria-label="Football OS primary navigation" className="fos-market-bottom-nav">
+        {visiblePrimary.map((workspace) => {
+          const selected = activePrimary === workspace.id
           return (
-            <button type="button" key={workspace.id} aria-label={workspace.label} onClick={() => onTabChange(workspace.id)} style={{ background: selected ? "#2563eb" : "rgba(2,6,23,0.24)", color: "white", border: selected ? "1px solid rgba(147,197,253,0.36)" : "1px solid rgba(148,163,184,0.1)", borderRadius: 15, padding: "7px 2px", cursor: "pointer", minHeight: 55, touchAction: "manipulation" }}>
-              <div style={{ fontSize: 18, lineHeight: 1 }}>{workspace.icon}</div>
-              <div style={{ marginTop: 5, fontSize: 10.5, fontWeight: 900 }}>{workspace.shortLabel}</div>
+            <button
+              type="button"
+              key={workspace.id}
+              aria-label={workspace.label}
+              aria-current={selected ? "page" : undefined}
+              onClick={() => onTabChange(workspace.id)}
+              className={selected ? "active" : ""}
+            >
+              <span>{icons[workspace.id]}</span>
+              <small>{workspace.shortLabel}</small>
             </button>
           )
         })}
