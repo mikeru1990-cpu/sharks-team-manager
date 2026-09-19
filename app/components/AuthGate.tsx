@@ -5,7 +5,7 @@ import type { User } from "@supabase/supabase-js"
 import { ShieldCheck } from "lucide-react"
 import { loadAuthContext, type AuthContext, type TeamAccess } from "../lib/auth"
 import { supabase } from "../lib/supabase"
-import { scrubSensitiveSquadCache } from "../lib/squadStore"
+import { clearAuthenticatedSquadCaches, scrubSensitiveSquadCache } from "../lib/squadStore"
 import Button from "./ui/Button"
 import Card from "./ui/Card"
 import Field from "./ui/Field"
@@ -45,6 +45,9 @@ export default function AuthGate({ children }: AuthGateProps) {
       if (!mounted) return
 
       if (!user) {
+        clearAuthenticatedSquadCaches()
+        window.localStorage.removeItem(ACTIVE_TEAM_KEY)
+        setActiveTeamIdState(null)
         setAuthContext(null)
         setLoading(false)
         return
@@ -100,7 +103,11 @@ export default function AuthGate({ children }: AuthGateProps) {
       password,
     })
 
-    if (error) setMessage("We could not sign you in. Check your details and try again.")
+    if (error) {
+      setMessage("We could not sign you in. Check your details and try again.")
+    } else {
+      setPassword("")
+    }
     setSubmitting(false)
   }
 
@@ -113,7 +120,7 @@ export default function AuthGate({ children }: AuthGateProps) {
 
   async function signOut() {
     if (!supabase) return
-    scrubSensitiveSquadCache()
+    clearAuthenticatedSquadCaches()
     window.localStorage.removeItem(ACTIVE_TEAM_KEY)
     await supabase.auth.signOut()
     setActiveTeamIdState(null)
