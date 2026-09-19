@@ -16,8 +16,18 @@ import type { WorkspaceTab } from "./lib/workspaces"
 import { authRequired } from "./lib/runtimeConfig"
 
 const LAST_WORKSPACE_KEY = "football-os:last-workspace"
-const WORKSPACE_TABS: WorkspaceTab[] = ["home", "matchday", "training", "players", "insights", "club"]
-const VIEW_ONLY_TABS: WorkspaceTab[] = ["home", "players", "club"]
+const WORKSPACE_TABS: WorkspaceTab[] = [
+  "home",
+  "schedule",
+  "matchday",
+  "team",
+  "more",
+  "training",
+  "players",
+  "insights",
+  "club",
+]
+const VIEW_ONLY_TABS: WorkspaceTab[] = ["home", "schedule", "team", "more", "players", "club"]
 
 const PREVIEW_TEAM: TeamAccess = {
   teamId: "team-u11-girls",
