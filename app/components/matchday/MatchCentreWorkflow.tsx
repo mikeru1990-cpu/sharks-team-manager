@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import { matchWorkflowKey, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
 import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
@@ -14,7 +15,7 @@ import {
 } from "../../lib/teamFormat"
 
 const tabs = ["Setup", "Squad", "Lineup", "Planner", "Live", "Report"] as const
-const key = "football-os-matchday-workflow-v6"
+const standaloneKey = "football-os-matchday-workflow-v6"
 const historyKey = "football-os-match-history-v1"
 
 type Tab = (typeof tabs)[number]
@@ -82,7 +83,8 @@ function playerName(players: SquadStorePlayer[], id: string) {
   return players.find((item) => item.id === id)?.name ?? "Player"
 }
 
-export default function MatchCentreWorkflow() {
+export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch?: ScheduledMatch }) {
+  const key = scheduledMatch ? matchWorkflowKey(scheduledMatch) : standaloneKey
   const squadPlayers = useSquadPlayers()
   const players = useMemo(() => squadPlayers.filter(isMatchdayEligible), [squadPlayers])
   const [active, setActive] = useState<Tab>("Setup")
@@ -122,10 +124,10 @@ export default function MatchCentreWorkflow() {
 
   useEffect(() => {
     try {
-      const savedFormat = loadTeamFormat()
-      const savedConfig = getTeamFormat(savedFormat)
       const raw = localStorage.getItem(key)
       const saved = raw ? JSON.parse(raw) : null
+      const savedFormat: TeamFormatId = saved?.format && saved.format in teamFormats ? saved.format : loadTeamFormat()
+      const savedConfig = getTeamFormat(savedFormat)
 
       setFormat(savedFormat)
       setSelected(saved?.selected ?? players.map((player) => player.id))
@@ -338,6 +340,7 @@ export default function MatchCentreWorkflow() {
           [
             {
               id: Date.now(),
+              ...(scheduledMatch ? { eventId: scheduledMatch.id, teamId: scheduledMatch.teamId, title: scheduledMatch.title, startsAt: scheduledMatch.startsAt } : {}),
               date: new Date().toISOString(),
               format,
               home,
