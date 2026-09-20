@@ -388,7 +388,7 @@ function EventDetail({
       {event.eventType === "match" && canManage && event.status === "scheduled" && (
         <button type="button" className="fos-matchday-cta" onClick={() => {
           try {
-            openScheduledMatch(event)
+            openScheduledMatch(event, responses)
             onNavigate("matchday")
           } catch {
             window.alert("Match details could not be opened. Please allow browser storage and try again.")

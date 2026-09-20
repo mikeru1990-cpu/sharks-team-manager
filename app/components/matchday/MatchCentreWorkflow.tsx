@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
-import { matchWorkflowKey, type ScheduledMatch } from "../../lib/scheduledMatch"
+import { matchWorkflowKey, responseForMatch, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
 import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
@@ -89,8 +89,8 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   const players = useMemo(() => squadPlayers.filter(isMatchdayEligible), [squadPlayers])
   const [active, setActive] = useState<Tab>("Setup")
   const [format, setFormat] = useState<TeamFormatId>("7v7")
-  const [selected, setSelected] = useState<string[]>(players.map((player) => player.id))
-  const [starters, setStarters] = useState<string[]>(players.slice(0, 7).map((player) => player.id))
+  const [selected, setSelected] = useState<string[]>(scheduledMatch ? [] : players.map((player) => player.id))
+  const [starters, setStarters] = useState<string[]>(scheduledMatch ? [] : players.slice(0, 7).map((player) => player.id))
   const [live, setLive] = useState<string[]>([])
   const [formation, setFormation] = useState<string>(teamFormats["7v7"].defaultFormation)
   const [positions, setPositions] = useState<Positions>({})
@@ -130,9 +130,10 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
       const savedConfig = getTeamFormat(savedFormat)
 
       setFormat(savedFormat)
-      setSelected(saved?.selected ?? players.map((player) => player.id))
+      const defaultSelection = scheduledMatch ? [] : players.map((player) => player.id)
+      setSelected(saved?.selected ?? defaultSelection)
 
-      const savedSelected: string[] = saved?.selected ?? players.map((player) => player.id)
+      const savedSelected: string[] = saved?.selected ?? defaultSelection
       const validStarters: string[] = (saved?.starters ?? []).filter((id: string) => savedSelected.includes(id))
       const fitted = [...validStarters]
       for (const id of savedSelected) {
@@ -158,7 +159,8 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
       const fallback = getTeamFormat("7v7")
       setFormat("7v7")
       setFormation(fallback.defaultFormation)
-      setStarters(players.slice(0, fallback.playersOnPitch).map((player) => player.id))
+      setSelected(scheduledMatch ? [] : players.map((player) => player.id))
+      setStarters(scheduledMatch ? [] : players.slice(0, fallback.playersOnPitch).map((player) => player.id))
     }
     setLoaded(true)
   }, [])
@@ -231,9 +233,19 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function toggleSelected(id: string) {
+    if (scheduledMatch && (period > 0 || finished || !loaded)) return
     const removing = selected.includes(id)
     setSelected((current) => (removing ? current.filter((item) => item !== id) : [...current, id]))
     if (removing) setStarters((current) => current.filter((item) => item !== id))
+  }
+
+  function selectConfirmedPlayers() {
+    if (!scheduledMatch || !loaded || period > 0 || finished) return
+    if (!window.confirm("Replace this match's squad with players marked Available? Starters no longer selected will be removed. Review your match squad limit afterwards.")) return
+    const confirmed = players.filter(player => responseForMatch(scheduledMatch, player) === "available").map(player => player.id)
+    setSelected(confirmed)
+    setStarters(current => current.filter(id => confirmed.includes(id)))
+    setPositions(current => Object.fromEntries(Object.entries(current).filter(([id]) => confirmed.includes(id))))
   }
 
   function toggleStarter(id: string) {
@@ -420,15 +432,30 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
         <section style={panel}>
           <div style={sectionHead}>
             <h2 style={{ margin: 0 }}>Squad selection</h2>
-            <strong>{selected.length} available</strong>
+            <strong>{selected.length} selected</strong>
           </div>
+          {scheduledMatch && <div style={{ ...panel, marginBottom: 12 }}>
+            <strong>Schedule responses</strong>
+            <p style={hint}>{scheduledMatch.availabilityCapturedAt
+              ? `Snapshot from Schedule · ${new Date(scheduledMatch.availabilityCapturedAt).toLocaleString("en-GB")}`
+              : "No availability snapshot for this match yet."} Reopen this match from Schedule to bring across updated responses. Your saved lineup is kept.</p>
+            <p style={hint}>These are event responses, not automatic selection. Players generally marked Injured or Unavailable in Team are excluded from this list.</p>
+            <button type="button" style={action} disabled={!loaded || period > 0 || finished || !scheduledMatch.availabilityCapturedAt} onClick={selectConfirmedPlayers}>Use Available responses</button>
+            {(period > 0 || finished) && <p style={hint}>Squad changes are locked after kick-off. Use Live for substitutions.</p>}
+          </div>}
           {players.map((player) => (
             <button
               key={player.id}
+              type="button"
+              aria-pressed={selected.includes(player.id)}
+              disabled={Boolean(scheduledMatch && (!loaded || period > 0 || finished))}
               onClick={() => toggleSelected(player.id)}
               style={{ ...row, background: selected.includes(player.id) ? "rgba(37,99,235,.2)" : "rgba(2,6,23,.48)" }}
             >
               {selected.includes(player.id) ? "✓ SELECTED" : "+ ADD"} · {player.knownAs ?? player.name}
+              {scheduledMatch && <span style={{ display: "block", marginTop: 5, fontSize: 13 }}>
+                Response: {{ available: "Available", maybe: "Maybe", unavailable: "Unavailable", unanswered: "Awaiting response" }[responseForMatch(scheduledMatch, player)]}
+              </span>}
             </button>
           ))}
         </section>
