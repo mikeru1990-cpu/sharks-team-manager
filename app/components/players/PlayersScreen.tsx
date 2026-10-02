@@ -4,6 +4,7 @@ import { Activity,CheckCircle2,Clock3,NotebookPen,TrendingUp,Users } from "lucid
 import { useTeamAccess } from "../system/TeamAccessProvider"
 import SquadSyncStatus from "../system/SquadSyncStatus"
 import RealPlayersList from "./RealPlayersList"
+import PositionProfiles from "./PositionProfiles"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
 type Attendance="Present"|"Late"|"Absent"|"Unmarked";type TrainingRecord={id:number;date:string;duration:number;attendance:Record<string,Attendance>;notes:Record<string,string>}
 const historyKey="football-os-training-history-v1"
@@ -17,6 +18,7 @@ export default function PlayersScreen() {
   return <div style={{ display: "grid", gap: 16, color: "#172033" }}>
     <RealPlayersList />
     <SquadSyncStatus />
+    {activeTeam?.canManage && <PositionProfiles key={activeTeam.teamId} teamId={activeTeam.teamId} />}
     {activeTeam?.canManage && <section style={{ border: "1px solid #dbe3ec", borderRadius: 20, padding: 16, background: "white" }}>
       <button type="button" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)} style={{ width: "100%", minHeight: 44, textAlign: "left", fontWeight: 700, color: "#172033", background: "transparent", border: 0 }}>
         {showHistory ? "Hide" : "Show"} training history on this device
