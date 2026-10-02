@@ -1,0 +1,14 @@
+.panel { padding: 18px; border: 1px solid #dbe3ec; border-radius: 20px; background: #fff; color: #172033; display: grid; gap: 14px; min-width: 0; }
+.panel h2, .panel p { margin: 0; }
+.panel p { line-height: 1.5; }
+.panel form, .panel fieldset { display: grid; gap: 14px; min-width: 0; }
+.panel fieldset { border: 1px solid #dbe3ec; padding: 12px; border-radius: 12px; }
+.panel legend { font-weight: 700; padding: 0 5px; }
+.panel label { display: grid; gap: 6px; font-weight: 600; min-width: 0; }
+.panel select, .panel textarea, .panel input:not([type=checkbox]) { width: 100%; min-width: 0; max-width: 100%; border: 1px solid #94a3b8; border-radius: 8px; min-height: 46px; padding: 9px; color: #172033; background: white; font: inherit; box-sizing: border-box; }
+.panel textarea { min-height: 85px; }
+.panel button { min-height: 46px; padding: 10px 14px; border: 1px solid #1d4ed8; border-radius: 10px; background: #1d4ed8; color: white; font-weight: 700; }
+.panel button:disabled { opacity: .5; }
+.panel .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 500; }
+.check input { width: 22px; height: 22px; flex-shrink: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,220px),1fr)); gap: 12px; }

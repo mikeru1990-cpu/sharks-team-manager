@@ -27,6 +27,7 @@ import {
   type TeamEvent,
   type TeamEventType,
 } from "../../lib/teamEvents"
+import { openScheduledMatch } from "../../lib/scheduledMatch"
 import type { WorkspaceTab } from "../../lib/workspaces"
 import { useTeamAccess } from "../system/TeamAccessProvider"
 
@@ -385,7 +386,14 @@ function EventDetail({
       {event.notes && <section className="fos-event-notes"><strong>Event notes</strong><p>{event.notes}</p></section>}
 
       {event.eventType === "match" && canManage && event.status === "scheduled" && (
-        <button type="button" className="fos-matchday-cta" onClick={() => onNavigate("matchday")}>
+        <button type="button" className="fos-matchday-cta" onClick={() => {
+          try {
+            openScheduledMatch(event, responses)
+            onNavigate("matchday")
+          } catch {
+            window.alert("Match details could not be opened. Please allow browser storage and try again.")
+          }
+        }}>
           <Trophy />
           <span><strong>Open Matchday</strong><small>Prepare squad, formation and live match tools</small></span>
           <ChevronRight />
