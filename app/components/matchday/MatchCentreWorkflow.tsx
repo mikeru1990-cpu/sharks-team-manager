@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import QuarterPlanner from "./QuarterPlanner"
 import { lineupProblem } from "../../lib/matchLineup"
 import { matchWorkflowKey, responseForMatch, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
@@ -517,17 +518,28 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
       )}
 
       {active === "Planner" && (
-        <section style={panel}>
-          <div style={sectionHead}>
-            <div>
-              <small style={eyebrow}>{format}</small>
-              <h2 style={{ margin: "3px 0 0" }}>{formation} tactical shape</h2>
-            </div>
-            <strong>{required} players</strong>
-          </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
-          <Pitch ids={live.length === required ? live : starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />
-        </section>
+        <QuarterPlanner
+          key={key}
+          storageKey={key}
+          players={players.filter(player => selected.includes(player.id))}
+          slots={layout.map(slot => slot.key)}
+          locked={selectionLocked}
+          running={running}
+          finished={finished}
+          onApply={(plan, quarter) => {
+            if (running || finished) return
+            const ids = Object.values(plan.lineup)
+            const nextPositions = Object.fromEntries(Object.entries(plan.lineup).map(([slot, id]) => [id, slot]))
+            if (lineupProblem(ids, selected, players.map(player => player.id), nextPositions, layout.map(slot => slot.key))) return
+            if (period === 0) setStarters(ids)
+            else {
+              snapshot()
+              setLive(ids)
+              event("period", `Quarter ${quarter} lineup applied`)
+            }
+            setPositions(nextPositions)
+          }}
+        />
       )}
 
       {active === "Live" && (
