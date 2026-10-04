@@ -28,6 +28,7 @@ import {
   type TeamEventType,
 } from "../../lib/teamEvents"
 import { openScheduledMatch } from "../../lib/scheduledMatch"
+import { buildFixtureCalendar, exportableFixtures } from "../../lib/fixtureCalendar"
 import type { WorkspaceTab } from "../../lib/workspaces"
 import { useTeamAccess } from "../system/TeamAccessProvider"
 
@@ -98,6 +99,29 @@ export default function ScheduleScreen({ onNavigate }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportDuration, setExportDuration] = useState(90)
+
+  async function exportForSpond() {
+    if (!activeTeam || !canManage) return
+    setSaving(true)
+    try {
+      // Read fresh fixtures; never export a previous team's cached screen state.
+      const fresh = await loadTeamEvents(activeTeam.teamId)
+      const calendar = buildFixtureCalendar(fresh, activeTeam.teamId, exportDuration)
+      const url = URL.createObjectURL(new Blob([calendar], { type: "text/calendar;charset=utf-8" }))
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "football-os-spond-fixtures.ics"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setMessage(`Calendar file prepared with ${exportableFixtures(fresh, activeTeam.teamId).length} matches. Import it in Spond's website Season Planner; check for existing games first.`)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Export could not be created.")
+    } finally { setSaving(false) }
+  }
 
   const playerKeys = useMemo(
     () => players.map((player) => player.cloudId ?? player.id),
@@ -201,6 +225,27 @@ export default function ScheduleScreen({ onNavigate }: Props) {
       </section>
 
       {message && <div className="fos-schedule-message">{message}</div>}
+
+      {canManage && (
+        <section className="fos-schedule-card">
+          <button type="button" onClick={() => setExportOpen(!exportOpen)} aria-expanded={exportOpen}>
+            Export for Spond
+          </button>
+          {exportOpen && <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            <p>Download upcoming matches from this team's saved Schedule. This is a one-off import, not live FA or Spond syncing.</p>
+            <p>Includes title, kick-off, end time and venue only. Player information, availability and private notes are not exported.</p>
+            <label>Default event length when no end time is saved
+              <select value={exportDuration} onChange={event => setExportDuration(Number(event.target.value))} style={{ minHeight: 44, marginLeft: 8 }}>
+                <option value={60}>60 minutes</option><option value={90}>90 minutes</option><option value={120}>120 minutes</option>
+              </select>
+            </label>
+            <p>In Spond's website: Event → Plan your season → Import. Review times, set arrival times and choose recipients before saving. Re-importing may duplicate games; update existing events for later changes.</p>
+            <button type="button" disabled={loading || saving} onClick={() => void exportForSpond()} style={{ minHeight: 44 }}>
+              {saving ? "Preparing…" : "Download fixture calendar (.ics)"}
+            </button>
+          </div>}
+        </section>
+      )}
 
       {adding && activeTeam && (
         <NewEventForm
