@@ -527,10 +527,10 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
           running={running}
           finished={finished}
           onApply={(plan, quarter) => {
-            if (running || finished) return
+            if (running || finished) return false
             const ids = Object.values(plan.lineup)
             const nextPositions = Object.fromEntries(Object.entries(plan.lineup).map(([slot, id]) => [id, slot]))
-            if (lineupProblem(ids, selected, players.map(player => player.id), nextPositions, layout.map(slot => slot.key))) return
+            if (lineupProblem(ids, selected, players.map(player => player.id), nextPositions, layout.map(slot => slot.key))) return false
             if (period === 0) setStarters(ids)
             else {
               snapshot()
@@ -538,6 +538,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
               event("period", `Quarter ${quarter} lineup applied`)
             }
             setPositions(nextPositions)
+            return true
           }}
         />
       )}

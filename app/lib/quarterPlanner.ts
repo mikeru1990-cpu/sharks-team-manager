@@ -1,5 +1,22 @@
 export type QuarterPlayer = { id: string; name: string; primaryPosition: string; secondaryPositions: string[] }
 export type QuarterPlan = { lineup: Record<string, string>; bench: string[] }
+export type QuarterDraft = { plans: QuarterPlan[]; keeper: string; duration: number; signature: string; applied: number }
+export function readQuarterDraft(raw: string | null, signature: string, players: QuarterPlayer[], slots: string[]): QuarterDraft | null {
+  try {
+    const saved = JSON.parse(raw ?? 'null') as QuarterDraft | null
+    if (!saved || saved.signature !== signature || !players.some(p => p.id === saved.keeper)) return null
+    if (![5, 10, 12, 15, 20, 25, 30].includes(saved.duration) || !Number.isInteger(saved.applied) || saved.applied < 0 || saved.applied > 4) return null
+    if (!Array.isArray(saved.plans) || saved.plans.length !== 4) return null
+    const ids = new Set(players.map(p => p.id))
+    if (!saved.plans.every(q => {
+      if (!q || !q.lineup || typeof q.lineup !== 'object' || Array.isArray(q.lineup) || !Array.isArray(q.bench)) return false
+      if (Object.keys(q.lineup).length !== slots.length || !slots.every(s => ids.has(q.lineup[s])) || q.lineup.GK !== saved.keeper) return false
+      const all = [...Object.values(q.lineup), ...q.bench]
+      return all.length === ids.size && new Set(all).size === ids.size && all.every(id => ids.has(id))
+    })) return null
+    return saved
+  } catch { return null }
+}
 export function roleGroup(role: string): string {
   const r = role.toUpperCase()
   if (r === 'GK') return 'GK'

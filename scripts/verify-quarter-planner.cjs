@@ -31,3 +31,19 @@ assert.equal(roleFit({primaryPosition:'TBC',secondaryPositions:[]},'D1'),0)
 const impossible=make(15)
 assert.ok(planWarnings(buildQuarterPlan(impossible,s,'p0'),impossible,s,'p0').some(w=>w.includes('consecutive')))
 console.log('PASS: 5/7/9/11-a-side, fixed keeper, balanced minutes, four substitutes, no consecutive bench when feasible, impossible constraints and role matching')
+const {readQuarterDraft}=ctx.exports
+const draft={plans:q,keeper:'p0',duration:15,signature:'team-match-formation',applied:2}
+const read=x=>readQuarterDraft(JSON.stringify(x),draft.signature,p,s)
+assert.equal(read(draft).applied,2)
+for(const applied of [-1,5,1.5,null]) assert.equal(read({...draft,applied}),null)
+for(const duration of [0,11,90,null]) assert.equal(read({...draft,duration}),null)
+assert.equal(read({...draft,signature:'other-team'}),null)
+assert.equal(readQuarterDraft('{broken',draft.signature,p,s),null)
+for(const corrupt of [
+ {...q[0],lineup:{...q[0].lineup,GK:'p1'}},
+ {...q[0],lineup:{...q[0].lineup,extra:'p9'}},
+ {...q[0],bench:[...q[0].bench,'p0']},
+ {...q[0],bench:q[0].bench.map((id,i)=>i===0?'removed':id)},
+ {...q[0],lineup:null},
+]) assert.equal(read({...draft,plans:[corrupt,...q.slice(1)]}),null)
+console.log('PASS: saved-plan restore, corrupt JSON, stale scope, fixed keeper, exact squad coverage and quarter progress bounds')

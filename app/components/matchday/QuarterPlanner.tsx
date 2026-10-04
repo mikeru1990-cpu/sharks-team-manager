@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useState, type CSSProperties } from 'react'
-import { buildQuarterPlan, planWarnings, type QuarterPlan, type QuarterPlayer } from '../../lib/quarterPlanner'
+import { buildQuarterPlan, planWarnings, readQuarterDraft, type QuarterPlan, type QuarterPlayer } from '../../lib/quarterPlanner'
 
 type Props = {
   players: QuarterPlayer[]; slots: string[]; storageKey: string; locked: boolean; running: boolean; finished: boolean
-  onApply: (plan: QuarterPlan, quarter: number) => void
+  onApply: (plan: QuarterPlan, quarter: number) => boolean
 }
 const card: CSSProperties = { padding: 16, borderRadius: 16, border: '1px solid #334155', background: '#0f172a', display: 'grid', gap: 12 }
 const control: CSSProperties = { minHeight: 44, padding: 10, borderRadius: 10, background: '#1e293b', color: 'white', border: '1px solid #64748b', width: '100%', fontSize: 16 }
@@ -22,11 +22,12 @@ export default function QuarterPlanner({ players, slots, storageKey, locked, run
   const [ready, setReady] = useState(false)
   useEffect(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(key) ?? 'null')
-      if (players.some(p => p.id === saved?.keeper) && saved?.signature === signature && Array.isArray(saved.plans) && saved.plans.length === 4 && saved.plans.every((q: QuarterPlan) => q && slots.every(s => players.some(p => p.id === q.lineup?.[s])) && new Set(Object.values(q.lineup)).size === slots.length && Array.isArray(q.bench) && q.lineup.GK === saved.keeper && q.bench.length === players.length - slots.length && new Set([...Object.values(q.lineup), ...q.bench]).size === players.length && q.bench.every(id => players.some(p => p.id === id)))) {
+      const saved = readQuarterDraft(localStorage.getItem(key), signature, players, slots)
+      if (saved) {
         setPlans(saved.plans); setKeeper(saved.keeper); setSavedSignature(saved.signature)
-        setDuration(Number.isInteger(saved.duration) && saved.duration >= 5 && saved.duration <= 30 ? saved.duration : 15)
-        setApplied(Number.isInteger(saved.applied) ? saved.applied : 0)
+        setDuration(saved.duration)
+        setApplied(saved.applied)
+        setQuarter(locked ? Math.min(saved.applied, 3) : 0)
       }
     } catch { /* Invalid device drafts are ignored. */ }
     setReady(true)
@@ -69,6 +70,7 @@ export default function QuarterPlanner({ players, slots, storageKey, locked, run
     {plans.length > 0 && !valid && <p role="alert">Squad or formation has changed. Rebuild the plan before using it.</p>}
     {!plans.length && locked && <p>Create a quarter plan before kick-off. Use Live for this match’s substitutions.</p>}
     {valid && <>
+      <p role="status" style={{ margin: 0, color: '#bfdbfe' }}>{finished ? 'Match completed.' : locked ? applied === 4 ? 'Q4 applied — all planned changes completed.' : applied > 0 ? `Next change: Q${applied + 1}.${running ? ' Pause the clock in Live first.' : ' Match paused — ready to apply.'}` : 'Q1 was not applied before kick-off. Use Live for substitutions.' : applied === 1 ? 'Q1 is ready in Lineup.' : 'Review all quarters, then use Q1 as your starting lineup.'}</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>{plans.map((_, i) => <button key={i} style={{ ...control, background: i === quarter ? '#1d4ed8' : '#1e293b' }} aria-pressed={quarter === i} onClick={() => setQuarter(i)}>Q{i + 1}</button>)}</div>
       <strong>Q{quarter + 1} · {quarter * duration}–{(quarter + 1) * duration} minutes</strong>
       {slots.map(slot => <label key={slot}>{slot === 'GK' ? 'Goalkeeper' : slot}<select style={control} aria-label={`Q${quarter + 1} ${slot}`} value={current.lineup[slot]} disabled={locked || slot === 'GK'} onChange={e => replace(slot, e.target.value)}>{players.filter(p => slot === 'GK' ? p.id === keeper : p.id !== keeper).map(p => <option key={p.id} value={p.id}>{p.name} · {p.primaryPosition}</option>)}</select></label>)}
@@ -76,7 +78,8 @@ export default function QuarterPlanner({ players, slots, storageKey, locked, run
       {quarter > 0 && <p>Coming on: {Object.values(current.lineup).filter(id => plans[quarter - 1].bench.includes(id)).map(name).join(' · ') || 'None'}<br/>Coming off: {current.bench.filter(id => Object.values(plans[quarter - 1].lineup).includes(id)).map(name).join(' · ') || 'None'}</p>}
       <button style={control} disabled={finished || running || (!locked && quarter !== 0) || (locked && (applied < 1 || quarter + 1 !== applied + 1))} onClick={() => {
         if (!window.confirm(locked ? `Apply Q${quarter + 1} to the paused live lineup? The clock will not jump or restart.` : 'Use Q1 as your starting lineup?')) return
-        onApply(current, quarter + 1); setApplied(quarter + 1); setMessage(locked ? `Q${quarter + 1} applied. Return to Live and resume when ready.` : 'Q1 copied to Lineup. Review it there, then kick off.')
+        if (!onApply(current, quarter + 1)) { setMessage('The lineup could not be applied. Check the squad and pause the match first.'); return }
+        setApplied(quarter + 1); setMessage(locked ? `Q${quarter + 1} applied. Return to Live and resume when ready.` : 'Q1 copied to Lineup. Review it there, then kick off.')
       }}>{locked ? `Apply Q${quarter + 1} to paused match` : 'Use Q1 as starting lineup'}</button>
       <p style={{ color: '#cbd5e1', margin: 0 }}>Pause the clock in Live at each quarter break, then apply the next quarter here. No automatic substitutions. Planned minutes below are estimates; Live records actual time.</p>
       <h3 style={{ margin: 0 }}>Playing time</h3>
