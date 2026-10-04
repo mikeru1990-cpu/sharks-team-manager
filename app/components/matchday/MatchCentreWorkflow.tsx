@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import { lineupProblem } from "../../lib/matchLineup"
 import { matchWorkflowKey, responseForMatch, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
 import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"
@@ -121,6 +122,10 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
     .sort((a, b) => (minutes[b] ?? 0) - (minutes[a] ?? 0))[0]
   const matchUnderway = period > 0 && !finished
   const lineupReady = starters.length === required
+  const selectionLocked = !loaded || period > 0 || finished
+  const startingBench = selected.filter(id => !starters.includes(id))
+  const startingProblem = lineupProblem(starters, selected, players.map(player => player.id), positions, layout.map(slot => slot.key))
+  const canKickoff = !selectionLocked && startingProblem === null
 
   useEffect(() => {
     try {
@@ -216,7 +221,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function handleFormatChange(nextFormat: TeamFormatId) {
-    if (matchUnderway) return
+    if (selectionLocked) return
     const nextConfig = getTeamFormat(nextFormat)
     const fitted = starters.filter((id) => selected.includes(id))
     for (const id of selected) {
@@ -233,7 +238,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function toggleSelected(id: string) {
-    if (scheduledMatch && (period > 0 || finished || !loaded)) return
+    if (selectionLocked) return
     const removing = selected.includes(id)
     setSelected((current) => (removing ? current.filter((item) => item !== id) : [...current, id]))
     if (removing) setStarters((current) => current.filter((item) => item !== id))
@@ -249,7 +254,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function toggleStarter(id: string) {
-    if (!selected.includes(id)) return
+    if (selectionLocked || !selected.includes(id)) return
     setStarters((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
@@ -274,10 +279,10 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function kickoff() {
-    if (!lineupReady || matchUnderway) return
+    if (!canKickoff) return
     const kickoffEvent = makeEvent("period", `Kick off · ${format} · ${formation}`, {}, 0)
     setLive([...starters])
-    assign(starters)
+    setPositions(Object.fromEntries(starters.map(id => [id, positions[id]])))
     setPeriod(1)
     setFinished(false)
     setHome(0)
@@ -415,15 +420,16 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
             </div>
             <strong>{required} on pitch</strong>
           </div>
-          <FormatPicker value={format} change={handleFormatChange} disabled={matchUnderway} />
+          <FormatPicker value={format} change={handleFormatChange} disabled={selectionLocked} />
           <div style={summaryStrip}>
             <span>{config.label}</span>
             <span>{formation}</span>
             <span>{starters.length}/{required} starters</span>
           </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
-          <button style={primary} disabled={!lineupReady || matchUnderway} onClick={kickoff}>
-            {matchUnderway ? "Match already in progress" : lineupReady ? `Kick off ${format}` : `Select ${required - starters.length} more starter${required - starters.length === 1 ? "" : "s"}`}
+          <FormationPicker formations={config.formations} value={formation} change={changeFormation} disabled={selectionLocked} />
+          {startingProblem && !selectionLocked && <p role="status" style={hint}>{startingProblem} Open Lineup to prepare your team.</p>}
+          <button style={primary} disabled={!canKickoff} onClick={kickoff}>
+            {finished ? "Match completed" : matchUnderway ? "Match already in progress" : `Kick off ${format}`}
           </button>
         </section>
       )}
@@ -448,7 +454,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
               key={player.id}
               type="button"
               aria-pressed={selected.includes(player.id)}
-              disabled={Boolean(scheduledMatch && (!loaded || period > 0 || finished))}
+              disabled={selectionLocked}
               onClick={() => toggleSelected(player.id)}
               style={{ ...row, background: selected.includes(player.id) ? "rgba(37,99,235,.2)" : "rgba(2,6,23,.48)" }}
             >
@@ -470,25 +476,42 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
             </div>
             <strong>{starters.length}/{required}</strong>
           </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
+          <FormationPicker formations={config.formations} value={formation} change={changeFormation} disabled={selectionLocked} />
           <p style={hint}>Choose the starters, apply the formation, then tap two players on the pitch to swap their roles.</p>
+          <div style={summaryStrip}>
+            <span>{starters.length}/{required} starting</span>
+            <span>{startingBench.length} on bench</span>
+            <span>{selected.length} attending</span>
+          </div>
+          {selectionLocked && <p style={hint}>Starting selection is locked. Use Live to manage the team on the pitch.</p>}
           {players.filter((player) => selected.includes(player.id)).map((player) => (
             <button
               key={player.id}
+              type="button"
+              disabled={selectionLocked}
+              aria-pressed={starters.includes(player.id)}
               onClick={() => toggleStarter(player.id)}
               style={{ ...row, background: starters.includes(player.id) ? "rgba(16,185,129,.22)" : "rgba(2,6,23,.48)" }}
             >
               {starters.includes(player.id) ? "STARTING" : "BENCH"} · {player.knownAs ?? player.name}
+              <span style={{ display: "block", marginTop: 5, fontSize: 13, color: "#cbd5e1" }}>
+                Preferred: {player.primaryPosition}{player.secondaryPositions.length ? ` · Also: ${player.secondaryPositions.join(", ")}` : ""}
+              </span>
             </button>
           ))}
           {lineupReady && (
             <>
-              <button style={action} onClick={() => assign(starters)}>Apply {formation}</button>
-              <Pitch ids={starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />
+              <button style={action} disabled={selectionLocked} onClick={() => assign(starters)}>Apply {formation}</button>
+              {!selectionLocked && <Pitch ids={starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />}
             </>
           )}
-          <button style={primary} disabled={!lineupReady || matchUnderway} onClick={kickoff}>
-            {lineupReady ? "Save lineup & kick off" : `Need ${required} starters`}
+          <div style={{ ...panel, marginTop: 12 }}>
+            <strong>Starting bench · {startingBench.length}</strong>
+            <p style={hint}>{startingBench.length ? startingBench.map(id => playerName(players, id)).join(" · ") : "No substitutes selected."}</p>
+          </div>
+          {!selectionLocked && <p role="status" style={hint}>{startingProblem ?? "Positions checked. Kick-off will keep this exact lineup."}</p>}
+          <button style={primary} disabled={!canKickoff} onClick={kickoff}>
+            {finished ? "Match completed" : matchUnderway ? "Match in progress" : "Use this lineup & kick off"}
           </button>
         </section>
       )}
@@ -578,11 +601,11 @@ function FormatPicker({ value, change, disabled }: { value: TeamFormatId; change
   )
 }
 
-function FormationPicker({ formations, value, change }: { formations: string[]; value: string; change: (formation: string) => void }) {
+function FormationPicker({ formations, value, change, disabled }: { formations: string[]; value: string; change: (formation: string) => void; disabled?: boolean }) {
   return (
     <div style={formationGrid}>
       {formations.map((formation) => (
-        <button key={formation} onClick={() => change(formation)} style={value === formation ? primary : action}>
+        <button key={formation} disabled={disabled} onClick={() => change(formation)} style={value === formation ? primary : action}>
           {formation}
         </button>
       ))}
