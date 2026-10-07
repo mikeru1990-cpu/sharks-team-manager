@@ -1,4 +1,14 @@
-export type QuarterPlayer = { id: string; name: string; primaryPosition: string; secondaryPositions: string[] }
+export type QuarterPlayer = { id: string; name: string; primaryPosition: string; secondaryPositions: string[]; slotRatings?: Record<string, number | null> }
+export type PositionRatings = { goalkeeper: number | null; defence: number | null; centre_mid: number | null; wide: number | null; striker: number | null }
+export function ratingsForSlots(profile: PositionRatings, slots: { key: string; x: number }[]) {
+  const mids = slots.filter(s => roleGroup(s.key) === 'MID')
+  return Object.fromEntries(slots.map(s => {
+    const group = roleGroup(s.key)
+    const role = group === 'GK' ? 'goalkeeper' : group === 'DEF' ? 'defence' : group === 'FWD' ? 'striker' : group === 'MID' ? (mids.length >= 3 && (s.x < 25 || s.x > 75) ? 'wide' : 'centre_mid') : null
+    const value = role ? profile[role] : null
+    return [s.key, typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 5 ? value : null]
+  }))
+}
 export type QuarterPlan = { lineup: Record<string, string>; bench: string[] }
 export type QuarterDraft = { plans: QuarterPlan[]; keeper: string; duration: number; signature: string; applied: number }
 export function readQuarterDraft(raw: string | null, signature: string, players: QuarterPlayer[], slots: string[]): QuarterDraft | null {
@@ -26,6 +36,8 @@ export function roleGroup(role: string): string {
   return r
 }
 export function roleFit(player: QuarterPlayer, slot: string) {
+  const rating = player.slotRatings?.[slot]
+  if (typeof rating === 'number' && Number.isInteger(rating) && rating >= 0 && rating <= 5) return rating === 0 ? -1000 : rating * 10
   const group = roleGroup(slot)
   if (roleGroup(player.primaryPosition) === group) return 2
   return player.secondaryPositions.some(p => roleGroup(p) === group) ? 1 : 0
@@ -40,13 +52,16 @@ function assignRoles(players: QuarterPlayer[], slots: string[]) {
     let best = { score: -Infinity, ids: [] as string[] }
     players.forEach((p, i) => {
       if (mask & (1 << i)) return
+      if (p.slotRatings?.[slots[index]] === 0) return
       const rest = solve(mask | (1 << i))
       const score = roleFit(p, slots[index]) + rest.score
       if (score > best.score) best = { score, ids: [p.id, ...rest.ids] }
     })
     memo.set(mask, best); return best
   }
-  return Object.fromEntries(solve(0).ids.map((id, i) => [slots[i], id]))
+  const result = solve(0)
+  if (!Number.isFinite(result.score)) throw Error('This fair rotation cannot fill every position without a 0-rated role. Review the formation, ratings or match squad; no new plan was saved.')
+  return Object.fromEntries(result.ids.map((id, i) => [slots[i], id]))
 }
 export function buildQuarterPlan(players: QuarterPlayer[], slots: string[], keeper: string): QuarterPlan[] {
   if (!slots.includes('GK') || new Set(slots).size !== slots.length || slots.length > 11 || slots.length < 2) throw Error('Choose a valid formation.')
@@ -76,7 +91,11 @@ export function planWarnings(plans: QuarterPlan[], players: QuarterPlayer[], slo
   plans.forEach((q, i) => {
     slots.filter(s => s !== 'GK').forEach(s => {
       const p = players.find(p => p.id === q.lineup[s])
-      if (p && !roleFit(p, s)) warnings.push(`Q${i + 1}: check ${p.name} at ${s}; no matching preferred role.`)
+      if (!p) return
+      const rating = p.slotRatings?.[s]
+      if (rating === 0) warnings.push(`Q${i + 1}: ${p.name} at ${s} is rated 0 — avoid. Change this position before applying.`)
+      else if (rating === 1 || rating === 2) warnings.push(`Q${i + 1}: ${p.name} at ${s} is rated ${rating}/5 — ${rating === 1 ? 'emergency cover' : 'developing / cover'}.`)
+      else if (rating == null && !roleFit(p, s)) warnings.push(`Q${i + 1}: check ${p.name} at ${s}; no rating or matching preferred role.`)
     })
   })
   return warnings

@@ -4,12 +4,13 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { buildQuarterPlan, planWarnings, readQuarterDraft, type QuarterPlan, type QuarterPlayer } from '../../lib/quarterPlanner'
 
 type Props = {
+  ratingsPending?: boolean
   players: QuarterPlayer[]; slots: string[]; storageKey: string; locked: boolean; running: boolean; finished: boolean
   onApply: (plan: QuarterPlan, quarter: number) => boolean
 }
 const card: CSSProperties = { padding: 16, borderRadius: 16, border: '1px solid #334155', background: '#0f172a', display: 'grid', gap: 12 }
 const control: CSSProperties = { minHeight: 44, padding: 10, borderRadius: 10, background: '#1e293b', color: 'white', border: '1px solid #64748b', width: '100%', fontSize: 16 }
-export default function QuarterPlanner({ players, slots, storageKey, locked, running, finished, onApply }: Props) {
+export default function QuarterPlanner({ players, slots, storageKey, locked, running, finished, onApply, ratingsPending = false }: Props) {
   const signature = JSON.stringify([players.map(p => [p.id, p.primaryPosition, p.secondaryPositions]).sort(), slots])
   const key = `${storageKey}:quarters-v1`
   const [keeper, setKeeper] = useState(players.find(p => p.primaryPosition === 'GK')?.id ?? '')
@@ -62,10 +63,10 @@ export default function QuarterPlanner({ players, slots, storageKey, locked, run
   const current = plans[quarter]
   return <section style={card} aria-label="Four-quarter planner">
     <h2 style={{ margin: 0 }}>Four-quarter planner</h2>
-    <p style={{ margin: 0, color: '#cbd5e1' }}>Changes between quarters. Goalkeeper stays on. Outfield time is balanced first; preferred roles guide positions. Ratings and season minutes are not used yet.</p>
+    <p style={{ margin: 0, color: '#cbd5e1' }}>Changes between quarters. Goalkeeper stays on. Outfield time is balanced first; saved coach ratings guide positions, with preferred roles as fallback. Season minutes are not used yet.</p>
     <label>Fixed goalkeeper<select style={control} value={keeper} disabled={locked} onChange={e => { setKeeper(e.target.value); setSavedSignature('') }}><option value="">Choose goalkeeper</option>{players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
     <label>Minutes per quarter<select style={control} value={duration} disabled={locked} onChange={e => setDuration(Number(e.target.value))}>{[5,10,12,15,20,25,30].map(n => <option key={n} value={n}>{n} minutes</option>)}</select></label>
-    <button style={control} disabled={!ready || locked || !keeper} onClick={generate}>{plans.length ? 'Rebuild four quarters' : 'Build four quarters'}</button>
+    <button style={control} disabled={!ready || locked || !keeper || ratingsPending} onClick={generate}>{plans.length ? 'Rebuild four quarters' : 'Build four quarters'}</button>
     {message && <p role="status">{message}</p>}
     {plans.length > 0 && !valid && <p role="alert">Squad or formation has changed. Rebuild the plan before using it.</p>}
     {!plans.length && locked && <p>Create a quarter plan before kick-off. Use Live for this match’s substitutions.</p>}

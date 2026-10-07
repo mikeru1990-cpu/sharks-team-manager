@@ -5,6 +5,20 @@ const ts = require('typescript')
 const ctx = { exports: {} }
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('app/lib/quarterPlanner.ts','utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,ctx)
 const {buildQuarterPlan,planWarnings,roleFit}=ctx.exports
+const {ratingsForSlots}=ctx.exports
+const ratings={goalkeeper:5,defence:3,centre_mid:2,wide:4,striker:1}
+const mapped=ratingsForSlots(ratings,[{key:'GK',x:50},{key:'D1',x:31},{key:'M1',x:20},{key:'M2',x:50},{key:'M3',x:80},{key:'F1',x:50}])
+assert.equal(mapped.M1,4);assert.equal(mapped.M2,2);assert.equal(mapped.M3,4);assert.equal(mapped.D1,3);assert.equal(mapped.F1,1)
+assert.equal(ratingsForSlots({...ratings,defence:NaN},[{key:'D1',x:50}]).D1,null)
+assert.equal(roleFit({primaryPosition:'TBC',secondaryPositions:[],slotRatings:{D1:4}},'D1'),40)
+assert.equal(roleFit({primaryPosition:'CB',secondaryPositions:[],slotRatings:{D1:0}},'D1'),-1000)
+assert.equal(roleFit({primaryPosition:'CB',secondaryPositions:[],slotRatings:{D1:null}},'D1'),2)
+const specialists=[{id:'g',name:'GK',primaryPosition:'GK',secondaryPositions:[]},{id:'a',name:'A',primaryPosition:'TBC',secondaryPositions:[],slotRatings:{D1:1,F1:5}},{id:'b',name:'B',primaryPosition:'TBC',secondaryPositions:[],slotRatings:{D1:5,F1:1}}]
+const rated=buildQuarterPlan(specialists,['GK','D1','F1'],'g')
+assert.equal(rated[0].lineup.D1,'b');assert.equal(rated[0].lineup.F1,'a')
+assert.throws(()=>buildQuarterPlan(specialists.map(p=>({...p,slotRatings:{D1:0,F1:4}})),['GK','D1','F1'],'g'),/0-rated/)
+assert.ok(planWarnings(rated,specialists.map(p=>({...p,slotRatings:{D1:1,F1:2}})),['GK','D1','F1'],'g').some(w=>w.includes('emergency cover')))
+console.log('PASS: cloud rating slot mapping, wide/central distinction, numeric validation, optimal role assignment and no automatic 0-rated roles')
 const make=n=>Array.from({length:n},(_,i)=>({id:`p${i}`,name:`Player ${i}`,primaryPosition:i===0?'GK':['CB','CM','ST'][i%3],secondaryPositions:['CB','CM','ST']}))
 for (const field of [5,7,9,11]) for (let total=field;total<=Math.min(22,field*2);total++) {
  const players=make(total),slots=['GK',...Array.from({length:field-1},(_,i)=>`${['D','M','F'][i%3]}${i}`)]

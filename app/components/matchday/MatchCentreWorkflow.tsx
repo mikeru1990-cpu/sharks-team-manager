@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
-import QuarterPlanner from "./QuarterPlanner"
+import QuarterPlanner from "./RatedQuarterPlanner"
 import { lineupProblem } from "../../lib/matchLineup"
 import { matchWorkflowKey, responseForMatch, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
@@ -523,6 +523,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
           storageKey={key}
           players={players.filter(player => selected.includes(player.id))}
           slots={layout.map(slot => slot.key)}
+          layout={layout}
           locked={selectionLocked}
           running={running}
           finished={finished}
