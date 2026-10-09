@@ -1,4 +1,10 @@
 export type QuarterPlayer = { id: string; name: string; primaryPosition: string; secondaryPositions: string[]; slotRatings?: Record<string, number | null> }
+export function quarterRoleLabel(player: QuarterPlayer, slot: string): string {
+  const rating = player.slotRatings?.[slot]
+  const labels = ['Avoid', 'Emergency cover', 'Developing / cover', 'Competent', 'Strong', 'Very strong']
+  if (typeof rating === 'number' && Number.isInteger(rating) && rating >= 0 && rating <= 5) return `${rating}/5 · ${labels[rating]}`
+  return player.primaryPosition && player.primaryPosition !== 'TBC' ? `Preferred: ${player.primaryPosition} · Not rated here` : 'Not rated here'
+}
 export type PositionRatings = { goalkeeper: number | null; defence: number | null; centre_mid: number | null; wide: number | null; striker: number | null }
 export function ratingsForSlots(profile: PositionRatings, slots: { key: string; x: number }[]) {
   const mids = slots.filter(s => roleGroup(s.key) === 'MID')

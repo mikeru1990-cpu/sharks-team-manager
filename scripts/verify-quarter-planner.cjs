@@ -5,6 +5,11 @@ const ts = require('typescript')
 const ctx = { exports: {} }
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('app/lib/quarterPlanner.ts','utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText,ctx)
 const {buildQuarterPlan,planWarnings,roleFit}=ctx.exports
+const {quarterRoleLabel}=ctx.exports
+assert.equal(quarterRoleLabel({primaryPosition:'TBC',slotRatings:{D1:4}},'D1'),'4/5 · Strong')
+assert.equal(quarterRoleLabel({primaryPosition:'TBC',slotRatings:{D1:0}},'D1'),'0/5 · Avoid')
+assert.equal(quarterRoleLabel({primaryPosition:'TBC',slotRatings:{D1:null}},'D1'),'Not rated here')
+assert.equal(quarterRoleLabel({primaryPosition:'GK'},'GK'),'Preferred: GK · Not rated here')
 const {ratingsForSlots}=ctx.exports
 const ratings={goalkeeper:5,defence:3,centre_mid:2,wide:4,striker:1}
 const mapped=ratingsForSlots(ratings,[{key:'GK',x:50},{key:'D1',x:31},{key:'M1',x:20},{key:'M2',x:50},{key:'M3',x:80},{key:'F1',x:50}])

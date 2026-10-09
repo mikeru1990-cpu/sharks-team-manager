@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, type CSSProperties } from 'react'
-import { buildQuarterPlan, planWarnings, readQuarterDraft, type QuarterPlan, type QuarterPlayer } from '../../lib/quarterPlanner'
+import { buildQuarterPlan, planWarnings, readQuarterDraft, quarterRoleLabel, type QuarterPlan, type QuarterPlayer } from '../../lib/quarterPlanner'
 
 type Props = {
   ratingsPending?: boolean
@@ -74,7 +74,7 @@ export default function QuarterPlanner({ players, slots, storageKey, locked, run
       <p role="status" style={{ margin: 0, color: '#bfdbfe' }}>{finished ? 'Match completed.' : locked ? applied === 4 ? 'Q4 applied — all planned changes completed.' : applied > 0 ? `Next change: Q${applied + 1}.${running ? ' Pause the clock in Live first.' : ' Match paused — ready to apply.'}` : 'Q1 was not applied before kick-off. Use Live for substitutions.' : applied === 1 ? 'Q1 is ready in Lineup.' : 'Review all quarters, then use Q1 as your starting lineup.'}</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>{plans.map((_, i) => <button key={i} style={{ ...control, background: i === quarter ? '#1d4ed8' : '#1e293b' }} aria-pressed={quarter === i} onClick={() => setQuarter(i)}>Q{i + 1}</button>)}</div>
       <strong>Q{quarter + 1} · {quarter * duration}–{(quarter + 1) * duration} minutes</strong>
-      {slots.map(slot => <label key={slot}>{slot === 'GK' ? 'Goalkeeper' : slot}<select style={control} aria-label={`Q${quarter + 1} ${slot}`} value={current.lineup[slot]} disabled={locked || slot === 'GK'} onChange={e => replace(slot, e.target.value)}>{players.filter(p => slot === 'GK' ? p.id === keeper : p.id !== keeper).map(p => <option key={p.id} value={p.id}>{p.name} · {p.primaryPosition}</option>)}</select></label>)}
+      {slots.map(slot => <label key={slot}>{slot === 'GK' ? 'Goalkeeper' : slot}<select style={control} aria-label={`Q${quarter + 1} ${slot}`} value={current.lineup[slot]} disabled={locked || slot === 'GK'} onChange={e => replace(slot, e.target.value)}>{players.filter(p => slot === 'GK' ? p.id === keeper : p.id !== keeper).map(p => <option key={p.id} value={p.id}>{p.name} · {quarterRoleLabel(p, slot)}</option>)}</select></label>)}
       <strong>Bench · {current.bench.length}</strong><p style={{ margin: 0 }}>{current.bench.map(name).join(' · ') || 'No substitutes'}</p>
       {quarter > 0 && <p>Coming on: {Object.values(current.lineup).filter(id => plans[quarter - 1].bench.includes(id)).map(name).join(' · ') || 'None'}<br/>Coming off: {current.bench.filter(id => Object.values(plans[quarter - 1].lineup).includes(id)).map(name).join(' · ') || 'None'}</p>}
       <button style={control} disabled={finished || running || (!locked && quarter !== 0) || (locked && (applied < 1 || quarter + 1 !== applied + 1))} onClick={() => {
