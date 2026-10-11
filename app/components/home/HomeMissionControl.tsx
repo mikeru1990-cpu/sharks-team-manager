@@ -18,7 +18,7 @@ import { useTeamAccess } from "../system/TeamAccessProvider"
 import type { WorkspaceTab } from "../../lib/workspaces"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
 import { useHomeSummary } from "../../lib/useHomeSummary"
-import { upcomingTeamEvents, eventAvailability, eventDateLabel } from "../../lib/homeSummary"
+import { upcomingTeamEvents, eventAvailability, eventDateLabel, matchesNeedingReports, hasUnfinishedMatch } from "../../lib/homeSummary"
 import { matchWorkflowKey, parseScheduledMatch, scheduledMatchKey } from "../../lib/scheduledMatch"
 
 type Props = { onNavigate: (tab: WorkspaceTab) => void }
@@ -61,6 +61,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
   const completed = (snapshot?.events ?? []).filter(event => event.status !== 'cancelled' && snapshot?.reports.some(report => report.event_id === event.id)).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
   const latest = completed[0]
   const latestOutcome = snapshot?.reports.find(report => report.event_id === latest?.id)?.outcome
+  const missingReports = matchesNeedingReports(snapshot?.events ?? [], (snapshot?.reports ?? []).map(report => report.event_id))
   const summaryLabel = loading ? 'Loading team updates…' : error ? 'Team updates unavailable' : 'No upcoming event scheduled'
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
@@ -70,7 +71,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
     month: "long",
   })
   const hasLive = canManage && !!match.running && !match.finished
-  const hasStarted = canManage && (match.seconds ?? 0) > 0 && !match.finished
+  const hasStarted = canManage && hasUnfinishedMatch(match)
   const matchStatus = hasLive ? "LIVE" : hasStarted ? "IN PROGRESS" : "READY"
   const matchDetail = hasLive
     ? `${match.home ?? 0}-${match.away ?? 0} · ${Math.floor((match.seconds ?? 0) / 60)}' · live match running`
@@ -262,9 +263,17 @@ export default function HomeMissionControl({ onNavigate }: Props) {
       <section className="fos-command-section">
         <div className="fos-command-heading">
           <div><small>YOUR DAY</small><h2>What needs attention</h2></div>
-          <span>{1 + Number(hasStarted) + Number(!!nextEvent) + Number(reviewCount > 0)} items</span>
+          <span>{1 + Number(hasStarted) + Number(!!nextEvent) + Number(reviewCount > 0) + Number(missingReports.length > 0)} items</span>
         </div>
         <div className="fos-command-attention">
+          {missingReports.length > 0 && <Action
+            tone="amber"
+            label="RESULTS TO FINISH"
+            title={`${missingReports.length} past match${missingReports.length === 1 ? '' : 'es'} without a report`}
+            detail={`${missingReports.slice(0, 2).map(event => event.title).join(' · ')}. Check whether played or cancelled; only record confirmed results.`}
+            cta="Review"
+            onClick={() => onNavigate('schedule')}
+          />}
           {hasStarted && (
             <Action
               tone="blue"

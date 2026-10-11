@@ -27,3 +27,17 @@ const counts = eventAvailability('fixture', [
 ], ['a', 'b', 'c', 'a'])
 assert.equal(JSON.stringify(counts), JSON.stringify({ available: 1, maybe: 1, unavailable: 0, unanswered: 1 }))
 console.log('Home summary: London date boundary, ordering, cancelled/completed exclusion, stale fixtures and active-player availability passed.')
+const { matchesNeedingReports, hasUnfinishedMatch } = context.exports
+const match = (id, date, status = 'scheduled') => ({ ...event(id, date, status), eventType: 'match' })
+assert.equal(matchesNeedingReports([
+  match('missing', '2026-10-04T10:00:00Z'),
+  match('reported', '2026-10-03T10:00:00Z', 'completed'),
+  match('cancelled', '2026-10-02T10:00:00Z', 'cancelled'),
+  match('today', '2026-10-11T09:00:00Z'),
+  { ...match('training', '2026-10-01T09:00:00Z'), eventType: 'training' },
+], ['reported'], now).map(e => e.id).join(','), 'missing')
+assert.equal(hasUnfinishedMatch({ period: 1, seconds: 0 }), true)
+assert.equal(hasUnfinishedMatch({ period: 0, seconds: 0 }), false)
+assert.equal(hasUnfinishedMatch({ period: 4, finished: true }), false)
+assert.equal(hasUnfinishedMatch({}), false)
+console.log('Follow-up checks: missing results exclude today, training, cancelled and reported games; match resume works at 00:00.')

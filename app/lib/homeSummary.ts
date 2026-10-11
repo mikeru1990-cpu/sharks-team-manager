@@ -18,3 +18,14 @@ export function eventAvailability(eventId: string, responses: EventResponse[], p
 export function eventDateLabel(value: string) {
   return new Date(value).toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
+
+export function matchesNeedingReports(events: TeamEvent[], reportedIds: string[], now = Date.now()) {
+  const reported = new Set(reportedIds)
+  return events.filter(event => event.eventType === 'match' && event.status !== 'cancelled' &&
+    !reported.has(event.id) && Number.isFinite(Date.parse(event.startsAt)) && day(event.startsAt) < day(now))
+    .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
+}
+
+export function hasUnfinishedMatch(value: { period?: number; finished?: boolean }) {
+  return typeof value.period === 'number' && value.period > 0 && !value.finished
+}
