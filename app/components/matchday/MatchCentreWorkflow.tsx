@@ -34,6 +34,8 @@ type TimelineEvent = {
 type Minutes = Record<string, number>
 type Positions = Record<string, string>
 type Snapshot = {
+  formation: string
+  quarterDraft?: string | null
   home: number
   away: number
   live: string[]
@@ -202,8 +204,8 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
     return () => clearInterval(timer)
   }, [running, finished, live])
 
-  function snapshot() {
-    setUndo({ home, away, live: [...live], positions: { ...positions }, timeline: [...timeline] })
+  function snapshot(quarterDraft?: string | null) {
+    setUndo({ formation, quarterDraft, home, away, live: [...live], positions: { ...positions }, timeline: [...timeline] })
   }
 
   function makeEvent(type: EventType, label: string, extra: Partial<TimelineEvent> = {}, forcedMinute = minute): TimelineEvent {
@@ -322,7 +324,22 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function undoLast() {
-    if (!undo) return
+    if (!undo || finished) return
+    if (running) {
+      window.alert('Pause the match before undoing an action.')
+      return
+    }
+    if (undo.quarterDraft !== undefined) {
+      try {
+        const draftKey = `${key}:quarters-v1`
+        if (undo.quarterDraft === null) localStorage.removeItem(draftKey)
+        else localStorage.setItem(draftKey, undo.quarterDraft)
+      } catch {
+        window.alert('The quarter plan could not be restored on this device. No changes were undone. Please try again.')
+        return
+      }
+    }
+    setFormation(undo.formation)
     setHome(undo.home)
     setAway(undo.away)
     setLive(undo.live)
@@ -332,18 +349,21 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function halfTime() {
+    setUndo(null)
     setRunning(false)
     setPeriod(2)
     event("period", "Half time")
   }
 
   function secondHalf() {
+    setUndo(null)
     setPeriod(2)
     setRunning(true)
     event("period", "Second half started")
   }
 
   function fullTime() {
+    setUndo(null)
     setRunning(false)
     setFinished(true)
     setPeriod(3)
@@ -534,7 +554,13 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
             if (lineupProblem(ids, selected, players.map(player => player.id), nextPositions, layout.map(slot => slot.key))) return false
             if (period === 0) setStarters(ids)
             else {
-              snapshot()
+              let quarterDraft: string | null
+              try { quarterDraft = localStorage.getItem(`${key}:quarters-v1`) }
+              catch {
+                window.alert('Cannot read the saved quarter plan. No lineup changes were made. Please try again.')
+                return false
+              }
+              snapshot(quarterDraft)
               setLive(ids)
               event("period", `Quarter ${quarter} lineup applied`)
             }
@@ -566,7 +592,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
           changeFormation={changeFormation}
           swap={swap}
           undoLast={undoLast}
-          canUndo={!!undo}
+          canUndo={!!undo && !running && !finished}
           least={least}
           most={most}
           period={period}
