@@ -108,6 +108,8 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   const [away, setAway] = useState(0)
   const [finished, setFinished] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const [saveRetry, setSaveRetry] = useState(0)
 
   const config = getTeamFormat(format)
   const required = config.playersOnPitch
@@ -175,11 +177,12 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
 
   useEffect(() => {
     if (!loaded) return
-    localStorage.setItem(
+    try { localStorage.setItem(
       key,
       JSON.stringify({ format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished }),
-    )
-  }, [loaded, format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished])
+    ); setSaveError(false) }
+    catch { setSaveError(true) }
+  }, [loaded, format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished, saveRetry])
 
   useEffect(() => {
     if (!loaded) return
@@ -363,15 +366,14 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
   }
 
   function fullTime() {
-    setUndo(null)
+    if (finished || period === 0) return
+    if (!window.confirm(`Finish this match at ${home}-${away}? Check the score first. This stops the clock and opens the report.`)) return
     setRunning(false)
-    setFinished(true)
-    setPeriod(3)
     const fullTimeEvent = makeEvent("period", `FULL TIME · ${home}-${away}`)
     const finalTimeline = [fullTimeEvent, ...timeline]
-    setTimeline(finalTimeline)
     try {
       const old = JSON.parse(localStorage.getItem(historyKey) ?? "[]")
+      if (!Array.isArray(old)) throw new Error('Invalid saved history')
       localStorage.setItem(
         historyKey,
         JSON.stringify(
@@ -394,7 +396,14 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
           ].slice(0, 100),
         ),
       )
-    } catch {}
+    } catch {
+      window.alert('The match history could not be saved on this device. The match is paused, not finished. Keep this page open and try Full time again.')
+      return
+    }
+    setUndo(null)
+    setFinished(true)
+    setPeriod(3)
+    setTimeline(finalTimeline)
     setActive("Report")
   }
 
@@ -411,6 +420,11 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
         section="Match Centre"
         detail="One match workflow powered by the shared 5v5, 7v7, 9v9 and 11v11 team-format engine."
       />
+      {saveError && <section role="alert" style={{ padding: 16, border: '2px solid #fbbf24', borderRadius: 12, background: '#422006' }}>
+        <strong>Match changes are not saved on this device.</strong>
+        <p>Keep this page open. Closing or reloading could lose recent changes.</p>
+        <button style={action} onClick={() => setSaveRetry(value => value + 1)}>Retry saving</button>
+      </section>}
 
       <section style={hero}>
         <div>
