@@ -429,7 +429,7 @@ export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch
       <section style={hero}>
         <div>
           <small>{finished ? "FULL TIME" : period === 2 ? "SECOND HALF" : period === 1 ? "FIRST HALF" : "PRE-MATCH"}</small>
-          <h2 style={{ margin: "4px 0" }}>{running ? "LIVE" : finished ? "COMPLETE" : seconds ? "PAUSED" : "READY"}</h2>
+          <h2 style={{ margin: "4px 0" }}>{running ? "LIVE" : finished ? "COMPLETE" : period > 0 ? "PAUSED" : "READY"}</h2>
           <b>{clock}</b>
         </div>
         <div style={{ textAlign: "right" }}>

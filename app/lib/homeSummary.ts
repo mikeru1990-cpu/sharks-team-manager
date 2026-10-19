@@ -29,3 +29,8 @@ export function matchesNeedingReports(events: TeamEvent[], reportedIds: string[]
 export function hasUnfinishedMatch(value: { period?: number; finished?: boolean }) {
   return typeof value.period === 'number' && value.period > 0 && !value.finished
 }
+
+// A scheduled start passing does not prove the event was played or completed.
+export function eventTimingLabel(startsAt: string, now = Date.now()) {
+  return Date.parse(startsAt) <= now ? "START TIME PASSED" : "COMING UP"
+}

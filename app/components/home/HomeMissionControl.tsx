@@ -18,7 +18,7 @@ import { useTeamAccess } from "../system/TeamAccessProvider"
 import type { WorkspaceTab } from "../../lib/workspaces"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
 import { useHomeSummary } from "../../lib/useHomeSummary"
-import { upcomingTeamEvents, eventAvailability, eventDateLabel, matchesNeedingReports, hasUnfinishedMatch } from "../../lib/homeSummary"
+import { upcomingTeamEvents, eventAvailability, eventDateLabel, eventTimingLabel, matchesNeedingReports, hasUnfinishedMatch } from "../../lib/homeSummary"
 import { matchWorkflowKey, parseScheduledMatch, scheduledMatchKey } from "../../lib/scheduledMatch"
 
 type Props = { onNavigate: (tab: WorkspaceTab) => void }
@@ -54,7 +54,13 @@ export default function HomeMissionControl({ onNavigate }: Props) {
     } catch {}
   }, [activeTeam?.teamId])
 
-  const upcoming = upcomingTeamEvents(snapshot?.events ?? [])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const upcoming = upcomingTeamEvents(snapshot?.events ?? [], now)
   const next = upcoming[0]
   const nextEvent = next ? { ...next, dateLabel: eventDateLabel(next.startsAt), timeLabel: next.meetAt ? `Meet ${new Date(next.meetAt).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}` : null, location: next.locationName } : null
   const counts = eventAvailability(next?.id ?? '', snapshot?.responses ?? [], players.map(player => player.cloudId ?? player.id))
@@ -210,7 +216,7 @@ export default function HomeMissionControl({ onNavigate }: Props) {
             <Trophy size={20} />
           </div>
           <div>
-            <small>{hasStarted ? "MATCHDAY" : nextEvent ? "COMING UP" : "NO EVENT SET"}</small>
+            <small>{hasStarted ? "MATCHDAY" : nextEvent ? eventTimingLabel(nextEvent.startsAt, now) : "NO EVENT SET"}</small>
             <h2>
               {hasStarted
                 ? `${clubName} ${match.home ?? 0} – ${match.away ?? 0} Opposition`

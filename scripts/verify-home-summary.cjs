@@ -41,3 +41,10 @@ assert.equal(hasUnfinishedMatch({ period: 0, seconds: 0 }), false)
 assert.equal(hasUnfinishedMatch({ period: 4, finished: true }), false)
 assert.equal(hasUnfinishedMatch({}), false)
 console.log('Follow-up checks: missing results exclude today, training, cancelled and reported games; match resume works at 00:00.')
+
+const { eventTimingLabel } = context.exports
+const kickoff = Date.parse("2026-10-18T09:00:00Z")
+assert.equal(eventTimingLabel("2026-10-18T09:00:00Z", kickoff - 1), "COMING UP")
+assert.equal(eventTimingLabel("2026-10-18T09:00:00Z", kickoff), "START TIME PASSED")
+assert.equal(eventTimingLabel("2026-10-18T09:00:00Z", kickoff + 3600000), "START TIME PASSED")
+console.log("PASS: fixture label changes at scheduled kickoff without claiming completion.")
