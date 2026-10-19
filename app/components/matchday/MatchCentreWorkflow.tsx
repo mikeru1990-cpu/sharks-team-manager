@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState, type CSSProperties } from "react"
+import QuarterPlanner from "./RatedQuarterPlanner"
+import { lineupProblem } from "../../lib/matchLineup"
+import { matchWorkflowKey, responseForMatch, type ScheduledMatch } from "../../lib/scheduledMatch"
 import TeamScopeBanner from "../layout/TeamScopeBanner"
 import { isMatchdayEligible, type SquadStorePlayer } from "../../lib/squadStore"
 import { useSquadPlayers } from "../../lib/useSquadPlayers"
@@ -14,7 +17,7 @@ import {
 } from "../../lib/teamFormat"
 
 const tabs = ["Setup", "Squad", "Lineup", "Planner", "Live", "Report"] as const
-const key = "football-os-matchday-workflow-v6"
+const standaloneKey = "football-os-matchday-workflow-v6"
 const historyKey = "football-os-match-history-v1"
 
 type Tab = (typeof tabs)[number]
@@ -31,6 +34,8 @@ type TimelineEvent = {
 type Minutes = Record<string, number>
 type Positions = Record<string, string>
 type Snapshot = {
+  formation: string
+  quarterDraft?: string | null
   home: number
   away: number
   live: string[]
@@ -82,13 +87,14 @@ function playerName(players: SquadStorePlayer[], id: string) {
   return players.find((item) => item.id === id)?.name ?? "Player"
 }
 
-export default function MatchCentreWorkflow() {
+export default function MatchCentreWorkflow({ scheduledMatch }: { scheduledMatch?: ScheduledMatch }) {
+  const key = scheduledMatch ? matchWorkflowKey(scheduledMatch) : standaloneKey
   const squadPlayers = useSquadPlayers()
   const players = useMemo(() => squadPlayers.filter(isMatchdayEligible), [squadPlayers])
   const [active, setActive] = useState<Tab>("Setup")
   const [format, setFormat] = useState<TeamFormatId>("7v7")
-  const [selected, setSelected] = useState<string[]>(players.map((player) => player.id))
-  const [starters, setStarters] = useState<string[]>(players.slice(0, 7).map((player) => player.id))
+  const [selected, setSelected] = useState<string[]>(scheduledMatch ? [] : players.map((player) => player.id))
+  const [starters, setStarters] = useState<string[]>(scheduledMatch ? [] : players.slice(0, 7).map((player) => player.id))
   const [live, setLive] = useState<string[]>([])
   const [formation, setFormation] = useState<string>(teamFormats["7v7"].defaultFormation)
   const [positions, setPositions] = useState<Positions>({})
@@ -102,6 +108,8 @@ export default function MatchCentreWorkflow() {
   const [away, setAway] = useState(0)
   const [finished, setFinished] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  const [saveRetry, setSaveRetry] = useState(0)
 
   const config = getTeamFormat(format)
   const required = config.playersOnPitch
@@ -119,18 +127,23 @@ export default function MatchCentreWorkflow() {
     .sort((a, b) => (minutes[b] ?? 0) - (minutes[a] ?? 0))[0]
   const matchUnderway = period > 0 && !finished
   const lineupReady = starters.length === required
+  const selectionLocked = !loaded || period > 0 || finished
+  const startingBench = selected.filter(id => !starters.includes(id))
+  const startingProblem = lineupProblem(starters, selected, players.map(player => player.id), positions, layout.map(slot => slot.key))
+  const canKickoff = !selectionLocked && startingProblem === null
 
   useEffect(() => {
     try {
-      const savedFormat = loadTeamFormat()
-      const savedConfig = getTeamFormat(savedFormat)
       const raw = localStorage.getItem(key)
       const saved = raw ? JSON.parse(raw) : null
+      const savedFormat: TeamFormatId = saved?.format && saved.format in teamFormats ? saved.format : loadTeamFormat()
+      const savedConfig = getTeamFormat(savedFormat)
 
       setFormat(savedFormat)
-      setSelected(saved?.selected ?? players.map((player) => player.id))
+      const defaultSelection = scheduledMatch ? [] : players.map((player) => player.id)
+      setSelected(saved?.selected ?? defaultSelection)
 
-      const savedSelected: string[] = saved?.selected ?? players.map((player) => player.id)
+      const savedSelected: string[] = saved?.selected ?? defaultSelection
       const validStarters: string[] = (saved?.starters ?? []).filter((id: string) => savedSelected.includes(id))
       const fitted = [...validStarters]
       for (const id of savedSelected) {
@@ -156,18 +169,20 @@ export default function MatchCentreWorkflow() {
       const fallback = getTeamFormat("7v7")
       setFormat("7v7")
       setFormation(fallback.defaultFormation)
-      setStarters(players.slice(0, fallback.playersOnPitch).map((player) => player.id))
+      setSelected(scheduledMatch ? [] : players.map((player) => player.id))
+      setStarters(scheduledMatch ? [] : players.slice(0, fallback.playersOnPitch).map((player) => player.id))
     }
     setLoaded(true)
   }, [])
 
   useEffect(() => {
     if (!loaded) return
-    localStorage.setItem(
+    try { localStorage.setItem(
       key,
       JSON.stringify({ format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished }),
-    )
-  }, [loaded, format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished])
+    ); setSaveError(false) }
+    catch { setSaveError(true) }
+  }, [loaded, format, selected, starters, live, formation, positions, minutes, timeline, seconds, period, home, away, finished, saveRetry])
 
   useEffect(() => {
     if (!loaded) return
@@ -192,8 +207,8 @@ export default function MatchCentreWorkflow() {
     return () => clearInterval(timer)
   }, [running, finished, live])
 
-  function snapshot() {
-    setUndo({ home, away, live: [...live], positions: { ...positions }, timeline: [...timeline] })
+  function snapshot(quarterDraft?: string | null) {
+    setUndo({ formation, quarterDraft, home, away, live: [...live], positions: { ...positions }, timeline: [...timeline] })
   }
 
   function makeEvent(type: EventType, label: string, extra: Partial<TimelineEvent> = {}, forcedMinute = minute): TimelineEvent {
@@ -212,7 +227,7 @@ export default function MatchCentreWorkflow() {
   }
 
   function handleFormatChange(nextFormat: TeamFormatId) {
-    if (matchUnderway) return
+    if (selectionLocked) return
     const nextConfig = getTeamFormat(nextFormat)
     const fitted = starters.filter((id) => selected.includes(id))
     for (const id of selected) {
@@ -229,13 +244,23 @@ export default function MatchCentreWorkflow() {
   }
 
   function toggleSelected(id: string) {
+    if (selectionLocked) return
     const removing = selected.includes(id)
     setSelected((current) => (removing ? current.filter((item) => item !== id) : [...current, id]))
     if (removing) setStarters((current) => current.filter((item) => item !== id))
   }
 
+  function selectConfirmedPlayers() {
+    if (!scheduledMatch || !loaded || period > 0 || finished) return
+    if (!window.confirm("Replace this match's squad with players marked Available? Starters no longer selected will be removed. Review your match squad limit afterwards.")) return
+    const confirmed = players.filter(player => responseForMatch(scheduledMatch, player) === "available").map(player => player.id)
+    setSelected(confirmed)
+    setStarters(current => current.filter(id => confirmed.includes(id)))
+    setPositions(current => Object.fromEntries(Object.entries(current).filter(([id]) => confirmed.includes(id))))
+  }
+
   function toggleStarter(id: string) {
-    if (!selected.includes(id)) return
+    if (selectionLocked || !selected.includes(id)) return
     setStarters((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
@@ -260,10 +285,10 @@ export default function MatchCentreWorkflow() {
   }
 
   function kickoff() {
-    if (!lineupReady || matchUnderway) return
+    if (!canKickoff) return
     const kickoffEvent = makeEvent("period", `Kick off · ${format} · ${formation}`, {}, 0)
     setLive([...starters])
-    assign(starters)
+    setPositions(Object.fromEntries(starters.map(id => [id, positions[id]])))
     setPeriod(1)
     setFinished(false)
     setHome(0)
@@ -302,7 +327,22 @@ export default function MatchCentreWorkflow() {
   }
 
   function undoLast() {
-    if (!undo) return
+    if (!undo || finished) return
+    if (running) {
+      window.alert('Pause the match before undoing an action.')
+      return
+    }
+    if (undo.quarterDraft !== undefined) {
+      try {
+        const draftKey = `${key}:quarters-v1`
+        if (undo.quarterDraft === null) localStorage.removeItem(draftKey)
+        else localStorage.setItem(draftKey, undo.quarterDraft)
+      } catch {
+        window.alert('The quarter plan could not be restored on this device. No changes were undone. Please try again.')
+        return
+      }
+    }
+    setFormation(undo.formation)
     setHome(undo.home)
     setAway(undo.away)
     setLive(undo.live)
@@ -312,32 +352,35 @@ export default function MatchCentreWorkflow() {
   }
 
   function halfTime() {
+    setUndo(null)
     setRunning(false)
     setPeriod(2)
     event("period", "Half time")
   }
 
   function secondHalf() {
+    setUndo(null)
     setPeriod(2)
     setRunning(true)
     event("period", "Second half started")
   }
 
   function fullTime() {
+    if (finished || period === 0) return
+    if (!window.confirm(`Finish this match at ${home}-${away}? Check the score first. This stops the clock and opens the report.`)) return
     setRunning(false)
-    setFinished(true)
-    setPeriod(3)
     const fullTimeEvent = makeEvent("period", `FULL TIME · ${home}-${away}`)
     const finalTimeline = [fullTimeEvent, ...timeline]
-    setTimeline(finalTimeline)
     try {
       const old = JSON.parse(localStorage.getItem(historyKey) ?? "[]")
+      if (!Array.isArray(old)) throw new Error('Invalid saved history')
       localStorage.setItem(
         historyKey,
         JSON.stringify(
           [
             {
               id: Date.now(),
+              ...(scheduledMatch ? { eventId: scheduledMatch.id, teamId: scheduledMatch.teamId, title: scheduledMatch.title, startsAt: scheduledMatch.startsAt } : {}),
               date: new Date().toISOString(),
               format,
               home,
@@ -353,7 +396,14 @@ export default function MatchCentreWorkflow() {
           ].slice(0, 100),
         ),
       )
-    } catch {}
+    } catch {
+      window.alert('The match history could not be saved on this device. The match is paused, not finished. Keep this page open and try Full time again.')
+      return
+    }
+    setUndo(null)
+    setFinished(true)
+    setPeriod(3)
+    setTimeline(finalTimeline)
     setActive("Report")
   }
 
@@ -370,11 +420,16 @@ export default function MatchCentreWorkflow() {
         section="Match Centre"
         detail="One match workflow powered by the shared 5v5, 7v7, 9v9 and 11v11 team-format engine."
       />
+      {saveError && <section role="alert" style={{ padding: 16, border: '2px solid #fbbf24', borderRadius: 12, background: '#422006' }}>
+        <strong>Match changes are not saved on this device.</strong>
+        <p>Keep this page open. Closing or reloading could lose recent changes.</p>
+        <button style={action} onClick={() => setSaveRetry(value => value + 1)}>Retry saving</button>
+      </section>}
 
       <section style={hero}>
         <div>
           <small>{finished ? "FULL TIME" : period === 2 ? "SECOND HALF" : period === 1 ? "FIRST HALF" : "PRE-MATCH"}</small>
-          <h2 style={{ margin: "4px 0" }}>{running ? "LIVE" : finished ? "COMPLETE" : seconds ? "PAUSED" : "READY"}</h2>
+          <h2 style={{ margin: "4px 0" }}>{running ? "LIVE" : finished ? "COMPLETE" : period > 0 ? "PAUSED" : "READY"}</h2>
           <b>{clock}</b>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -400,15 +455,16 @@ export default function MatchCentreWorkflow() {
             </div>
             <strong>{required} on pitch</strong>
           </div>
-          <FormatPicker value={format} change={handleFormatChange} disabled={matchUnderway} />
+          <FormatPicker value={format} change={handleFormatChange} disabled={selectionLocked} />
           <div style={summaryStrip}>
             <span>{config.label}</span>
             <span>{formation}</span>
             <span>{starters.length}/{required} starters</span>
           </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
-          <button style={primary} disabled={!lineupReady || matchUnderway} onClick={kickoff}>
-            {matchUnderway ? "Match already in progress" : lineupReady ? `Kick off ${format}` : `Select ${required - starters.length} more starter${required - starters.length === 1 ? "" : "s"}`}
+          <FormationPicker formations={config.formations} value={formation} change={changeFormation} disabled={selectionLocked} />
+          {startingProblem && !selectionLocked && <p role="status" style={hint}>{startingProblem} Open Lineup to prepare your team.</p>}
+          <button style={primary} disabled={!canKickoff} onClick={kickoff}>
+            {finished ? "Match completed" : matchUnderway ? "Match already in progress" : `Kick off ${format}`}
           </button>
         </section>
       )}
@@ -417,15 +473,30 @@ export default function MatchCentreWorkflow() {
         <section style={panel}>
           <div style={sectionHead}>
             <h2 style={{ margin: 0 }}>Squad selection</h2>
-            <strong>{selected.length} available</strong>
+            <strong>{selected.length} selected</strong>
           </div>
+          {scheduledMatch && <div style={{ ...panel, marginBottom: 12 }}>
+            <strong>Schedule responses</strong>
+            <p style={hint}>{scheduledMatch.availabilityCapturedAt
+              ? `Snapshot from Schedule · ${new Date(scheduledMatch.availabilityCapturedAt).toLocaleString("en-GB")}`
+              : "No availability snapshot for this match yet."} Reopen this match from Schedule to bring across updated responses. Your saved lineup is kept.</p>
+            <p style={hint}>These are event responses, not automatic selection. Players generally marked Injured or Unavailable in Team are excluded from this list.</p>
+            <button type="button" style={action} disabled={!loaded || period > 0 || finished || !scheduledMatch.availabilityCapturedAt} onClick={selectConfirmedPlayers}>Use Available responses</button>
+            {(period > 0 || finished) && <p style={hint}>Squad changes are locked after kick-off. Use Live for substitutions.</p>}
+          </div>}
           {players.map((player) => (
             <button
               key={player.id}
+              type="button"
+              aria-pressed={selected.includes(player.id)}
+              disabled={selectionLocked}
               onClick={() => toggleSelected(player.id)}
               style={{ ...row, background: selected.includes(player.id) ? "rgba(37,99,235,.2)" : "rgba(2,6,23,.48)" }}
             >
               {selected.includes(player.id) ? "✓ SELECTED" : "+ ADD"} · {player.knownAs ?? player.name}
+              {scheduledMatch && <span style={{ display: "block", marginTop: 5, fontSize: 13 }}>
+                Response: {{ available: "Available", maybe: "Maybe", unavailable: "Unavailable", unanswered: "Awaiting response" }[responseForMatch(scheduledMatch, player)]}
+              </span>}
             </button>
           ))}
         </section>
@@ -440,41 +511,77 @@ export default function MatchCentreWorkflow() {
             </div>
             <strong>{starters.length}/{required}</strong>
           </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
+          <FormationPicker formations={config.formations} value={formation} change={changeFormation} disabled={selectionLocked} />
           <p style={hint}>Choose the starters, apply the formation, then tap two players on the pitch to swap their roles.</p>
+          <div style={summaryStrip}>
+            <span>{starters.length}/{required} starting</span>
+            <span>{startingBench.length} on bench</span>
+            <span>{selected.length} attending</span>
+          </div>
+          {selectionLocked && <p style={hint}>Starting selection is locked. Use Live to manage the team on the pitch.</p>}
           {players.filter((player) => selected.includes(player.id)).map((player) => (
             <button
               key={player.id}
+              type="button"
+              disabled={selectionLocked}
+              aria-pressed={starters.includes(player.id)}
               onClick={() => toggleStarter(player.id)}
               style={{ ...row, background: starters.includes(player.id) ? "rgba(16,185,129,.22)" : "rgba(2,6,23,.48)" }}
             >
               {starters.includes(player.id) ? "STARTING" : "BENCH"} · {player.knownAs ?? player.name}
+              <span style={{ display: "block", marginTop: 5, fontSize: 13, color: "#cbd5e1" }}>
+                Preferred: {player.primaryPosition}{player.secondaryPositions.length ? ` · Also: ${player.secondaryPositions.join(", ")}` : ""}
+              </span>
             </button>
           ))}
           {lineupReady && (
             <>
-              <button style={action} onClick={() => assign(starters)}>Apply {formation}</button>
-              <Pitch ids={starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />
+              <button style={action} disabled={selectionLocked} onClick={() => assign(starters)}>Apply {formation}</button>
+              {!selectionLocked && <Pitch ids={starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />}
             </>
           )}
-          <button style={primary} disabled={!lineupReady || matchUnderway} onClick={kickoff}>
-            {lineupReady ? "Save lineup & kick off" : `Need ${required} starters`}
+          <div style={{ ...panel, marginTop: 12 }}>
+            <strong>Starting bench · {startingBench.length}</strong>
+            <p style={hint}>{startingBench.length ? startingBench.map(id => playerName(players, id)).join(" · ") : "No substitutes selected."}</p>
+          </div>
+          {!selectionLocked && <p role="status" style={hint}>{startingProblem ?? "Positions checked. Kick-off will keep this exact lineup."}</p>}
+          <button style={primary} disabled={!canKickoff} onClick={kickoff}>
+            {finished ? "Match completed" : matchUnderway ? "Match in progress" : "Use this lineup & kick off"}
           </button>
         </section>
       )}
 
       {active === "Planner" && (
-        <section style={panel}>
-          <div style={sectionHead}>
-            <div>
-              <small style={eyebrow}>{format}</small>
-              <h2 style={{ margin: "3px 0 0" }}>{formation} tactical shape</h2>
-            </div>
-            <strong>{required} players</strong>
-          </div>
-          <FormationPicker formations={config.formations} value={formation} change={changeFormation} />
-          <Pitch ids={live.length === required ? live : starters} positions={positions} minutes={minutes} swap={swap} layout={layout} expected={required} />
-        </section>
+        <QuarterPlanner
+          key={key}
+          storageKey={key}
+          players={players.filter(player => selected.includes(player.id))}
+          slots={layout.map(slot => slot.key)}
+          layout={layout}
+          locked={selectionLocked}
+          running={running}
+          finished={finished}
+          onApply={(plan, quarter) => {
+            if (running || finished) return false
+            const ids = Object.values(plan.lineup)
+            const nextPositions = Object.fromEntries(Object.entries(plan.lineup).map(([slot, id]) => [id, slot]))
+            if (lineupProblem(ids, selected, players.map(player => player.id), nextPositions, layout.map(slot => slot.key))) return false
+            if (period === 0) setStarters(ids)
+            else {
+              let quarterDraft: string | null
+              try { quarterDraft = localStorage.getItem(`${key}:quarters-v1`) }
+              catch {
+                window.alert('Cannot read the saved quarter plan. No lineup changes were made. Please try again.')
+                return false
+              }
+              snapshot(quarterDraft)
+              setLive(ids)
+              event("period", `Quarter ${quarter} lineup applied`)
+            }
+            setPositions(nextPositions)
+            return true
+          }}
+        />
       )}
 
       {active === "Live" && (
@@ -499,7 +606,7 @@ export default function MatchCentreWorkflow() {
           changeFormation={changeFormation}
           swap={swap}
           undoLast={undoLast}
-          canUndo={!!undo}
+          canUndo={!!undo && !running && !finished}
           least={least}
           most={most}
           period={period}
@@ -548,11 +655,11 @@ function FormatPicker({ value, change, disabled }: { value: TeamFormatId; change
   )
 }
 
-function FormationPicker({ formations, value, change }: { formations: string[]; value: string; change: (formation: string) => void }) {
+function FormationPicker({ formations, value, change, disabled }: { formations: string[]; value: string; change: (formation: string) => void; disabled?: boolean }) {
   return (
     <div style={formationGrid}>
       {formations.map((formation) => (
-        <button key={formation} onClick={() => change(formation)} style={value === formation ? primary : action}>
+        <button key={formation} disabled={disabled} onClick={() => change(formation)} style={value === formation ? primary : action}>
           {formation}
         </button>
       ))}
